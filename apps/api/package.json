@@ -11,7 +11,8 @@
     "dependencies": {
         "@erp-360/shared": "workspace:*",
         "@fastify/cors": "^11.3.0",
-        "fastify": "^5.12.5"
+        "fastify": "^5.12.5",
+        "fastify-type-provider-zod": "^7.0.0"
     },
     "devDependencies": {
         "tsx": "^4.20.5"
