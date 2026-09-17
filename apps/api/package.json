@@ -9,7 +9,8 @@
     "build": "tsc",
     "format": "prettier --check .",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:setup": "wait-on tcp:localhost:5432 && pnpm db:migrate"
   },
   "dependencies": {
     "@erp-360/shared": "workspace:*",

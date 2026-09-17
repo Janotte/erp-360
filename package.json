@@ -8,6 +8,8 @@
     "packages/*"
   ],
   "scripts": {
+    "docker:up": "docker compose up -d",
+    "predev": "pnpm docker:up",
     "dev": "turbo dev",
     "build": "turbo build",
     "clean": "turbo clean",
@@ -32,8 +34,10 @@
     "@erp-360/eslint-config": "workspace:*",
     "@types/node": "^22.20.3",
     "eslint": "^10.10.0",
+    "npm-run-all": "^4.1.5",
     "prettier": "^3.9.7",
     "turbo": "^2.10.13",
-    "typescript": "~6.0.2"
+    "typescript": "~6.0.2",
+    "wait-on": "^9.1.0"
   }
 }
