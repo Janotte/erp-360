@@ -1,20 +1,21 @@
 {
-    "name": "@erp-360/api",
-    "version": "1.0.0",
-    "private": true,
-    "type": "module",
-    "main": "dist/index.js",
-    "scripts": {
-        "dev": "tsx watch src/index.ts",
-        "build": "tsc"
-    },
-    "dependencies": {
-        "@erp-360/shared": "workspace:*",
-        "@fastify/cors": "^11.3.0",
-        "fastify": "^5.12.5",
-        "fastify-type-provider-zod": "^7.0.0"
-    },
-    "devDependencies": {
-        "tsx": "^4.20.5"
-    }
+  "name": "@erp-360/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "format": "prettier --check ."
+  },
+  "dependencies": {
+    "@erp-360/shared": "workspace:*",
+    "@fastify/cors": "^11.3.0",
+    "fastify": "^5.12.5",
+    "fastify-type-provider-zod": "^7.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.5"
+  }
 }

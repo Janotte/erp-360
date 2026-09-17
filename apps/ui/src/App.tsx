@@ -24,7 +24,11 @@ function App() {
   const queryClient = useQueryClient();
 
   // 1. Hook para buscar dados (GET) com cache inteligente
-  const { data: usuario, isLoading, error } = useQuery<User>({
+  const {
+    data: usuario,
+    isLoading,
+    error,
+  } = useQuery<User>({
     queryKey: ['usuarioAtual'],
     queryFn: fetchUsuario,
   });
@@ -40,9 +44,9 @@ function App() {
 
   const lidarComClique = () => {
     const dadosFake: User = {
-      id: "ea9b60ee-6c30-4e67-bb78-3db8ccda3da3", // UUID válido exigido pelo Zod
-      name: "Carlos Alberto",
-      email: "carlos@tanstack.com",
+      id: 'ea9b60ee-6c30-4e67-bb78-3db8ccda3da3', // UUID válido exigido pelo Zod
+      name: 'Carlos Alberto',
+      email: 'carlos@tanstack.com',
     };
     mutation.mutate(dadosFake);
   };
@@ -53,11 +57,8 @@ function App() {
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
       <h1>Frontend + TanStack Query + Fastify Monorepo</h1>
-      
-      <button 
-        onClick={lidarComClique} 
-        disabled={mutation.isPending}
-      >
+
+      <button onClick={lidarComClique} disabled={mutation.isPending}>
         {mutation.isPending ? 'Enviando...' : 'Atualizar Usuário (POST)'}
       </button>
 
@@ -66,11 +67,24 @@ function App() {
       )}
 
       {usuario && (
-        <div style={{ marginTop: '20px', border: '1px solid #00dfa2', padding: '15px', borderRadius: '8px' }}>
+        <div
+          style={{
+            marginTop: '20px',
+            border: '1px solid #00dfa2',
+            padding: '15px',
+            borderRadius: '8px',
+          }}
+        >
           <h3>Dados do Usuário (Estado Sincronizado):</h3>
-          <p><strong>ID:</strong> {usuario.id}</p>
-          <p><strong>Nome:</strong> {usuario.name}</p>
-          <p><strong>Email:</strong> {usuario.email}</p>
+          <p>
+            <strong>ID:</strong> {usuario.id}
+          </p>
+          <p>
+            <strong>Nome:</strong> {usuario.name}
+          </p>
+          <p>
+            <strong>Email:</strong> {usuario.email}
+          </p>
         </div>
       )}
     </div>

@@ -11,7 +11,8 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "clean": "turbo clean",
-    "lint": "turbo lint"
+    "lint": "turbo lint",
+    "format:fix": "prettier --write ."
   },
   "keywords": [],
   "author": "",
@@ -29,6 +30,7 @@
     "@erp-360/eslint-config": "workspace:*",
     "@types/node": "^22.20.3",
     "eslint": "^10.10.0",
+    "prettier": "^3.9.7",
     "turbo": "^2.10.13",
     "typescript": "~6.0.2"
   }
