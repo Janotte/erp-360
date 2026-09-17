@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { User } from '@erp-360/shared';
 import { API_URL } from '@erp-360/shared';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Função para buscar o usuário (GET)
 const fetchUsuario = async (): Promise<User> => {

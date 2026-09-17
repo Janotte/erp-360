@@ -12,6 +12,8 @@
     "build": "turbo build",
     "clean": "turbo clean",
     "lint": "turbo lint",
+    "lint:fix": "turbo lint -- --fix",
+    "format": "turbo format",
     "format:fix": "prettier --write ."
   },
   "keywords": [],
