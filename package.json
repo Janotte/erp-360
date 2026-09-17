@@ -1,0 +1,32 @@
+{
+  "name": "erp-360",
+  "version": "1.0.0",
+  "description": "Sistema ERP 360",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "clean": "turbo clean"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.4.2",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.4.2",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "turbo": "^2.10.13",
+    "typescript": "^7.0.2"
+  }
+}
