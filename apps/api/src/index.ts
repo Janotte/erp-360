@@ -1,43 +1,51 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
-import { UserSchema, API_URL } from '@erp-360/shared';
+import { UserSchema, type User, API_URL } from '@erp-360/shared';
 
-// Inicializa o Fastify com logs ativados no ambiente de desenvolvimento
 const fastify = Fastify({
   logger: true
 }).withTypeProvider<ZodTypeProvider>();
 
-// Configura os compiladores de validação e serialização do Zod
 fastify.setValidatorCompiler(validatorCompiler);
 fastify.setSerializerCompiler(serializerCompiler);
 
-// Registra o plugin de CORS
 fastify.register(cors, {
   origin: '*' // Em produção, mude para a URL do seu Frontend
 });
 
-// Rota POST validando o corpo (Body) da requisição com o Schema Compartilhado
-fastify.post('/user', {
-  schema: {
-    body: UserSchema, // Valida o input que vem do Frontend
-    response: {
-      201: UserSchema // Garante que a resposta da API também segue o Schema
-    }
-  }
-}, async (request, reply) => {
-  // Aqui dentro, o TS já sabe perfeitamente que request.body é do tipo User!
-  const { id, name, email } = request.body;
+// Estado em memória para o exemplo (POST atualiza, GET lê)
+let usuarioAtual: User = {
+  id: 'ea9b60ee-6c30-4e67-bb78-3db8ccda3da3',
+  name: 'Usuário Inicial',
+  email: 'inicial@erp360.com',
+};
 
-  // Lógica de banco/negócio fictícia...
-  return reply.status(201).send({ id, name, email });
+fastify.get('/user', {
+  schema: {
+    response: {
+      200: UserSchema,
+    },
+  },
+}, async () => {
+  return usuarioAtual;
 });
 
+fastify.post('/user', {
+  schema: {
+    body: UserSchema,
+    response: {
+      201: UserSchema,
+    },
+  },
+}, async (request, reply) => {
+  const { id, name, email } = request.body;
+  usuarioAtual = { id, name, email };
+  return reply.status(201).send(usuarioAtual);
+});
 
-// Inicia o servidor
 const start = async () => {
   try {
-    // O Fastify escuta na porta 3000
     await fastify.listen({ port: 3000, host: '0.0.0.0' });
     console.log(`🚀 Servidor Fastify + Zod pronto em ${API_URL}`);
   } catch (err) {

@@ -112,5 +112,4 @@ function App() {
 export default App;
 
 Se você tentar enviar um id que não seja um UUID, ou um name com menos de 3 caracteres, o próprio Fastify vai rejeitar a requisição automaticamente com um erro 400 Bad Request detalhando o que falhou no Zod, protegendo sua API sem que você precise digitar um único if.
-Agora que a arquitetura ponta a ponta com Zod está de pé, o que prefere fazer a seguir? Podemos configurar uma ferramenta de requisições HTTP mais moderna como o TanStack Query (React Query) no frontend para gerenciar os estados da API, ou criar um pacote de configuração centralizada de TypeScript/ESLint para os apps não repetirem código de configuração?
 

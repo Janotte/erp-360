@@ -193,5 +193,3 @@ O Turbo vai identificar o script dev dentro de apps/ui e apps/api, iniciando os 
 Para buildar todos os projetos respeitando a ordem de dependências:
 
 pnpm build
-
-Deseja que eu te mostre como configurar o eslint e o prettier centralizados na raiz do monorepo, ou quer passar para a parte de comunicação HTTP entre a UI (usando Axios/Fetch) e a API?
