@@ -7,15 +7,21 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "format": "prettier --check ."
+    "format": "prettier --check .",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
     "@erp-360/shared": "workspace:*",
     "@fastify/cors": "^11.3.0",
+    "drizzle-orm": "^0.45.2",
     "fastify": "^5.12.5",
-    "fastify-type-provider-zod": "^7.0.0"
+    "fastify-type-provider-zod": "^7.0.0",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.20.5"
   }
 }
