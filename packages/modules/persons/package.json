@@ -1,0 +1,14 @@
+{
+  "name": "@erp-360/mod-persons",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@erp-360/mod-core": "workspace:*",
+    "@erp-360/shared": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "zod": "^4.6.5"
+  }
+}
