@@ -1,94 +1,111 @@
-import type { User } from '@erp-360/shared';
 import { API_URL } from '@erp-360/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 
-// Função para buscar o usuário (GET)
-const fetchUsuario = async (): Promise<User> => {
-  const response = await fetch(`${API_URL}/user`);
-  if (!response.ok) throw new Error('Erro ao buscar usuário');
-  return response.json();
-};
+import { Login } from './components/Login';
+import { apiFetch } from './services/apiClient';
+import { authStorage } from './utils/auth';
 
-// Função para criar o usuário (POST)
-const criarUsuarioAPI = async (novoUsuario: User): Promise<User> => {
-  const response = await fetch(`${API_URL}/user`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(novoUsuario),
-  });
-  if (!response.ok) throw new Error('Erro ao criar usuário');
+// PASSO 1: A função de busca (fetch) que utiliza o trecho do token
+const fetchPersons = async () => {
+  const response = await apiFetch(`${API_URL}/persons`);
+
+  if (!response.ok) {
+    throw new Error('Erro ao carregar as pessoas.');
+  }
+
   return response.json();
 };
 
 function App() {
-  const queryClient = useQueryClient();
+  const [logado, setLogado] = useState(authStorage.isAuthenticated());
 
-  // 1. Hook para buscar dados (GET) com cache inteligente
-  const {
-    data: usuario,
-    isLoading,
-    error,
-  } = useQuery<User>({
-    queryKey: ['usuarioAtual'],
-    queryFn: fetchUsuario,
-  });
-
-  // 2. Hook para enviar dados (POST) e invalidar o cache antigo
-  const mutation = useMutation({
-    mutationFn: criarUsuarioAPI,
-    onSuccess: () => {
-      // Força o TanStack Query a buscar os dados novamente para atualizar a tela
-      queryClient.invalidateQueries({ queryKey: ['usuarioAtual'] });
-    },
-  });
-
-  const lidarComClique = () => {
-    const dadosFake: User = {
-      id: 'ea9b60ee-6c30-4e67-bb78-3db8ccda3da3', // UUID válido exigido pelo Zod
-      name: 'Carlos Alberto',
-      email: 'carlos@tanstack.com',
-    };
-    mutation.mutate(dadosFake);
+  const lidarComLogout = () => {
+    authStorage.removeToken();
+    setLogado(false);
   };
 
-  if (isLoading) return <div>Carregando usuário...</div>;
-  if (error) return <div>Ocorreu um erro: {error.message}</div>;
+  // PASSO 2: O TanStack Query orquestra a função assíncrona acima
+  const {
+    data: persons,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['persons'],
+    queryFn: fetchPersons,
+    enabled: logado, // Só executa a requisição se o usuário estiver de fato logado
+  });
+
+  if (!logado) {
+    return <Login onLoginSuccess={() => setLogado(true)} />;
+  }
 
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <h1>Frontend + TanStack Query + Fastify Monorepo</h1>
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderBottom: '1px solid #eee',
+          paddingBottom: '10px',
+        }}
+      >
+        <h2>Painel Multi-Tenant do Sistema</h2>
+        <button onClick={lidarComLogout} style={styles.logoutBtn}>
+          Sair do Sistema
+        </button>
+      </header>
 
-      <button onClick={lidarComClique} disabled={mutation.isPending}>
-        {mutation.isPending ? 'Enviando...' : 'Atualizar Usuário (POST)'}
-      </button>
+      <main style={{ marginTop: '20px' }}>
+        <h3>Módulo: Pessoas</h3>
 
-      {mutation.isError && (
-        <p style={{ color: 'red' }}>Falha ao criar: {mutation.error.message}</p>
-      )}
+        {isLoading && <p>Carregando dados financeiros da sua empresa...</p>}
+        {error && <p style={{ color: 'red' }}>Erro: {error.message}</p>}
 
-      {usuario && (
-        <div
-          style={{
-            marginTop: '20px',
-            border: '1px solid #00dfa2',
-            padding: '15px',
-            borderRadius: '8px',
-          }}
-        >
-          <h3>Dados do Usuário (Estado Sincronizado):</h3>
-          <p>
-            <strong>ID:</strong> {usuario.id}
-          </p>
-          <p>
-            <strong>Nome:</strong> {usuario.name}
-          </p>
-          <p>
-            <strong>Email:</strong> {usuario.email}
-          </p>
-        </div>
-      )}
+        {/* Listagem das pessoas vindas do banco filtradas pelo Tenant logado */}
+        {persons && (
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            {persons.map((person: any) => (
+              <li key={person.id} style={styles.itemPerson}>
+                <strong>{person.name}</strong> - {person.document}
+                <span style={styles.badge}>{person.status}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </main>
     </div>
   );
 }
+
+const styles = {
+  logoutBtn: {
+    padding: '8px 16px',
+    backgroundColor: '#ef4444',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+  },
+  itemPerson: {
+    padding: '12px',
+    border: '1px solid #e5e7eb',
+    borderRadius: '6px',
+    marginBottom: '8px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f9fafb',
+  },
+  badge: {
+    backgroundColor: '#fef3c7',
+    color: '#d97706',
+    padding: '4px 8px',
+    borderRadius: '12px',
+    fontSize: '12px',
+    fontWeight: 'bold',
+  },
+};
 
 export default App;
