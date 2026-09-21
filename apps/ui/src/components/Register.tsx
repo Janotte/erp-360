@@ -1,46 +1,62 @@
 import { useMutation } from '@tanstack/react-query';
 import React, { useState } from 'react';
 
-import { enviarLoginAPI } from '../services/auth';
-import { authStorage } from '../utils/auth';
+import { enviarRegistroAPI } from '../services/auth';
 
-interface LoginProps {
-  onLoginSuccess: () => void;
-  onGoToRegister: () => void;
-  successMessage?: string;
+interface RegisterProps {
+  onRegisterSuccess: () => void;
+  onGoToLogin: () => void;
 }
 
-export function Login({ onLoginSuccess, onGoToRegister, successMessage }: LoginProps) {
+export function Register({ onRegisterSuccess, onGoToLogin }: RegisterProps) {
+  const [nomeEmpresa, setNomeEmpresa] = useState('');
+  const [nomeUsuario, setNomeUsuario] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [senha, setSenha] = useState('');
 
-  // Mutation do TanStack Query para gerenciar o estado assíncrono do login
   const { mutate, isPending, error } = useMutation({
-    mutationFn: enviarLoginAPI,
-    onSuccess: (data) => {
-      // 1. Salva o JWT com segurança no armazenamento local
-      authStorage.setToken(data.token);
-      // 2. Notifica o componente pai que o usuário está logado
-      onLoginSuccess();
+    mutationFn: enviarRegistroAPI,
+    onSuccess: () => {
+      onRegisterSuccess();
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) return;
-
-    // Dispara a requisição. Dica: passe a senha direto, a API fará o hash/verificação
-    mutate({ email, password });
+    if (!nomeEmpresa || !nomeUsuario || !email || !senha) return;
+    mutate({ nomeEmpresa, nomeUsuario, email, senha });
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h2 style={styles.title}>Acessar o Sistema</h2>
-        <p style={styles.subtitle}>Insira suas credenciais multi-tenant</p>
+        <h2 style={styles.title}>Criar Conta</h2>
+        <p style={styles.subtitle}>Registre sua empresa e o usuário administrador</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
-          {successMessage && <div style={styles.successBox}>{successMessage}</div>}
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Nome da empresa</label>
+            <input
+              type="text"
+              value={nomeEmpresa}
+              onChange={(e) => setNomeEmpresa(e.target.value)}
+              style={styles.input}
+              placeholder="Minha Empresa Ltda"
+              required
+            />
+          </div>
+
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Seu nome</label>
+            <input
+              type="text"
+              value={nomeUsuario}
+              onChange={(e) => setNomeUsuario(e.target.value)}
+              style={styles.input}
+              placeholder="João Silva"
+              required
+            />
+          </div>
 
           <div style={styles.inputGroup}>
             <label style={styles.label}>E-mail</label>
@@ -58,10 +74,11 @@ export function Login({ onLoginSuccess, onGoToRegister, successMessage }: LoginP
             <label style={styles.label}>Senha</label>
             <input
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
               style={styles.input}
               placeholder="••••••••"
+              minLength={6}
               required
             />
           </div>
@@ -76,14 +93,14 @@ export function Login({ onLoginSuccess, onGoToRegister, successMessage }: LoginP
               backgroundColor: isPending ? '#ccc' : '#00dfa2',
             }}
           >
-            {isPending ? 'Autenticando...' : 'Entrar'}
+            {isPending ? 'Criando conta...' : 'Registrar'}
           </button>
         </form>
 
         <p style={styles.footer}>
-          Não tem conta?{' '}
-          <button type="button" onClick={onGoToRegister} style={styles.link}>
-            Criar conta
+          Já tem conta?{' '}
+          <button type="button" onClick={onGoToLogin} style={styles.link}>
+            Entrar
           </button>
         </p>
       </div>
@@ -91,7 +108,6 @@ export function Login({ onLoginSuccess, onGoToRegister, successMessage }: LoginP
   );
 }
 
-// Estilos CSS-in-JS básicos e limpos para visualização rápida
 const styles = {
   container: {
     display: 'flex',
@@ -134,13 +150,6 @@ const styles = {
     borderRadius: '4px',
     backgroundColor: '#fee2e2',
     color: '#b91c1c',
-    fontSize: '14px',
-  },
-  successBox: {
-    padding: '10px',
-    borderRadius: '4px',
-    backgroundColor: '#d1fae5',
-    color: '#047857',
     fontSize: '14px',
   },
   button: {

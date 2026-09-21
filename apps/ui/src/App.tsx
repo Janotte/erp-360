@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { Login } from './components/Login';
+import { Register } from './components/Register';
 import { apiFetch } from './services/apiClient';
 import { authStorage } from './utils/auth';
 
@@ -17,12 +18,20 @@ const fetchPersons = async () => {
   return response.json();
 };
 
+type AuthView = 'login' | 'register';
+
 function App() {
   const [logado, setLogado] = useState(authStorage.isAuthenticated());
+  const [authView, setAuthView] = useState<AuthView>('login');
+  const [registerSuccessMessage, setRegisterSuccessMessage] = useState<
+    string | undefined
+  >();
 
   const lidarComLogout = () => {
     authStorage.removeToken();
     setLogado(false);
+    setAuthView('login');
+    setRegisterSuccessMessage(undefined);
   };
 
   // PASSO 2: O TanStack Query orquestra a função assíncrona acima
@@ -37,7 +46,31 @@ function App() {
   });
 
   if (!logado) {
-    return <Login onLoginSuccess={() => setLogado(true)} />;
+    if (authView === 'register') {
+      return (
+        <Register
+          onGoToLogin={() => {
+            setAuthView('login');
+            setRegisterSuccessMessage(undefined);
+          }}
+          onRegisterSuccess={() => {
+            setRegisterSuccessMessage('Conta criada. Faça login.');
+            setAuthView('login');
+          }}
+        />
+      );
+    }
+
+    return (
+      <Login
+        onLoginSuccess={() => setLogado(true)}
+        onGoToRegister={() => {
+          setAuthView('register');
+          setRegisterSuccessMessage(undefined);
+        }}
+        successMessage={registerSuccessMessage}
+      />
+    );
   }
 
   return (

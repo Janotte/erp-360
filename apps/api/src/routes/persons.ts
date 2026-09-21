@@ -3,8 +3,8 @@ import { PersonSchema } from '@erp-360/shared';
 import { and, desc, eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { db } from '../db/index.ts';
-import '../types/fastify.ts';
+import { db } from '../db/index.js';
+import '../types/fastify.js';
 
 const personResponse = PersonSchema;
 
