@@ -10,6 +10,13 @@ export interface LoginResponse {
   };
 }
 
+export interface RegistrarInput {
+  nomeEmpresa: string;
+  nomeUsuario: string;
+  email: string;
+  senha: string;
+}
+
 export const enviarLoginAPI = async (dados: {
   email: string;
   password: string;
@@ -22,24 +29,15 @@ export const enviarLoginAPI = async (dados: {
 
   if (!response.ok) {
     const erro = await response.json().catch(() => ({}));
-    throw new Error(erro.message || 'Falha ao autenticar. Verifique suas credenciais.');
+    throw new Error(erro.message || 'Falha ao autenticar.');
   }
 
   return response.json();
 };
 
-export interface RegisterResponse {
-  sucesso: boolean;
-  usuarioId: string;
-  tenantId: string;
-}
-
-export const enviarRegistroAPI = async (dados: {
-  nomeEmpresa: string;
-  nomeUsuario: string;
-  email: string;
-  senha: string;
-}): Promise<RegisterResponse> => {
+export const enviarRegistrarAPI = async (
+  dados: RegistrarInput,
+): Promise<{ sucesso: boolean }> => {
   const response = await fetch(`${API_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -48,7 +46,7 @@ export const enviarRegistroAPI = async (dados: {
 
   if (!response.ok) {
     const erro = await response.json().catch(() => ({}));
-    throw new Error(erro.message || 'Falha ao registrar. Tente novamente.');
+    throw new Error(erro.message || 'Falha ao registrar empresa.');
   }
 
   return response.json();
