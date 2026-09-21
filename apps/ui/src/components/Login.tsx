@@ -1,6 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
 import React, { useState } from 'react';
 
+import { Button } from '@/components/ui/button';
+
 import { enviarLoginAPI } from '../services/auth';
 import { authStorage } from '../utils/auth';
 
@@ -68,23 +70,21 @@ export function Login({ onLoginSuccess, onGoToRegister, successMessage }: LoginP
 
           {error && <div style={styles.errorBox}>{error.message}</div>}
 
-          <button
-            type="submit"
-            disabled={isPending}
-            style={{
-              ...styles.button,
-              backgroundColor: isPending ? '#ccc' : '#00dfa2',
-            }}
-          >
+          <Button type="submit" disabled={isPending} className="w-full">
             {isPending ? 'Autenticando...' : 'Entrar'}
-          </button>
+          </Button>
         </form>
 
         <p style={styles.footer}>
           Não tem conta?{' '}
-          <button type="button" onClick={onGoToRegister} style={styles.link}>
+          <Button
+            type="button"
+            variant="link"
+            onClick={onGoToRegister}
+            className="h-auto p-0"
+          >
             Criar conta
-          </button>
+          </Button>
         </p>
       </div>
     </div>
@@ -143,29 +143,10 @@ const styles = {
     color: '#047857',
     fontSize: '14px',
   },
-  button: {
-    padding: '12px',
-    border: 'none',
-    borderRadius: '4px',
-    color: '#fff',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-  },
   footer: {
     margin: '20px 0 0 0',
     textAlign: 'center' as const,
     fontSize: '14px',
     color: '#6b7280',
-  },
-  link: {
-    background: 'none',
-    border: 'none',
-    color: '#00dfa2',
-    fontWeight: '600',
-    cursor: 'pointer',
-    padding: 0,
-    fontSize: '14px',
   },
 };

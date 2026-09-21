@@ -1,6 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
 import React, { useState } from 'react';
 
+import { Button } from '@/components/ui/button';
+
 import { enviarRegistroAPI } from '../services/auth';
 
 interface RegisterProps {
@@ -85,23 +87,21 @@ export function Register({ onRegisterSuccess, onGoToLogin }: RegisterProps) {
 
           {error && <div style={styles.errorBox}>{error.message}</div>}
 
-          <button
-            type="submit"
-            disabled={isPending}
-            style={{
-              ...styles.button,
-              backgroundColor: isPending ? '#ccc' : '#00dfa2',
-            }}
-          >
+          <Button type="submit" disabled={isPending} className="w-full">
             {isPending ? 'Criando conta...' : 'Registrar'}
-          </button>
+          </Button>
         </form>
 
         <p style={styles.footer}>
           Já tem conta?{' '}
-          <button type="button" onClick={onGoToLogin} style={styles.link}>
+          <Button
+            type="button"
+            variant="link"
+            onClick={onGoToLogin}
+            className="h-auto p-0"
+          >
             Entrar
-          </button>
+          </Button>
         </p>
       </div>
     </div>
@@ -152,29 +152,10 @@ const styles = {
     color: '#b91c1c',
     fontSize: '14px',
   },
-  button: {
-    padding: '12px',
-    border: 'none',
-    borderRadius: '4px',
-    color: '#fff',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-  },
   footer: {
     margin: '20px 0 0 0',
     textAlign: 'center' as const,
     fontSize: '14px',
     color: '#6b7280',
-  },
-  link: {
-    background: 'none',
-    border: 'none',
-    color: '#00dfa2',
-    fontWeight: '600',
-    cursor: 'pointer',
-    padding: 0,
-    fontSize: '14px',
   },
 };
