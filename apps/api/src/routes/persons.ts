@@ -116,4 +116,30 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
       return person;
     },
   );
+
+  fastify.delete(
+    '/:id',
+    {
+      schema: {
+        params: z.object({
+          id: z.string().uuid({ message: 'ID precisa ser um UUID válido' }),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { tenantId } = request.user;
+      const { id } = request.params as { id: string };
+
+      const [person] = await db
+        .delete(persons)
+        .where(and(eq(persons.id, id), eq(persons.tenantId, tenantId)))
+        .returning();
+
+      if (!person) {
+        return reply.status(404).send({ message: 'Pessoa não encontrada' });
+      }
+
+      return { success: true };
+    },
+  );
 };

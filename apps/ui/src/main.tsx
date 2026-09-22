@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
+import { Toaster } from '@/components/ui/sonner';
+
 import App from './App.tsx';
 
 // Cria uma instância do cliente de query
@@ -20,6 +22,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <App />
+      <Toaster position="top-right" richColors />{' '}
+      {/* 🆕 Ativa notificações coloridas no topo direito */}
     </QueryClientProvider>
   </React.StrictMode>,
 );

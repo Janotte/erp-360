@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -8,10 +9,10 @@ import { Label } from '@/components/ui/label';
 
 import { type Person, personsService } from '../../services/persons';
 interface FormPersonProps {
-  pessoaParaEditar?: Person | null;
+  personToUpdate?: Person | null;
   onSuccess: () => void;
 }
-export function FormPerson({ pessoaParaEditar, onSuccess }: FormPersonProps) {
+export function FormPerson({ personToUpdate, onSuccess }: FormPersonProps) {
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [document, setDocument] = useState('');
@@ -22,26 +23,34 @@ export function FormPerson({ pessoaParaEditar, onSuccess }: FormPersonProps) {
   const [isEmployee, setIsEmployee] = useState(false);
 
   useEffect(() => {
-    if (pessoaParaEditar) {
-      setName(pessoaParaEditar.name);
-      setDocument(pessoaParaEditar.document || '');
-      setEmail(pessoaParaEditar.email || '');
-      setPhone(pessoaParaEditar.phone || '');
-      setIsClient(pessoaParaEditar.isClient);
-      setIsSupplier(pessoaParaEditar.isSupplier);
-      setIsEmployee(pessoaParaEditar.isEmployee);
+    if (personToUpdate) {
+      setName(personToUpdate.name);
+      setDocument(personToUpdate.document || '');
+      setEmail(personToUpdate.email || '');
+      setPhone(personToUpdate.phone || '');
+      setIsClient(personToUpdate.isClient);
+      setIsSupplier(personToUpdate.isSupplier);
+      setIsEmployee(personToUpdate.isEmployee);
     }
-  }, [pessoaParaEditar]);
+  }, [personToUpdate]);
 
   const mutation = useMutation({
     mutationFn: (dados: Omit<Person, 'id'>) => {
-      return pessoaParaEditar
-        ? personsService.update(pessoaParaEditar.id, dados)
+      return personToUpdate
+        ? personsService.update(personToUpdate.id, dados)
         : personsService.create(dados);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['listaPersons'] });
+      toast.success(
+        personToUpdate
+          ? 'Pessoa atualizada com sucesso!'
+          : 'Pessoa cadastrada com sucesso!',
+      );
       onSuccess();
+    },
+    onError: (error) => {
+      toast.error(`Falha ao salvar: ${error.message || 'Erro inesperado'}`);
     },
   });
 

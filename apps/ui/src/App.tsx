@@ -4,57 +4,74 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
 import { AppSidebar } from './components/AppSidebar';
 import { Login } from './components/Auth/Login';
-import { Registro } from './components/Auth/Register';
+import { Register } from './components/Auth/Register';
 import { Dashboard } from './components/Dashboard';
 import { Navbar } from './components/Navbar';
 import { ListPersons } from './components/Persons/ListPersons';
 import { authStorage } from './utils/auth';
 
-type TelaAtiva = 'login' | 'registro' | 'app';
+function pathAtual() {
+  return window.location.pathname.replace(/\/$/, '') || '/';
+}
 
-function hashAtual() {
-  return window.location.hash || '#dashboard';
+function rotaInicial() {
+  const autenticado = authStorage.isAuthenticated();
+  const hash = window.location.hash;
+  const path = pathAtual();
+
+  if (!autenticado) {
+    if (path === '/register' || hash === '#register') return '/register';
+    return '/login';
+  }
+
+  if (hash === '#persons') return '/persons';
+  if (hash === '#pagar') return '/pagar';
+  if (hash === '#receber') return '/receber';
+  if (hash === '#configuracoes') return '/configuracoes';
+  if (hash === '#dashboard') return '/dashboard';
+  if (path === '/persons') return '/persons';
+  if (path === '/pagar') return '/pagar';
+  if (path === '/receber') return '/receber';
+  if (path === '/configuracoes') return '/configuracoes';
+  return '/dashboard';
 }
 
 function App() {
-  const [tela, setTela] = useState<TelaAtiva>(
-    authStorage.isAuthenticated() ? 'app' : 'login',
-  );
-  const [hash, setHash] = useState(hashAtual);
+  const [path, setPath] = useState(rotaInicial);
 
-  useEffect(() => {
-    const sincronizarHash = () => setHash(hashAtual());
-    window.addEventListener('hashchange', sincronizarHash);
-    return () => window.removeEventListener('hashchange', sincronizarHash);
-  }, []);
-
-  useEffect(() => {
-    if (tela === 'app' && !window.location.hash) {
-      window.location.hash = '#dashboard';
+  const irPara = (destino: string) => {
+    if (pathAtual() !== destino || window.location.hash) {
+      window.history.pushState({}, '', destino);
     }
-  }, [tela]);
+    setPath(destino);
+  };
+
+  useEffect(() => {
+    if (pathAtual() !== path || window.location.hash) {
+      window.history.replaceState({}, '', path);
+    }
+  }, [path]);
+
+  useEffect(() => {
+    const sincronizar = () => setPath(rotaInicial());
+    window.addEventListener('popstate', sincronizar);
+    return () => window.removeEventListener('popstate', sincronizar);
+  }, []);
 
   const handleLogout = () => {
     authStorage.removeToken();
-    window.location.hash = '';
-    setTela('login');
+    irPara('/login');
   };
 
-  const goToApp = () => {
-    window.location.hash = '#dashboard';
-    setHash('#dashboard');
-    setTela('app');
-  };
+  if (!authStorage.isAuthenticated()) {
+    if (path === '/register') {
+      return <Register onRegisterSuccess={() => irPara('/login')} />;
+    }
 
-  if (tela === 'registro') {
-    return <Registro onRegistroSuccess={() => setTela('login')} />;
-  }
-
-  if (tela === 'login') {
     return (
       <Login
-        onLoginSuccess={goToApp}
-        onAlternarParaRegistro={() => setTela('registro')}
+        onLoginSuccess={() => irPara('/dashboard')}
+        onAlternarParaRegistro={() => irPara('/register')}
       />
     );
   }
@@ -62,11 +79,11 @@ function App() {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-zinc-50 text-zinc-900 font-sans">
-        <AppSidebar hashAtivo={hash} />
+        <AppSidebar pathAtivo={path} onNavigate={irPara} />
 
         <SidebarInset className="flex flex-col flex-1 w-full overflow-x-hidden">
           <Navbar onLogout={handleLogout} />
-          {hash === '#persons' ? (
+          {path === '/persons' ? (
             <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
               <ListPersons />
             </main>

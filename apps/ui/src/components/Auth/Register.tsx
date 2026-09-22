@@ -15,11 +15,11 @@ import { Label } from '@/components/ui/label';
 
 import { enviarRegistrarAPI } from '../../services/auth';
 
-interface RegistroProps {
-  onRegistroSuccess: () => void;
+interface RegisterProps {
+  onRegisterSuccess: () => void;
 }
 
-export function Registro({ onRegistroSuccess }: RegistroProps) {
+export function Register({ onRegisterSuccess }: RegisterProps) {
   const [nomeEmpresa, setNomeEmpresa] = useState('');
   const [nomeUsuario, setNomeUsuario] = useState('');
   const [email, setEmail] = useState('');
@@ -29,7 +29,7 @@ export function Registro({ onRegistroSuccess }: RegistroProps) {
     mutationFn: enviarRegistrarAPI,
     onSuccess: () => {
       setTimeout(() => {
-        onRegistroSuccess();
+        onRegisterSuccess();
       }, 2000);
     },
   });
@@ -101,19 +101,19 @@ export function Registro({ onRegistroSuccess }: RegistroProps) {
             )}
             {isSuccess && (
               <p className="text-sm font-medium text-emerald-600 bg-emerald-50 p-3 rounded-md">
-                Empresa registrada com sucesso! Redirecionando...
+                Empresa cadastrada com sucesso! Redirecionando...
               </p>
             )}
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <Button type="submit" className="w-full" disabled={isPending || isSuccess}>
-              {isPending ? 'Criando Ambiente...' : 'Registrar Empresa'}
+              {isPending ? 'Criando Ambiente...' : 'Cadastrar Empresa'}
             </Button>
             <div className="text-sm text-center text-zinc-500">
               Já possui cadastro?{' '}
               <button
                 type="button"
-                onClick={onRegistroSuccess}
+                onClick={onRegisterSuccess}
                 className="font-medium text-primary hover:underline cursor-pointer"
               >
                 Voltar para o Login

@@ -13,18 +13,19 @@ import {
 } from '@/components/ui/sidebar';
 
 const itensMenu = [
-  { title: 'Dashboard', icon: LayoutDashboard, url: '#dashboard' },
-  { title: 'Pessoas', icon: Users, url: '#persons' },
-  { title: 'Contas a Pagar', icon: CreditCard, url: '#pagar' },
-  { title: 'Contas a Receber', icon: ArrowUpRight, url: '#receber' },
-  { title: 'Configurações', icon: Settings, url: '#configuracoes' },
+  { title: 'Dashboard', icon: LayoutDashboard, url: '/dashboard' },
+  { title: 'Pessoas', icon: Users, url: '/persons' },
+  { title: 'Contas a Pagar', icon: CreditCard, url: '/pagar' },
+  { title: 'Contas a Receber', icon: ArrowUpRight, url: '/receber' },
+  { title: 'Configurações', icon: Settings, url: '/configuracoes' },
 ];
 
 interface AppSidebarProps {
-  hashAtivo: string;
+  pathAtivo: string;
+  onNavigate: (path: string) => void;
 }
 
-export function AppSidebar({ hashAtivo }: AppSidebarProps) {
+export function AppSidebar({ pathAtivo, onNavigate }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-zinc-200 py-4 px-4 flex flex-row items-center gap-2">
@@ -46,9 +47,16 @@ export function AppSidebar({ hashAtivo }: AppSidebarProps) {
                   <SidebarMenuButton
                     asChild
                     tooltip={item.title}
-                    isActive={hashAtivo === item.url}
+                    isActive={pathAtivo === item.url}
                   >
-                    <a href={item.url} className="flex items-center gap-3">
+                    <a
+                      href={item.url}
+                      className="flex items-center gap-3"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        onNavigate(item.url);
+                      }}
+                    >
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </a>

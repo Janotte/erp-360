@@ -11,9 +11,13 @@ export interface Person {
   isSupplier: boolean;
   isEmployee: boolean;
 }
-const getHeaders = () => ({
-  'Content-Type': 'application/json',
+const authHeaders = () => ({
   Authorization: `Bearer ${authStorage.getToken()}`,
+});
+
+const jsonHeaders = () => ({
+  'Content-Type': 'application/json',
+  ...authHeaders(),
 });
 
 async function parsePersonResponse(res: Response, fallback: string): Promise<Person> {
@@ -26,13 +30,13 @@ async function parsePersonResponse(res: Response, fallback: string): Promise<Per
 export const personsService = {
   list: async (tipo?: string): Promise<Person[]> => {
     const url = tipo ? `${API_URL}/persons?tipo=${tipo}` : `${API_URL}/persons`;
-    const res = await fetch(url, { headers: getHeaders() });
+    const res = await fetch(url, { headers: authHeaders() });
     return res.json();
   },
   create: async (dados: Omit<Person, 'id'>): Promise<Person> => {
     const res = await fetch(`${API_URL}/persons`, {
       method: 'POST',
-      headers: getHeaders(),
+      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     return parsePersonResponse(res, 'Falha ao cadastrar.');
@@ -40,7 +44,7 @@ export const personsService = {
   update: async (id: string, dados: Partial<Person>): Promise<Person> => {
     const res = await fetch(`${API_URL}/persons/${id}`, {
       method: 'PUT',
-      headers: getHeaders(),
+      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     return parsePersonResponse(res, 'Falha ao atualizar.');
@@ -48,7 +52,7 @@ export const personsService = {
   delete: async (id: string): Promise<{ success: boolean; message?: string }> => {
     const res = await fetch(`${API_URL}/persons/${id}`, {
       method: 'DELETE',
-      headers: getHeaders(),
+      headers: authHeaders(),
     });
     if (!res.ok) {
       const erro = await res.json();

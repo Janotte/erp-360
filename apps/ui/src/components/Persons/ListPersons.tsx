@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 import {
   AlertDialog,
@@ -55,6 +56,7 @@ export function ListPersons() {
       queryClient.invalidateQueries({ queryKey: ['listaPersons'] });
       setOpenAlert(false);
       setErroExclusao(null);
+      toast.success('Pessoa removida com sucesso!');
     },
     onError: (error: any) => {
       // 🌟 Exibe a mensagem caso a API bloqueie por possuir vínculos ativos
@@ -94,17 +96,17 @@ export function ListPersons() {
         >
           <DialogTrigger asChild>
             <Button size="sm" className="gap-2">
-              <Plus className="h-4 w-4" /> Nova Person
+              <Plus className="h-4 w-4" /> Nova Pessoa
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
-                {pessoaSelecionada ? 'Editar Person' : 'Cadastrar Nova Person'}
+                {pessoaSelecionada ? 'Editar Pessoa' : 'Cadastrar Nova Pessoa'}
               </DialogTitle>
             </DialogHeader>
             <FormPerson
-              pessoaParaEditar={pessoaSelecionada}
+              personToUpdate={pessoaSelecionada}
               onSuccess={() => setOpenDialog(false)}
             />
           </DialogContent>
