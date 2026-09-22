@@ -13,7 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-import { enviarRegistrarAPI } from '../services/auth';
+import { enviarRegistrarAPI } from '../../services/auth';
 
 interface RegistroProps {
   onRegistroSuccess: () => void;

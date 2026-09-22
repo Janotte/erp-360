@@ -13,8 +13,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-import { enviarLoginAPI } from '../services/auth';
-import { authStorage } from '../utils/auth';
+import { enviarLoginAPI } from '../../services/auth';
+import { authStorage } from '../../utils/auth';
 
 interface LoginProps {
   onLoginSuccess: () => void;

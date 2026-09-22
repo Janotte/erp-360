@@ -1,23 +1,49 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
 import { AppSidebar } from './components/AppSidebar';
-import { Login } from './components/Login';
+import { Login } from './components/Auth/Login';
+import { Registro } from './components/Auth/Register';
+import { Dashboard } from './components/Dashboard';
 import { Navbar } from './components/Navbar';
-import { Registro } from './components/Registro';
+import { ListPersons } from './components/Persons/ListPersons';
 import { authStorage } from './utils/auth';
 
-type TelaAtiva = 'login' | 'registro' | 'dashboard';
+type TelaAtiva = 'login' | 'registro' | 'app';
+
+function hashAtual() {
+  return window.location.hash || '#dashboard';
+}
 
 function App() {
   const [tela, setTela] = useState<TelaAtiva>(
-    authStorage.isAuthenticated() ? 'dashboard' : 'login',
+    authStorage.isAuthenticated() ? 'app' : 'login',
   );
+  const [hash, setHash] = useState(hashAtual);
 
-  const lidarComLogout = () => {
+  useEffect(() => {
+    const sincronizarHash = () => setHash(hashAtual());
+    window.addEventListener('hashchange', sincronizarHash);
+    return () => window.removeEventListener('hashchange', sincronizarHash);
+  }, []);
+
+  useEffect(() => {
+    if (tela === 'app' && !window.location.hash) {
+      window.location.hash = '#dashboard';
+    }
+  }, [tela]);
+
+  const handleLogout = () => {
     authStorage.removeToken();
+    window.location.hash = '';
     setTela('login');
+  };
+
+  const goToApp = () => {
+    window.location.hash = '#dashboard';
+    setHash('#dashboard');
+    setTela('app');
   };
 
   if (tela === 'registro') {
@@ -27,48 +53,26 @@ function App() {
   if (tela === 'login') {
     return (
       <Login
-        onLoginSuccess={() => setTela('dashboard')}
+        onLoginSuccess={goToApp}
         onAlternarParaRegistro={() => setTela('registro')}
       />
     );
   }
 
   return (
-    // 1. SidebarProvider gerencia o estado global de colapso
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-zinc-50 text-zinc-900 font-sans">
-        {/* 2. Barra lateral esquerda instalada */}
-        <AppSidebar />
+        <AppSidebar hashAtivo={hash} />
 
-        {/* 3. SidebarInset joga o conteúdo para o lado respeitando a barra lateral */}
         <SidebarInset className="flex flex-col flex-1 w-full overflow-x-hidden">
-          <Navbar onLogout={lidarComLogout} />
-
-          {/* Conteúdo Dinâmico do Dashboard */}
-          <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="p-6 bg-white rounded-xl border border-zinc-200 shadow-2xs">
-                <h4 className="text-sm font-medium text-zinc-500">A pagar hoje</h4>
-                <p className="text-2xl font-bold mt-2 text-zinc-900">R$ 1.250,00</p>
-              </div>
-              <div className="p-6 bg-white rounded-xl border border-zinc-200 shadow-2xs">
-                <h4 className="text-sm font-medium text-zinc-500">A receber hoje</h4>
-                <p className="text-2xl font-bold mt-2 text-zinc-900">R$ 4.800,00</p>
-              </div>
-              <div className="p-6 bg-white rounded-xl border border-zinc-200 shadow-2xs">
-                <h4 className="text-sm font-medium text-zinc-500">Saldo Tenant</h4>
-                <p className="text-2xl font-bold mt-2 text-emerald-600">+ R$ 3.550,00</p>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl border border-zinc-200 shadow-2xs">
-              <h3 className="text-lg font-bold">Módulo de Trabalho Ativo</h3>
-              <p className="text-sm text-zinc-500 mt-1">
-                Clique nos botões da barra lateral ou reduza o tamanho da tela para testar
-                o menu hambúrguer no celular.
-              </p>
-            </div>
-          </main>
+          <Navbar onLogout={handleLogout} />
+          {hash === '#persons' ? (
+            <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
+              <ListPersons />
+            </main>
+          ) : (
+            <Dashboard />
+          )}
         </SidebarInset>
       </div>
     </SidebarProvider>

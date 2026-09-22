@@ -17,7 +17,10 @@ const fastify = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
 fastify.setValidatorCompiler(validatorCompiler);
 fastify.setSerializerCompiler(serializerCompiler);
 
-fastify.register(cors, { origin: '*' });
+fastify.register(cors, {
+  origin: '*',
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+});
 
 fastify.register(fastifyJwt, {
   secret: process.env.JWT_SECRET as string,

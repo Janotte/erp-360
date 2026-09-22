@@ -12,16 +12,19 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
 
-// Itens de navegação do ERP
 const itensMenu = [
   { title: 'Dashboard', icon: LayoutDashboard, url: '#dashboard' },
-  { title: 'Pessoas', icon: Users, url: '#pessoas' },
+  { title: 'Pessoas', icon: Users, url: '#persons' },
   { title: 'Contas a Pagar', icon: CreditCard, url: '#pagar' },
   { title: 'Contas a Receber', icon: ArrowUpRight, url: '#receber' },
   { title: 'Configurações', icon: Settings, url: '#configuracoes' },
 ];
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  hashAtivo: string;
+}
+
+export function AppSidebar({ hashAtivo }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-zinc-200 py-4 px-4 flex flex-row items-center gap-2">
@@ -40,7 +43,11 @@ export function AppSidebar() {
             <SidebarMenu>
               {itensMenu.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild tooltip={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip={item.title}
+                    isActive={hashAtivo === item.url}
+                  >
                     <a href={item.url} className="flex items-center gap-3">
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
