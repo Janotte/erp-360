@@ -8,12 +8,15 @@ export const UserSchema = z.object({
 
 export type User = z.infer<typeof UserSchema>;
 
+// Schema de validação do Zod para criação de Pessoas
 export const PersonSchema = z.object({
-  id: z.string().uuid({ message: 'ID precisa ser um UUID válido' }),
-  tenantId: z.string().uuid(),
-  name: z.string().min(1, { message: 'Nome é obrigatório' }),
-  document: z.string().min(1, { message: 'Documento é obrigatório' }),
-  createdAt: z.string().datetime(),
+  name: z.string().min(2, 'O nome deve ter pelo menos 2 caracteres'),
+  document: z.string().optional(),
+  email: z.string().email('E-mail inválido').optional().or(z.literal('')),
+  phone: z.string().optional(),
+  isClient: z.boolean().default(false),
+  isSupplier: z.boolean().default(false),
+  isEmployee: z.boolean().default(false),
 });
 
 export type Person = z.infer<typeof PersonSchema>;

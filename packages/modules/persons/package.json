@@ -7,8 +7,6 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@erp-360/mod-core": "workspace:*",
-    "@erp-360/shared": "workspace:*",
-    "drizzle-orm": "^0.45.2",
-    "zod": "^4.6.5"
+    "drizzle-orm": "^0.45.2"
   }
 }

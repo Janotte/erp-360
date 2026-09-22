@@ -372,15 +372,9 @@ importers:
       '@erp-360/mod-core':
         specifier: workspace:*
         version: link:../core
-      '@erp-360/shared':
-        specifier: workspace:*
-        version: link:../../shared
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)(postgres@3.4.9)
-      zod:
-        specifier: ^4.6.5
-        version: 4.6.5
 
   packages/shared:
     dependencies:

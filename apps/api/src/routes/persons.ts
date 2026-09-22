@@ -1,41 +1,64 @@
 import { persons } from '@erp-360/mod-persons';
-import { PersonSchema } from '@erp-360/shared';
-import { and, desc, eq } from 'drizzle-orm';
+import { PersonSchema, type Person } from '@erp-360/shared';
+import { and, eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import '../types/fastify.js';
 
-const personResponse = PersonSchema;
-
-function toPerson(row: typeof persons.$inferSelect) {
-  return {
-    ...row,
-    createdAt: row.createdAt.toISOString(),
-  };
-}
+const listPersonsQuery = z.object({
+  tipo: z.enum(['cliente', 'fornecedor', 'colaborador']).optional(),
+});
 
 export const personsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
 
+  // 1. Rota para Cadastrar uma Pessoa (Protegida por Tenant)
+  fastify.post(
+    '/',
+    {
+      preHandler: [fastify.autenticarETenant],
+      schema: { body: PersonSchema },
+    },
+    async (request, reply) => {
+      const { tenantId } = request.user;
+      const data = request.body as Person;
+
+      const [newPerson] = await db
+        .insert(persons)
+        .values({
+          ...data,
+          tenantId,
+        })
+        .returning();
+
+      return reply.status(201).send(newPerson);
+    },
+  );
+
+  // 2. Rota para Listar as persons do Tenant (com filtro opcional por tipo)
   fastify.get(
     '/',
     {
+      preHandler: [fastify.autenticarETenant],
       schema: {
-        response: {
-          200: z.array(personResponse),
-        },
+        querystring: listPersonsQuery,
       },
     },
     async (request) => {
       const { tenantId } = request.user;
-      const rows = await db
+      const { tipo } = request.query as z.infer<typeof listPersonsQuery>;
+
+      const condicoes = [eq(persons.tenantId, tenantId)];
+
+      if (tipo === 'cliente') condicoes.push(eq(persons.isClient, true));
+      if (tipo === 'fornecedor') condicoes.push(eq(persons.isSupplier, true));
+      if (tipo === 'colaborador') condicoes.push(eq(persons.isEmployee, true));
+
+      return db
         .select()
         .from(persons)
-        .where(eq(persons.tenantId, tenantId))
-        .orderBy(desc(persons.createdAt));
-
-      return rows.map(toPerson);
+        .where(and(...condicoes));
     },
   );
 
@@ -46,27 +69,22 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
         params: z.object({
           id: z.string().uuid({ message: 'ID precisa ser um UUID válido' }),
         }),
-        response: {
-          200: personResponse,
-          404: z.object({ error: z.string() }),
-        },
       },
     },
     async (request, reply) => {
       const { tenantId } = request.user;
       const { id } = request.params as { id: string };
 
-      const [row] = await db
+      const [person] = await db
         .select()
         .from(persons)
-        .where(and(eq(persons.id, id), eq(persons.tenantId, tenantId)))
-        .limit(1);
+        .where(and(eq(persons.id, id), eq(persons.tenantId, tenantId)));
 
-      if (!row) {
+      if (!person) {
         return reply.status(404).send({ error: 'Pessoa não encontrada' });
       }
 
-      return toPerson(row);
+      return person;
     },
   );
 };
