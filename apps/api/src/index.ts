@@ -11,6 +11,8 @@ import { API_URL } from '@erp-360/shared';
 import { authRoutes } from './routes/auth.js';
 import { personsRoutes } from './routes/persons.ts';
 import './types/fastify.js';
+import { payablesRoutes } from './routes/payables.ts';
+import { receivablesRoutes } from './routes/receivables.ts';
 
 const fastify = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
 
@@ -36,6 +38,8 @@ fastify.decorate('autenticarETenant', async (request, reply) => {
 
 fastify.register(authRoutes, { prefix: '/auth' });
 fastify.register(personsRoutes, { prefix: '/persons' });
+fastify.register(payablesRoutes, { prefix: '/payables' });
+fastify.register(receivablesRoutes, { prefix: '/receivables' });
 
 const start = async () => {
   try {

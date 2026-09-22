@@ -1,0 +1,13 @@
+{
+  "name": "@erp-360/mod-financial",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@erp-360/mod-core": "workspace:*",
+    "@erp-360/mod-persons": "workspace:*",
+    "drizzle-orm": "^0.45.2"
+  }
+}

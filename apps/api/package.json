@@ -16,6 +16,7 @@
   "dependencies": {
     "@erp-360/mod-core": "workspace:*",
     "@erp-360/mod-persons": "workspace:*",
+    "@erp-360/mod-financial": "workspace:*",
     "@erp-360/shared": "workspace:*",
     "@fastify/cors": "^11.3.0",
     "@fastify/jwt": "^10.2.2",

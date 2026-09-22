@@ -5,6 +5,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import '../types/fastify.js';
+import { accountsPayable, accountsReceivable } from '@erp-360/mod-financial';
 
 const listPersonsQuery = z.object({
   tipo: z.enum(['cliente', 'fornecedor', 'colaborador']).optional(),
@@ -130,16 +131,54 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
       const { tenantId } = request.user;
       const { id } = request.params as { id: string };
 
-      const [person] = await db
-        .delete(persons)
-        .where(and(eq(persons.id, id), eq(persons.tenantId, tenantId)))
-        .returning();
+      try {
+        // 🌟 1. Verifica se a pessoa possui vínculos em contas a pagar
+        const [hasPayable] = await db
+          .select()
+          .from(accountsPayable)
+          .where(
+            and(eq(accountsPayable.personId, id), eq(accountsPayable.tenantId, tenantId)),
+          )
+          .limit(1);
 
-      if (!person) {
-        return reply.status(404).send({ message: 'Pessoa não encontrada' });
+        // 🌟 2. Verifica se a pessoa possui vínculos em contas a receber
+        const [hasReceivable] = await db
+          .select()
+          .from(accountsReceivable)
+          .where(
+            and(
+              eq(accountsReceivable.personId, id),
+              eq(accountsReceivable.tenantId, tenantId),
+            ),
+          )
+          .limit(1);
+
+        // Se houver qualquer vínculo, bloqueia e retorna erro 400
+        if (hasPayable || hasReceivable) {
+          return reply.status(400).send({
+            message:
+              'Não é possível excluir esta pessoa porque ela possui movimentações financeiras vinculadas.',
+          });
+        }
+
+        // Executa a deleção garantindo que a pessoa pertence ao Tenant do usuário logado
+        const [deletedPerson] = await db
+          .delete(persons)
+          .where(and(eq(persons.id, id), eq(persons.tenantId, tenantId)))
+          .returning();
+
+        // Se o ID não existir ou pertencer a outro tenant, o array retornará vazio
+        if (!deletedPerson) {
+          return reply.status(404).send({ message: 'Pessoa não encontrada' });
+        }
+
+        return { success: true };
+      } catch (error) {
+        fastify.log.error(error);
+        return reply
+          .status(500)
+          .send({ message: 'Erro interno ao tentar excluir o registro.' });
       }
-
-      return { success: true };
     },
   );
 };

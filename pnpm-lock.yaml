@@ -196,6 +196,9 @@ importers:
       '@erp-360/mod-core':
         specifier: workspace:*
         version: link:../../packages/modules/core
+      '@erp-360/mod-financial':
+        specifier: workspace:*
+        version: link:../../packages/modules/financial
       '@erp-360/mod-persons':
         specifier: workspace:*
         version: link:../../packages/modules/persons
@@ -381,6 +384,18 @@ importers:
       zod:
         specifier: ^4.6.5
         version: 4.6.5
+
+  packages/modules/financial:
+    dependencies:
+      '@erp-360/mod-core':
+        specifier: workspace:*
+        version: link:../core
+      '@erp-360/mod-persons':
+        specifier: workspace:*
+        version: link:../persons
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)(postgres@3.4.9)
 
   packages/modules/persons:
     dependencies:
