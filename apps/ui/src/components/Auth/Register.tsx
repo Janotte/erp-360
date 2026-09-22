@@ -13,20 +13,20 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-import { enviarRegistrarAPI } from '../../services/auth';
+import { sendRegisterAPI } from '../../services/auth';
 
 interface RegisterProps {
   onRegisterSuccess: () => void;
 }
 
 export function Register({ onRegisterSuccess }: RegisterProps) {
-  const [nomeEmpresa, setNomeEmpresa] = useState('');
-  const [nomeUsuario, setNomeUsuario] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
-  const [senha, setSenha] = useState('');
+  const [password, setPassword] = useState('');
 
   const { mutate, isPending, error, isSuccess } = useMutation({
-    mutationFn: enviarRegistrarAPI,
+    mutationFn: sendRegisterAPI,
     onSuccess: () => {
       setTimeout(() => {
         onRegisterSuccess();
@@ -36,7 +36,7 @@ export function Register({ onRegisterSuccess }: RegisterProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    mutate({ nomeEmpresa, nomeUsuario, email, senha });
+    mutate({ companyName, username, email, password });
   };
 
   return (
@@ -53,22 +53,22 @@ export function Register({ onRegisterSuccess }: RegisterProps) {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="nomeEmpresa">Nome da Empresa</Label>
+              <Label htmlFor="companyName">Nome da Empresa</Label>
               <Input
-                id="nomeEmpresa"
+                id="companyName"
                 placeholder="Minha Empresa LTDA"
-                value={nomeEmpresa}
-                onChange={(e) => setNomeEmpresa(e.target.value)}
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="nomeUsuario">Seu Nome completo</Label>
+              <Label htmlFor="username">Seu Nome completo</Label>
               <Input
-                id="nomeUsuario"
+                id="username"
                 placeholder="João Silva"
-                value={nomeUsuario}
-                onChange={(e) => setNomeUsuario(e.target.value)}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
               />
             </div>
@@ -84,13 +84,13 @@ export function Register({ onRegisterSuccess }: RegisterProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="senha">Senha de Acesso</Label>
+              <Label htmlFor="password">Senha de Acesso</Label>
               <Input
-                id="senha"
+                id="password"
                 type="password"
                 placeholder="Mínimo 6 caracteres"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 required
               />
             </div>

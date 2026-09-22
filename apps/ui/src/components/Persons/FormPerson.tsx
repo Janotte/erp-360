@@ -41,7 +41,7 @@ export function FormPerson({ personToUpdate, onSuccess }: FormPersonProps) {
         : personsService.create(dados);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['listaPersons'] });
+      queryClient.invalidateQueries({ queryKey: ['listPersons'] });
       toast.success(
         personToUpdate
           ? 'Pessoa atualizada com sucesso!'
@@ -80,7 +80,7 @@ export function FormPerson({ personToUpdate, onSuccess }: FormPersonProps) {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <Label htmlFor="document">Document</Label>
+          <Label htmlFor="document">Documento</Label>
           <Input
             id="document"
             value={document}
@@ -88,7 +88,7 @@ export function FormPerson({ personToUpdate, onSuccess }: FormPersonProps) {
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="phone">Phone</Label>
+          <Label htmlFor="phone">Telefone</Label>
           <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
       </div>
@@ -103,7 +103,7 @@ export function FormPerson({ personToUpdate, onSuccess }: FormPersonProps) {
       </div>
 
       <div className="flex flex-col gap-2 pt-2">
-        <Label>Perfil da Person</Label>
+        <Label>Perfil da Pessoa</Label>
         <div className="flex gap-6 mt-1">
           <div className="flex items-center space-x-2">
             <Checkbox

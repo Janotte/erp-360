@@ -77,21 +77,19 @@ function App() {
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-zinc-50 text-zinc-900 font-sans">
-        <AppSidebar pathAtivo={path} onNavigate={irPara} />
+    <SidebarProvider className="bg-zinc-50 text-zinc-900 font-sans">
+      <AppSidebar pathAtivo={path} onNavigate={irPara} />
 
-        <SidebarInset className="flex flex-col flex-1 w-full overflow-x-hidden">
-          <Navbar onLogout={handleLogout} />
-          {path === '/persons' ? (
-            <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
-              <ListPersons />
-            </main>
-          ) : (
-            <Dashboard />
-          )}
-        </SidebarInset>
-      </div>
+      <SidebarInset className="flex min-w-0 flex-col overflow-x-hidden">
+        <Navbar onLogout={handleLogout} />
+        {path === '/persons' ? (
+          <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 md:p-6">
+            <ListPersons />
+          </main>
+        ) : (
+          <Dashboard />
+        )}
+      </SidebarInset>
     </SidebarProvider>
   );
 }

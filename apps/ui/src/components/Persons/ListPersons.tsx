@@ -42,18 +42,18 @@ export function ListPersons() {
   const queryClient = useQueryClient();
   const [openDialog, setOpenDialog] = useState(false);
   const [openAlert, setOpenAlert] = useState(false);
-  const [pessoaSelecionada, setPersonSelecionada] = useState<Person | null>(null);
+  const [personSelected, setPersonSelected] = useState<Person | null>(null);
   const [erroExclusao, setErroExclusao] = useState<string | null>(null);
 
   const { data: persons, isLoading } = useQuery({
-    queryKey: ['listaPersons'],
+    queryKey: ['listPersons'],
     queryFn: () => personsService.list(),
   });
 
   const deleteMutation = useMutation({
     mutationFn: personsService.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['listaPersons'] });
+      queryClient.invalidateQueries({ queryKey: ['listPersons'] });
       setOpenAlert(false);
       setErroExclusao(null);
       toast.success('Pessoa removida com sucesso!');
@@ -64,13 +64,13 @@ export function ListPersons() {
     },
   });
 
-  const abrirEdicao = (pessoa: Person) => {
-    setPersonSelecionada(pessoa);
+  const openEdit = (person: Person) => {
+    setPersonSelected(person);
     setOpenDialog(true);
   };
 
-  const abrirExclusao = (pessoa: Person) => {
-    setPersonSelecionada(pessoa);
+  const openDelete = (person: Person) => {
+    setPersonSelected(person);
     setErroExclusao(null);
     setOpenAlert(true);
   };
@@ -81,7 +81,7 @@ export function ListPersons() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h3 className="text-lg font-bold text-zinc-900">Persons</h3>
+          <h3 className="text-lg font-bold text-zinc-900">Pessoas</h3>
           <p className="text-sm text-zinc-500">
             Gerencie clientes, fornecedores e colaboradores.
           </p>
@@ -91,7 +91,7 @@ export function ListPersons() {
           open={openDialog}
           onOpenChange={(v) => {
             setOpenDialog(v);
-            if (!v) setPersonSelecionada(null);
+            if (!v) setPersonSelected(null);
           }}
         >
           <DialogTrigger asChild>
@@ -102,11 +102,11 @@ export function ListPersons() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
-                {pessoaSelecionada ? 'Editar Pessoa' : 'Cadastrar Nova Pessoa'}
+                {personSelected ? 'Editar Pessoa' : 'Cadastrar Nova Pessoa'}
               </DialogTitle>
             </DialogHeader>
             <FormPerson
-              personToUpdate={pessoaSelecionada}
+              personToUpdate={personSelected}
               onSuccess={() => setOpenDialog(false)}
             />
           </DialogContent>
@@ -125,23 +125,23 @@ export function ListPersons() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {persons?.map((pessoa) => (
-              <TableRow key={pessoa.id}>
-                <TableCell className="font-medium">{pessoa.name}</TableCell>
-                <TableCell>{pessoa.document || '-'}</TableCell>
-                <TableCell>{pessoa.email || '-'}</TableCell>
+            {persons?.map((person) => (
+              <TableRow key={person.id}>
+                <TableCell className="font-medium">{person.name}</TableCell>
+                <TableCell>{person.document || '-'}</TableCell>
+                <TableCell>{person.email || '-'}</TableCell>
                 <TableCell className="flex gap-1.5 flex-wrap">
-                  {pessoa.isClient && (
+                  {person.isClient && (
                     <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-600">
                       Cliente
                     </span>
                   )}
-                  {pessoa.isSupplier && (
+                  {person.isSupplier && (
                     <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-50 text-amber-600">
                       Fornecedor
                     </span>
                   )}
-                  {pessoa.isEmployee && (
+                  {person.isEmployee && (
                     <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-50 text-purple-600">
                       Colaborador
                     </span>
@@ -156,13 +156,13 @@ export function ListPersons() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onClick={() => abrirEdicao(pessoa)}
+                        onClick={() => openEdit(person)}
                         className="gap-2 cursor-pointer"
                       >
                         <Pencil className="h-3.5 w-3.5" /> Editar
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => abrirExclusao(pessoa)}
+                        onClick={() => openDelete(person)}
                         className="gap-2 text-destructive focus:text-destructive cursor-pointer"
                       >
                         <Trash2 className="h-3.5 w-3.5" /> Excluir
@@ -198,7 +198,7 @@ export function ListPersons() {
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
-                if (pessoaSelecionada) deleteMutation.mutate(pessoaSelecionada.id);
+                if (personSelected) deleteMutation.mutate(personSelected.id);
               }}
               className="bg-destructive hover:bg-destructive/90 text-white"
               disabled={deleteMutation.isPending}

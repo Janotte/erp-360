@@ -10,21 +10,21 @@ export interface LoginResponse {
   };
 }
 
-export interface RegistrarInput {
-  nomeEmpresa: string;
-  nomeUsuario: string;
+export interface RegisterInput {
+  companyName: string;
+  username: string;
   email: string;
-  senha: string;
+  password: string;
 }
 
-export const enviarLoginAPI = async (dados: {
+export const sendLoginAPI = async (data: {
   email: string;
   password: string;
 }): Promise<LoginResponse> => {
   const response = await fetch(`${API_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(dados),
+    body: JSON.stringify(data),
   });
 
   if (!response.ok) {
@@ -35,13 +35,13 @@ export const enviarLoginAPI = async (dados: {
   return response.json();
 };
 
-export const enviarRegistrarAPI = async (
-  dados: RegistrarInput,
-): Promise<{ sucesso: boolean }> => {
+export const sendRegisterAPI = async (
+  data: RegisterInput,
+): Promise<{ success: boolean }> => {
   const response = await fetch(`${API_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(dados),
+    body: JSON.stringify(data),
   });
 
   if (!response.ok) {

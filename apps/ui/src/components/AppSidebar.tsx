@@ -10,6 +10,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from '@/components/ui/sidebar';
 
 const itensMenu = [
@@ -26,10 +27,17 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ pathAtivo, onNavigate }: AppSidebarProps) {
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  const navegar = (url: string) => {
+    onNavigate(url);
+    if (isMobile) setOpenMobile(false);
+  };
+
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-zinc-200 py-4 px-4 flex flex-row items-center gap-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-zinc-900 text-white font-bold text-sm">
+      <SidebarHeader className="flex h-16 shrink-0 flex-row items-center gap-2 border-b border-zinc-200 px-4">
+        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-zinc-900 text-sm font-bold text-white">
           E
         </div>
         <span className="font-bold text-zinc-900 group-data-[collapsible=icon]:hidden">
@@ -54,7 +62,7 @@ export function AppSidebar({ pathAtivo, onNavigate }: AppSidebarProps) {
                       className="flex items-center gap-3"
                       onClick={(event) => {
                         event.preventDefault();
-                        onNavigate(item.url);
+                        navegar(item.url);
                       }}
                     >
                       <item.icon className="h-4 w-4" />

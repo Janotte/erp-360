@@ -13,7 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-import { enviarLoginAPI } from '../../services/auth';
+import { sendLoginAPI } from '../../services/auth';
 import { authStorage } from '../../utils/auth';
 
 interface LoginProps {
@@ -26,7 +26,7 @@ export function Login({ onLoginSuccess, onAlternarParaRegistro }: LoginProps) {
   const [password, setPassword] = useState('');
 
   const { mutate, isPending, error } = useMutation({
-    mutationFn: enviarLoginAPI,
+    mutationFn: sendLoginAPI,
     onSuccess: (data) => {
       authStorage.setToken(data.token);
       onLoginSuccess();
