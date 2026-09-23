@@ -10,7 +10,28 @@ export interface Person {
   isClient: boolean;
   isSupplier: boolean;
   isEmployee: boolean;
+  createdAt?: string;
 }
+
+export interface FiltersPersons {
+  page: number;
+  limit: number;
+  sortField: 'name' | 'createdAt';
+  sortOrder: 'asc' | 'desc';
+  type?: string;
+  search?: string;
+}
+
+export interface PaginationResponse<T> {
+  data: T[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
 const authHeaders = () => ({
   Authorization: `Bearer ${authStorage.getToken()}`,
 });
@@ -28,9 +49,23 @@ async function parsePersonResponse(res: Response, fallback: string): Promise<Per
   return body as Person;
 }
 export const personsService = {
-  list: async (tipo?: string): Promise<Person[]> => {
-    const url = tipo ? `${API_URL}/persons?tipo=${tipo}` : `${API_URL}/persons`;
-    const res = await fetch(url, { headers: authHeaders() });
+  list: async (filters: FiltersPersons): Promise<PaginationResponse<Person>> => {
+    const params = new URLSearchParams({
+      page: filters.page.toString(),
+      limit: filters.limit.toString(),
+      sortField: filters.sortField === 'name' ? 'nome' : filters.sortField,
+      sortOrder: filters.sortOrder,
+      ...(filters.type && { tipo: filters.type }),
+      ...(filters.search && { busca: filters.search }),
+    });
+
+    const res = await fetch(`${API_URL}/persons?${params.toString()}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      const erro = await res.json().catch(() => ({}));
+      throw new Error(erro.message || erro.error || 'Falha ao carregar pessoas.');
+    }
     return res.json();
   },
   create: async (dados: Omit<Person, 'id'>): Promise<Person> => {

@@ -41,7 +41,7 @@ export function FormPerson({ personToUpdate, onSuccess }: FormPersonProps) {
         : personsService.create(dados);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['listPersons'] });
+      queryClient.invalidateQueries({ queryKey: ['listaPessoas'] });
       toast.success(
         personToUpdate
           ? 'Pessoa atualizada com sucesso!'

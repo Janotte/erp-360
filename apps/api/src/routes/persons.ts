@@ -1,6 +1,6 @@
 import { persons } from '@erp-360/mod-persons';
 import { PersonSchema, type Person } from '@erp-360/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.js';
@@ -9,6 +9,11 @@ import { accountsPayable, accountsReceivable } from '@erp-360/mod-financial';
 
 const listPersonsQuery = z.object({
   tipo: z.enum(['cliente', 'fornecedor', 'colaborador']).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+  sortField: z.enum(['nome', 'createdAt']).default('nome'),
+  sortOrder: z.enum(['asc', 'desc']).default('asc'),
+  busca: z.string().optional(),
 });
 
 export const personsRoutes: FastifyPluginAsync = async (fastify) => {
@@ -18,7 +23,6 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     '/',
     {
-      preHandler: [fastify.autenticarETenant],
       schema: { body: PersonSchema },
     },
     async (request, reply) => {
@@ -41,25 +45,71 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     '/',
     {
-      preHandler: [fastify.autenticarETenant],
-      schema: {
-        querystring: listPersonsQuery,
-      },
+      schema: { querystring: listPersonsQuery },
     },
-    async (request) => {
+    async (request, reply) => {
       const { tenantId } = request.user;
-      const { tipo } = request.query as z.infer<typeof listPersonsQuery>;
+      const {
+        page,
+        limit,
+        sortField,
+        sortOrder,
+        tipo,
+        busca: search,
+      } = request.query as z.infer<typeof listPersonsQuery>;
 
-      const condicoes = [eq(persons.tenantId, tenantId)];
+      const offset = (page - 1) * limit;
+      const conditions = [eq(persons.tenantId, tenantId)];
 
-      if (tipo === 'cliente') condicoes.push(eq(persons.isClient, true));
-      if (tipo === 'fornecedor') condicoes.push(eq(persons.isSupplier, true));
-      if (tipo === 'colaborador') condicoes.push(eq(persons.isEmployee, true));
+      // 1. Filtros por Perfil
+      if (tipo === 'cliente') conditions.push(eq(persons.isClient, true));
+      if (tipo === 'fornecedor') conditions.push(eq(persons.isSupplier, true));
+      if (tipo === 'colaborador') conditions.push(eq(persons.isEmployee, true));
 
-      return db
+      // 2. Filtro por Busca Textual (Nome, Documento ou E-mail)
+      if (search) {
+        conditions.push(
+          or(
+            ilike(persons.name, `%${search}%`),
+            ilike(persons.document, `%${search}%`),
+            ilike(persons.email, `%${search}%`),
+          )!,
+        );
+      }
+
+      // 3. Configuração de Ordenação Dinâmica
+      const sortColumns = {
+        nome: persons.name,
+        createdAt: persons.createdAt,
+      } as const;
+      const sortColumn = sortColumns[sortField];
+      const orderBy = sortOrder === 'asc' ? [asc(sortColumn)] : [desc(sortColumn)];
+
+      // 4. Executa a Query trazendo os dados paginados
+      const data = await db
         .select()
         .from(persons)
-        .where(and(...condicoes));
+        .where(and(...conditions))
+        .orderBy(...orderBy)
+        .limit(limit)
+        .offset(offset);
+
+      // 5. Conta o total de registros para o Front saber o limite de páginas
+      const [totalCount] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(persons)
+        .where(and(...conditions));
+
+      // Retorna a estrutura envelopada com os metadados de paginação
+      return reply.send({
+        data,
+        meta: {
+          total: Number(totalCount?.count || 0),
+          page,
+          limit,
+          totalPages: Math.ceil(Number(totalCount?.count || 0) / limit),
+        },
+      });
     },
   );
 
