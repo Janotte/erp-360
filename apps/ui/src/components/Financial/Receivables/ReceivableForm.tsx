@@ -28,14 +28,18 @@ export function ReceivableForm({ onSuccess }: ReceivableFormProps) {
   const [amountStr, setAmountStr] = useState('');
   const [dueDate, setDueDate] = useState('');
 
-  // Espaço para novos estados futuros específicos de recebimento:
-  // const [formaRecebimento, setFormaRecebimento] = useState('pix');
-  // const [nossoNumeroBoleto, setNossoNumeroBoleto] = useState('');
-
-  const { data: persons } = useQuery({
-    queryKey: ['personList'],
-    queryFn: () => personsService.list('cliente'), // Otimizado para filtrar clientes
+  const { data: personsResponse } = useQuery({
+    queryKey: ['personList', 'receivable'],
+    queryFn: () =>
+      personsService.list({
+        page: 1,
+        limit: 100,
+        sortField: 'name',
+        sortOrder: 'asc',
+        type: 'cliente',
+      }),
   });
+  const persons = personsResponse?.data;
 
   const mutation = useMutation({
     mutationFn: (dados: any) => financialService.create('receivable', dados),

@@ -16,11 +16,10 @@ import { financialService } from '@/services/financials';
 import { personsService } from '@/services/persons';
 
 interface PayableFormProps {
-  tipo: 'payable' | 'receivable';
   onSuccess: () => void;
 }
 
-export function PayableForm({ tipo, onSuccess }: PayableFormProps) {
+export function PayableForm({ onSuccess }: PayableFormProps) {
   const queryClient = useQueryClient();
   const [personId, setPersonId] = useState('');
   const [document, setDocument] = useState('');
@@ -28,20 +27,24 @@ export function PayableForm({ tipo, onSuccess }: PayableFormProps) {
   const [amountStr, setAmountStr] = useState('');
   const [dueDate, setDueDate] = useState('');
 
-  const { data: persons } = useQuery({
-    queryKey: ['personsList', tipo],
-    queryFn: () => personsService.list(tipo === 'payable' ? 'fornecedor' : 'cliente'),
+  const { data: personsResponse } = useQuery({
+    queryKey: ['personsList', 'payable'],
+    queryFn: () =>
+      personsService.list({
+        page: 1,
+        limit: 100,
+        sortField: 'name',
+        sortOrder: 'asc',
+        type: 'fornecedor',
+      }),
   });
+  const persons = personsResponse?.data;
 
   const mutation = useMutation({
-    mutationFn: (data: any) => financialService.create(tipo, data),
+    mutationFn: (data: any) => financialService.create('payable', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['financial', tipo] });
-      toast.success(
-        tipo === 'payable'
-          ? 'Conta a pagar lançada com sucesso!'
-          : 'Conta a receber lançada com sucesso!',
-      );
+      queryClient.invalidateQueries({ queryKey: ['financial', 'payable'] });
+      toast.success('Conta a pagar lançada com sucesso!');
       onSuccess();
     },
     onError: (err: any) => toast.error(`Erro: ${err.message}`),
@@ -68,13 +71,7 @@ export function PayableForm({ tipo, onSuccess }: PayableFormProps) {
         <Label>Fornecedor / Favorecido</Label>
         <Select value={personId} onValueChange={setPersonId} required>
           <SelectTrigger>
-            <SelectValue
-              placeholder={
-                tipo === 'payable'
-                  ? 'Selecione um fornecedor...'
-                  : 'Selecione um cliente...'
-              }
-            />
+            <SelectValue placeholder="Selecione um fornecedor..." />
           </SelectTrigger>
           <SelectContent>
             {persons?.map((p) => (

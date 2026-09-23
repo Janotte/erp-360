@@ -3,9 +3,11 @@ import {
   ChevronRight,
   CreditCard,
   LayoutDashboard,
+  type LucideIcon,
   Settings,
   Users,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import {
   Sidebar,
@@ -23,15 +25,25 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 
-const rotasFinanceiro = ['/payables', '/receivables', '/settings'];
+type FilhoMenu = {
+  title: string;
+  icon: LucideIcon;
+  url: string;
+};
 
-const itensMenu = [
+type ItemMenu = {
+  title: string;
+  icon: LucideIcon;
+  url?: string;
+  filhos?: FilhoMenu[];
+};
+
+const itensMenu: ItemMenu[] = [
   { title: 'Dashboard', icon: LayoutDashboard, url: '/dashboard' },
   { title: 'Pessoas', icon: Users, url: '/persons' },
   {
     title: 'Financeiro',
     icon: CreditCard,
-    url: '/payables',
     filhos: [
       { title: 'Contas a Pagar', icon: CreditCard, url: '/payables' },
       { title: 'Contas a Receber', icon: ArrowUpRight, url: '/receivables' },
@@ -47,7 +59,12 @@ interface AppSidebarProps {
 
 export function AppSidebar({ pathAtivo, onNavigate }: AppSidebarProps) {
   const { isMobile, setOpenMobile } = useSidebar();
-  const financeiroAberto = rotasFinanceiro.includes(pathAtivo);
+  const rotaFinanceira = pathAtivo === '/payables' || pathAtivo === '/receivables';
+  const [financeiroAberto, setFinanceiroAberto] = useState(rotaFinanceira);
+
+  useEffect(() => {
+    if (rotaFinanceira) setFinanceiroAberto(true);
+  }, [rotaFinanceira]);
 
   const navegar = (url: string) => {
     onNavigate(url);
@@ -71,55 +88,69 @@ export function AppSidebar({ pathAtivo, onNavigate }: AppSidebarProps) {
           <SidebarGroupContent>
             <SidebarMenu>
               {itensMenu.map((item) => {
-                const temFilhos = Boolean(item.filhos?.length);
-                const ativo = temFilhos ? financeiroAberto : pathAtivo === item.url;
+                if (item.filhos?.length) {
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        tooltip={item.title}
+                        isActive={rotaFinanceira}
+                        onClick={() => setFinanceiroAberto((aberto) => !aberto)}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                        <ChevronRight
+                          className={`ml-auto h-4 w-4 transition-transform ${
+                            financeiroAberto ? 'rotate-90' : ''
+                          }`}
+                        />
+                      </SidebarMenuButton>
+
+                      {financeiroAberto && (
+                        <SidebarMenuSub>
+                          {item.filhos.map((filho) => (
+                            <SidebarMenuSubItem key={filho.url}>
+                              <SidebarMenuSubButton
+                                asChild
+                                isActive={pathAtivo === filho.url}
+                              >
+                                <a
+                                  href={filho.url}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    navegar(filho.url);
+                                  }}
+                                >
+                                  <filho.icon className="h-4 w-4" />
+                                  <span>{filho.title}</span>
+                                </a>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      )}
+                    </SidebarMenuItem>
+                  );
+                }
 
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild tooltip={item.title} isActive={ativo}>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={item.title}
+                      isActive={pathAtivo === item.url}
+                    >
                       <a
                         href={item.url}
                         className="flex items-center gap-3"
                         onClick={(event) => {
                           event.preventDefault();
-                          navegar(item.url);
+                          if (item.url) navegar(item.url);
                         }}
                       >
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
-                        {temFilhos && (
-                          <ChevronRight
-                            className={`ml-auto h-4 w-4 transition-transform ${
-                              financeiroAberto ? 'rotate-90' : ''
-                            }`}
-                          />
-                        )}
                       </a>
                     </SidebarMenuButton>
-
-                    {temFilhos && financeiroAberto && (
-                      <SidebarMenuSub>
-                        {item.filhos!.map((filho) => (
-                          <SidebarMenuSubItem key={filho.url}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={pathAtivo === filho.url}
-                            >
-                              <a
-                                href={filho.url}
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  navegar(filho.url);
-                                }}
-                              >
-                                <filho.icon className="h-4 w-4" />
-                                <span>{filho.title}</span>
-                              </a>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    )}
                   </SidebarMenuItem>
                 );
               })}

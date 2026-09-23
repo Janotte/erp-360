@@ -59,7 +59,7 @@ export function PayableList() {
             <DialogHeader>
               <DialogTitle>Lançar Conta a Pagar</DialogTitle>
             </DialogHeader>
-            <PayableForm tipo="payable" onSuccess={() => setOpenInsertPayable(false)} />
+            <PayableForm onSuccess={() => setOpenInsertPayable(false)} />
           </DialogContent>
         </Dialog>
       </div>
