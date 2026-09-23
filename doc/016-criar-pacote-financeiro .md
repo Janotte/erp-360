@@ -1,8 +1,9 @@
 ---
-
 Para criar o módulo financeiro de forma profissional, vamos agrupar as regras de Contas a Pagar e Contas a Receber dentro de um único pacote chamado @erp-360/mod-financial.
 Seguindo a arquitetura do seu projeto, vamos criar esse pacote local, definir as tabelas com relacionamentos diretos para a tabela de persons e configurar as chaves estrangeiras (references) protegidas por tenantId.
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---
+
+---
 
 ## 📂 Passo 1: Criar o Pacote Financeiro (packages/modules/financial)
 

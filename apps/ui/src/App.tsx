@@ -6,6 +6,8 @@ import { AppSidebar } from './components/AppSidebar';
 import { Login } from './components/Auth/Login';
 import { Register } from './components/Auth/Register';
 import { Dashboard } from './components/Dashboard';
+import { PayableList } from './components/Financial/Payables/PayableList';
+import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
 import { Navbar } from './components/Navbar';
 import { ListPersons } from './components/Persons/ListPersons';
 import { authStorage } from './utils/auth';
@@ -24,15 +26,15 @@ function rotaInicial() {
     return '/login';
   }
 
-  if (hash === '#persons') return '/persons';
-  if (hash === '#pagar') return '/pagar';
-  if (hash === '#receber') return '/receber';
-  if (hash === '#configuracoes') return '/configuracoes';
   if (hash === '#dashboard') return '/dashboard';
+  if (hash === '#persons') return '/persons';
+  if (hash === '#receivables') return '/receivables';
+  if (hash === '#payables') return '/payables';
+  if (hash === '#settings') return '/settings';
   if (path === '/persons') return '/persons';
-  if (path === '/pagar') return '/pagar';
-  if (path === '/receber') return '/receber';
-  if (path === '/configuracoes') return '/configuracoes';
+  if (path === '/receivables') return '/receivables';
+  if (path === '/payables') return '/payables';
+  if (path === '/settings') return '/settings';
   return '/dashboard';
 }
 
@@ -85,6 +87,14 @@ function App() {
         {path === '/persons' ? (
           <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 md:p-6">
             <ListPersons />
+          </main>
+        ) : path === '/payables' ? (
+          <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 md:p-6">
+            <PayableList />
+          </main>
+        ) : path === '/receivables' ? (
+          <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 md:p-6">
+            <ReceivableList />
           </main>
         ) : (
           <Dashboard />

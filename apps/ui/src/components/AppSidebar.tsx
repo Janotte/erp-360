@@ -1,4 +1,11 @@
-import { ArrowUpRight, CreditCard, LayoutDashboard, Settings, Users } from 'lucide-react';
+import {
+  ArrowUpRight,
+  ChevronRight,
+  CreditCard,
+  LayoutDashboard,
+  Settings,
+  Users,
+} from 'lucide-react';
 
 import {
   Sidebar,
@@ -10,15 +17,27 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   useSidebar,
 } from '@/components/ui/sidebar';
+
+const rotasFinanceiro = ['/payables', '/receivables', '/settings'];
 
 const itensMenu = [
   { title: 'Dashboard', icon: LayoutDashboard, url: '/dashboard' },
   { title: 'Pessoas', icon: Users, url: '/persons' },
-  { title: 'Contas a Pagar', icon: CreditCard, url: '/pagar' },
-  { title: 'Contas a Receber', icon: ArrowUpRight, url: '/receber' },
-  { title: 'Configurações', icon: Settings, url: '/configuracoes' },
+  {
+    title: 'Financeiro',
+    icon: CreditCard,
+    url: '/payables',
+    filhos: [
+      { title: 'Contas a Pagar', icon: CreditCard, url: '/payables' },
+      { title: 'Contas a Receber', icon: ArrowUpRight, url: '/receivables' },
+    ],
+  },
+  { title: 'Configurações', icon: Settings, url: '/settings' },
 ];
 
 interface AppSidebarProps {
@@ -28,6 +47,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ pathAtivo, onNavigate }: AppSidebarProps) {
   const { isMobile, setOpenMobile } = useSidebar();
+  const financeiroAberto = rotasFinanceiro.includes(pathAtivo);
 
   const navegar = (url: string) => {
     onNavigate(url);
@@ -50,27 +70,59 @@ export function AppSidebar({ pathAtivo, onNavigate }: AppSidebarProps) {
           <SidebarGroupLabel>Navegação</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {itensMenu.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    tooltip={item.title}
-                    isActive={pathAtivo === item.url}
-                  >
-                    <a
-                      href={item.url}
-                      className="flex items-center gap-3"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        navegar(item.url);
-                      }}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {itensMenu.map((item) => {
+                const temFilhos = Boolean(item.filhos?.length);
+                const ativo = temFilhos ? financeiroAberto : pathAtivo === item.url;
+
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild tooltip={item.title} isActive={ativo}>
+                      <a
+                        href={item.url}
+                        className="flex items-center gap-3"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          navegar(item.url);
+                        }}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                        {temFilhos && (
+                          <ChevronRight
+                            className={`ml-auto h-4 w-4 transition-transform ${
+                              financeiroAberto ? 'rotate-90' : ''
+                            }`}
+                          />
+                        )}
+                      </a>
+                    </SidebarMenuButton>
+
+                    {temFilhos && financeiroAberto && (
+                      <SidebarMenuSub>
+                        {item.filhos!.map((filho) => (
+                          <SidebarMenuSubItem key={filho.url}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={pathAtivo === filho.url}
+                            >
+                              <a
+                                href={filho.url}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  navegar(filho.url);
+                                }}
+                              >
+                                <filho.icon className="h-4 w-4" />
+                                <span>{filho.title}</span>
+                              </a>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    )}
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
