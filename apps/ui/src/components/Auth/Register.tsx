@@ -21,7 +21,8 @@ interface RegisterProps {
 
 export function Register({ onRegisterSuccess }: RegisterProps) {
   const [companyName, setCompanyName] = useState('');
-  const [username, setUsername] = useState('');
+  const [cnpj, setCnpj] = useState('');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -36,7 +37,7 @@ export function Register({ onRegisterSuccess }: RegisterProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    mutate({ companyName, username, email, password });
+    mutate({ companyName, cnpj, name, email, password });
   };
 
   return (
@@ -63,12 +64,22 @@ export function Register({ onRegisterSuccess }: RegisterProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="username">Seu Nome completo</Label>
+              <Label htmlFor="cnpj">CNPJ</Label>
               <Input
-                id="username"
+                id="cnpj"
+                placeholder="12.345.678/0001-00"
+                value={cnpj}
+                onChange={(e) => setCnpj(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="name">Seu Nome completo</Label>
+              <Input
+                id="name"
                 placeholder="João Silva"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 required
               />
             </div>

@@ -43,6 +43,13 @@
       "when": 1790110181451,
       "tag": "0005_low_rhino",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790168751590,
+      "tag": "0006_bitter_overlord",
+      "breakpoints": true
     }
   ]
 }

@@ -15,10 +15,11 @@ const loginBody = z.object({
 });
 
 const registerBody = z.object({
-  nomeEmpresa: z.string().min(1),
-  nomeUsuario: z.string().min(1),
+  companyName: z.string().min(1),
+  cnpj: z.string().min(14),
+  name: z.string().min(1),
   email: z.string().email(),
-  senha: z.string().min(6),
+  password: z.string().min(6),
 });
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
@@ -78,7 +79,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-      const { nomeEmpresa, nomeUsuario, email, senha } = request.body as z.infer<
+      const { companyName, cnpj, name, email, password } = request.body as z.infer<
         typeof registerBody
       >;
 
@@ -95,16 +96,16 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
         const [novoTenant] = await db
           .insert(tenants)
-          .values({ name: nomeEmpresa })
+          .values({ name: companyName, cnpj })
           .returning();
 
-        const hash = await bcrypt.hash(senha, 10);
+        const hash = await bcrypt.hash(password, 10);
 
         const [novoUsuario] = await db
           .insert(users)
           .values({
             tenantId: novoTenant.id,
-            name: nomeUsuario,
+            name: name,
             email,
             passwordHash: hash,
           })

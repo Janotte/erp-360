@@ -12,7 +12,8 @@ export interface LoginResponse {
 
 export interface RegisterInput {
   companyName: string;
-  username: string;
+  cnpj: string;
+  name: string;
   email: string;
   password: string;
 }
