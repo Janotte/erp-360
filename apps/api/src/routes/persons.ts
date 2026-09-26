@@ -6,9 +6,10 @@ import { z } from 'zod';
 import { db } from '../db/index.js';
 import '../types/fastify.js';
 import { accountsPayable, accountsReceivable } from '@erp-360/mod-financial';
+import { personAddressRoutes } from './person-addresses.js';
 
 const listPersonsQuery = z.object({
-  tipo: z.enum(['cliente', 'fornecedor', 'colaborador']).optional(),
+  type: z.enum(['cliente', 'fornecedor', 'colaborador']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   sortField: z.enum(['nome', 'createdAt']).default('nome'),
@@ -18,6 +19,7 @@ const listPersonsQuery = z.object({
 
 export const personsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
+  await fastify.register(personAddressRoutes);
 
   // 1. Rota para Cadastrar uma Pessoa (Protegida por Tenant)
   fastify.post(
@@ -54,7 +56,7 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
         limit,
         sortField,
         sortOrder,
-        tipo,
+        type,
         busca: search,
       } = request.query as z.infer<typeof listPersonsQuery>;
 
@@ -62,9 +64,9 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
       const conditions = [eq(persons.tenantId, tenantId)];
 
       // 1. Filtros por Perfil
-      if (tipo === 'cliente') conditions.push(eq(persons.isClient, true));
-      if (tipo === 'fornecedor') conditions.push(eq(persons.isSupplier, true));
-      if (tipo === 'colaborador') conditions.push(eq(persons.isEmployee, true));
+      if (type === 'cliente') conditions.push(eq(persons.isClient, true));
+      if (type === 'fornecedor') conditions.push(eq(persons.isSupplier, true));
+      if (type === 'colaborador') conditions.push(eq(persons.isEmployee, true));
 
       // 2. Filtro por Busca Textual (Nome, Documento ou E-mail)
       if (search) {

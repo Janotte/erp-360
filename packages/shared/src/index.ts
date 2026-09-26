@@ -21,6 +21,25 @@ export const PersonSchema = z.object({
 
 export type Person = z.infer<typeof PersonSchema>;
 
+export const personAddressTypes = [
+  'Principal',
+  'Faturamento',
+  'Entrega',
+  'Outro',
+] as const;
+
+export const PersonAddressSchema = z.object({
+  type: z.enum(personAddressTypes).default('Principal'),
+  postalCode: z.string().max(9).optional().or(z.literal('')),
+  street: z.string().max(60).optional().or(z.literal('')),
+  number: z.string().max(10).optional().or(z.literal('')),
+  complement: z.string().max(30).optional().or(z.literal('')),
+  neighborhood: z.string().max(50).optional().or(z.literal('')),
+  cityId: z.string().uuid().optional().or(z.literal('')).or(z.null()),
+});
+
+export type PersonAddressInput = z.infer<typeof PersonAddressSchema>;
+
 export const API_URL = 'http://localhost:3000';
 
 export * from './utils/FormatCurrency';

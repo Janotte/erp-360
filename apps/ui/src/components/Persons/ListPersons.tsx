@@ -59,6 +59,7 @@ import { FormPerson } from './FormPerson';
 export function ListPersons() {
   const queryClient = useQueryClient();
   const [openDialog, setOpenDialog] = useState(false);
+  const [personPersisted, setPersonPersisted] = useState(false);
   const [openAlert, setOpenAlert] = useState(false);
   const [personSelected, setPersonSelected] = useState<Person | null>(null);
   const [erroExclusao, setErroExclusao] = useState<string | null>(null);
@@ -169,7 +170,7 @@ export function ListPersons() {
               setPage(1);
             }}
           >
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="w-full sm:w-45">
               <SelectValue placeholder="Filtrar por Perfil" />
             </SelectTrigger>
             <SelectContent>
@@ -182,6 +183,7 @@ export function ListPersons() {
           <Button
             onClick={() => {
               setPersonSelected(null);
+              setPersonPersisted(false);
               setOpenDialog(true);
             }}
           >
@@ -324,22 +326,24 @@ export function ListPersons() {
         open={openDialog}
         onOpenChange={(open) => {
           setOpenDialog(open);
-          if (!open) setPersonSelected(null);
+          if (!open) {
+            setPersonSelected(null);
+            setPersonPersisted(false);
+          }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {personSelected ? 'Editar Pessoa' : 'Cadastrar Nova Pessoa'}
+              {personSelected || personPersisted
+                ? 'Editar Pessoa'
+                : 'Cadastrar Nova Pessoa'}
             </DialogTitle>
           </DialogHeader>
           <FormPerson
             key={personSelected?.id ?? 'new'}
             personToUpdate={personSelected}
-            onSuccess={() => {
-              setOpenDialog(false);
-              setPersonSelected(null);
-            }}
+            onPersisted={() => setPersonPersisted(true)}
           />
         </DialogContent>
       </Dialog>

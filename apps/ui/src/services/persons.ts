@@ -13,6 +13,32 @@ export interface Person {
   createdAt?: string;
 }
 
+export type AddressType = 'Principal' | 'Faturamento' | 'Entrega' | 'Outro';
+
+export interface PersonAddress {
+  id: string;
+  type: AddressType;
+  postalCode: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  neighborhood: string | null;
+  cityId: string | null;
+  cityName: string | null;
+  stateId: string | null;
+  stateAbbreviation: string | null;
+}
+
+export interface PersonAddressInput {
+  type: AddressType;
+  postalCode?: string;
+  street?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  cityId?: string | null;
+}
+
 export interface FiltersPersons {
   page: number;
   limit: number;
@@ -41,12 +67,27 @@ const jsonHeaders = () => ({
   ...authHeaders(),
 });
 
+async function readBody(res: Response) {
+  return res.json().catch(() => ({}));
+}
+
 async function parsePersonResponse(res: Response, fallback: string): Promise<Person> {
-  const body = await res.json().catch(() => ({}));
+  const body = await readBody(res);
   if (!res.ok) {
     throw new Error(body.message || body.error || fallback);
   }
   return body as Person;
+}
+
+async function parseAddressResponse(
+  res: Response,
+  fallback: string,
+): Promise<PersonAddress> {
+  const body = await readBody(res);
+  if (!res.ok) {
+    throw new Error(body.message || body.error || fallback);
+  }
+  return body as PersonAddress;
 }
 export const personsService = {
   list: async (filters: FiltersPersons): Promise<PaginationResponse<Person>> => {
@@ -55,7 +96,7 @@ export const personsService = {
       limit: filters.limit.toString(),
       sortField: filters.sortField === 'name' ? 'nome' : filters.sortField,
       sortOrder: filters.sortOrder,
-      ...(filters.type && { tipo: filters.type }),
+      ...(filters.type && { type: filters.type }),
       ...(filters.search && { busca: filters.search }),
     });
 
@@ -94,5 +135,48 @@ export const personsService = {
       throw new Error(erro.message || 'Erro ao excluir.');
     }
     return res.json();
+  },
+  listAddresses: async (personId: string): Promise<PersonAddress[]> => {
+    const res = await fetch(`${API_URL}/persons/${personId}/addresses`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      const erro = await readBody(res);
+      throw new Error(erro.message || erro.error || 'Falha ao carregar endereços.');
+    }
+    return res.json();
+  },
+  createAddress: async (
+    personId: string,
+    dados: PersonAddressInput,
+  ): Promise<PersonAddress> => {
+    const res = await fetch(`${API_URL}/persons/${personId}/addresses`, {
+      method: 'POST',
+      headers: jsonHeaders(),
+      body: JSON.stringify(dados),
+    });
+    return parseAddressResponse(res, 'Falha ao cadastrar endereço.');
+  },
+  updateAddress: async (
+    personId: string,
+    addressId: string,
+    dados: PersonAddressInput,
+  ): Promise<PersonAddress> => {
+    const res = await fetch(`${API_URL}/persons/${personId}/addresses/${addressId}`, {
+      method: 'PUT',
+      headers: jsonHeaders(),
+      body: JSON.stringify(dados),
+    });
+    return parseAddressResponse(res, 'Falha ao atualizar endereço.');
+  },
+  deleteAddress: async (personId: string, addressId: string): Promise<void> => {
+    const res = await fetch(`${API_URL}/persons/${personId}/addresses/${addressId}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      const erro = await readBody(res);
+      throw new Error(erro.message || 'Erro ao excluir endereço.');
+    }
   },
 };
