@@ -1,0 +1,1142 @@
+[
+  {
+    "id": "5170d51c-afc9-413d-baf9-0866f7d3447b",
+    "code": "0132",
+    "name": "Afeganistão"
+  },
+  {
+    "id": "2a87afa7-0e38-4fa1-8098-324c37f758fa",
+    "code": "7560",
+    "name": "África do Sul"
+  },
+  {
+    "id": "b4a4b643-af1f-4e11-9491-255988393423",
+    "code": "0175",
+    "name": "Albânia"
+  },
+  {
+    "id": "b686395d-ad89-4588-9838-1fffa0d5e6c0",
+    "code": "0888",
+    "name": "Alemanha"
+  },
+  {
+    "id": "62e68c38-0fc8-42f9-861b-11dfc25ce3f5",
+    "code": "0370",
+    "name": "Andorra"
+  },
+  {
+    "id": "6cd9f20a-ff75-4d01-b160-a6134e27969c",
+    "code": "0400",
+    "name": "Angola"
+  },
+  {
+    "id": "10a9bc4e-9504-481b-87f4-8507b23c9de9",
+    "code": "0418",
+    "name": "Anguilla"
+  },
+  {
+    "id": "746c449a-b434-47b6-b431-32b17cd591ed",
+    "code": "0434",
+    "name": "Antígua e Barbuda"
+  },
+  {
+    "id": "07d2055c-72c7-4305-ac46-cfe4b76dd059",
+    "code": "0477",
+    "name": "Antilhas Holandesas"
+  },
+  {
+    "id": "c081dee7-345b-4a37-8089-ac3a72b98972",
+    "code": "0531",
+    "name": "Arábia Saudita"
+  },
+  {
+    "id": "0895004f-dcf5-4b82-97fd-c88cb49865a0",
+    "code": "0590",
+    "name": "Argélia"
+  },
+  {
+    "id": "982f7ae0-83dc-456a-977c-de863dac1772",
+    "code": "0639",
+    "name": "Argentina"
+  },
+  {
+    "id": "1dd51edd-56e0-4f51-a5cf-b43072e423f9",
+    "code": "0647",
+    "name": "Armênia"
+  },
+  {
+    "id": "833d3a93-e757-43e9-af8b-72045278a93f",
+    "code": "0655",
+    "name": "Aruba"
+  },
+  {
+    "id": "df1ae0d8-92aa-43ca-a8eb-4bee7e22cbf2",
+    "code": "0698",
+    "name": "Austrália"
+  },
+  {
+    "id": "bb191341-2928-489a-bd54-c50e605854b9",
+    "code": "0728",
+    "name": "Áustria"
+  },
+  {
+    "id": "71f66e08-e7b3-44a4-b1ed-385982d37414",
+    "code": "0736",
+    "name": "Azerbaijão"
+  },
+  {
+    "id": "558b8be7-98cd-4a5d-b58e-97ceb194c6ce",
+    "code": "0779",
+    "name": "Bahamas"
+  },
+  {
+    "id": "08082b8e-ba38-4846-8546-04ffafb389cc",
+    "code": "0809",
+    "name": "Bahrein"
+  },
+  {
+    "id": "e6837d4f-6967-4735-91b4-335cf7a6170a",
+    "code": "0817",
+    "name": "Bangladesh"
+  },
+  {
+    "id": "b9c3e853-6ea7-4fa4-86f4-b07985d3d130",
+    "code": "0833",
+    "name": "Barbados"
+  },
+  {
+    "id": "f84ffbf4-8342-4210-97b8-eb9a6d50359a",
+    "code": "0884",
+    "name": "Belize"
+  },
+  {
+    "id": "e3fcec91-a26a-4ab3-943c-44af4ea4075e",
+    "code": "2291",
+    "name": "Benim"
+  },
+  {
+    "id": "6906018f-a6f6-47aa-b287-751fcd938b45",
+    "code": "0906",
+    "name": "Bermudas"
+  },
+  {
+    "id": "ce8cddeb-d117-41b4-a4bd-659068681f5e",
+    "code": "0850",
+    "name": "Bielorrússia"
+  },
+  {
+    "id": "50f8df7f-ac38-43f7-bb4a-d2b0f958f0d9",
+    "code": "0973",
+    "name": "Bolívia"
+  },
+  {
+    "id": "573f4d6f-462c-4528-b2bf-eb1e44b5d7da",
+    "code": "0981",
+    "name": "Bósnia e Herzegovina"
+  },
+  {
+    "id": "bb431ed6-248d-4a32-83e9-7633038aff8f",
+    "code": "1015",
+    "name": "Botsuana"
+  },
+  {
+    "id": "0146dbe6-0243-4e7c-ae11-49f158548d38",
+    "code": "1058",
+    "name": "Brasil"
+  },
+  {
+    "id": "a03b0e58-7934-4efc-b5fb-58fa019d4962",
+    "code": "1082",
+    "name": "Brunei"
+  },
+  {
+    "id": "0dd151d5-ebfa-4a98-8164-9cb18c9156d3",
+    "code": "1112",
+    "name": "Bulgária"
+  },
+  {
+    "id": "00c58835-e674-4afa-8b5e-2d4edbc99fbb",
+    "code": "0310",
+    "name": "Burkina Faso"
+  },
+  {
+    "id": "f26bb66a-55c5-4df0-9299-a4754c98631b",
+    "code": "1155",
+    "name": "Burundi"
+  },
+  {
+    "id": "67378672-8c1c-4067-a739-ef1807e24c5b",
+    "code": "1198",
+    "name": "Butão"
+  },
+  {
+    "id": "34210c06-85d1-49cb-99b7-0ad1c077f2bb",
+    "code": "1279",
+    "name": "Cabo Verde"
+  },
+  {
+    "id": "bfebe004-a3ae-4611-a9a1-8362569d6573",
+    "code": "1457",
+    "name": "Camarões"
+  },
+  {
+    "id": "683504d3-bbcf-46f7-b7a0-1999ce3f449b",
+    "code": "1414",
+    "name": "Camboja"
+  },
+  {
+    "id": "92967b24-4f35-4f53-ac06-9fabe5cc6e3b",
+    "code": "1490",
+    "name": "Canadá"
+  },
+  {
+    "id": "45831335-0162-4916-a170-77323500f757",
+    "code": "1546",
+    "name": "Catar"
+  },
+  {
+    "id": "b8284d07-15b7-4e83-93dc-e6b3dd2215de",
+    "code": "1538",
+    "name": "Cazaquistão"
+  },
+  {
+    "id": "af1575cb-0317-4969-bc7f-82a84e1008d8",
+    "code": "7889",
+    "name": "Chade"
+  },
+  {
+    "id": "80e41f48-0f12-41ce-9396-ab7540bce438",
+    "code": "1589",
+    "name": "Chile"
+  },
+  {
+    "id": "be63647b-37ab-47e6-83fd-bb5301043173",
+    "code": "1600",
+    "name": "China"
+  },
+  {
+    "id": "f728925e-c8e3-41d0-94be-c93c8018fc5f",
+    "code": "1635",
+    "name": "Chipre"
+  },
+  {
+    "id": "4662a679-d2a7-4fd6-9588-9244bcd74cab",
+    "code": "1694",
+    "name": "Colômbia"
+  },
+  {
+    "id": "e6ba2400-b54a-4a92-85c8-bf8916a14f65",
+    "code": "1732",
+    "name": "Comores"
+  },
+  {
+    "id": "380c2b8f-f3ae-48ca-8ff7-d80f64ee1131",
+    "code": "1775",
+    "name": "Congo"
+  },
+  {
+    "id": "1c86cdb4-8c9b-4ee3-8d79-cdf6cbee00de",
+    "code": "1872",
+    "name": "Coreia do Norte"
+  },
+  {
+    "id": "b5de28ec-565b-43ae-ab5f-45ddd5c7422d",
+    "code": "1902",
+    "name": "Coreia do Sul"
+  },
+  {
+    "id": "4c8f1535-a1d2-476e-a8e9-9e1db28a2e5b",
+    "code": "1937",
+    "name": "Costa do Marfim"
+  },
+  {
+    "id": "c3389264-6ea8-469e-a963-b226a9059d98",
+    "code": "1961",
+    "name": "Costa Rica"
+  },
+  {
+    "id": "046b1c71-55b2-477c-9c99-ae9e3658f58d",
+    "code": "1953",
+    "name": "Croácia"
+  },
+  {
+    "id": "22d369e4-5886-415f-b67a-d945a1aa1d8d",
+    "code": "1996",
+    "name": "Cuba"
+  },
+  {
+    "id": "6dea0ae8-71da-4838-8802-07d11a5c87b9",
+    "code": "2321",
+    "name": "Dinamarca"
+  },
+  {
+    "id": "b3ad8379-5cbb-4cac-a075-e9ed2e80b5d2",
+    "code": "7838",
+    "name": "Djibouti"
+  },
+  {
+    "id": "d1dfb2e2-5cda-4b41-90c4-8d803049a1fd",
+    "code": "2356",
+    "name": "Dominica"
+  },
+  {
+    "id": "c9b0ba04-06e7-4966-a31f-78962fab0f51",
+    "code": "2402",
+    "name": "Egito"
+  },
+  {
+    "id": "af00cf3f-1fd1-4bb5-957d-d7c7e2089b4b",
+    "code": "6874",
+    "name": "El Salvador"
+  },
+  {
+    "id": "91ac4ccd-4fe4-460c-96b4-24016b7c70c4",
+    "code": "2445",
+    "name": "Emirados Árabes Unidos"
+  },
+  {
+    "id": "78253093-f148-4ecb-a3d7-38ce438637ab",
+    "code": "2399",
+    "name": "Equador"
+  },
+  {
+    "id": "6f674659-3468-4f5c-bb8c-324afc7cdcc0",
+    "code": "2437",
+    "name": "Eritreia"
+  },
+  {
+    "id": "d54e05c5-2b47-4ab9-88df-e82e2a0ea14e",
+    "code": "2470",
+    "name": "Eslováquia"
+  },
+  {
+    "id": "83c2c442-de38-4dba-89ac-6244f70494f6",
+    "code": "2461",
+    "name": "Eslovênia"
+  },
+  {
+    "id": "70b3c67d-905a-4dfe-99a7-d390325aaf06",
+    "code": "2453",
+    "name": "Espanha"
+  },
+  {
+    "id": "35ab642b-5da4-411c-a513-471de8983308",
+    "code": "2496",
+    "name": "Estados Unidos da América"
+  },
+  {
+    "id": "e3679516-40c8-4ad5-b0b9-d16b1eff74dc",
+    "code": "2518",
+    "name": "Estônia"
+  },
+  {
+    "id": "db868962-6efc-4ef8-9cb0-747eaded27c3",
+    "code": "2534",
+    "name": "Etiópia"
+  },
+  {
+    "id": "89b70fc8-bec3-4c54-8f62-5888e75a0c92",
+    "code": "0000",
+    "name": "Exterior"
+  },
+  {
+    "id": "b1b21a95-0cf1-45c1-98ea-bb89dc0343bf",
+    "code": "8702",
+    "name": "Fiji"
+  },
+  {
+    "id": "26e7749e-f213-4e77-883e-ee3abe2a24d9",
+    "code": "2674",
+    "name": "Filipinas"
+  },
+  {
+    "id": "d034fc4c-eb32-4827-801a-b880bb165514",
+    "code": "2712",
+    "name": "Finlândia"
+  },
+  {
+    "id": "44fcf29a-f1f7-4e22-865a-cfbd9f1ee411",
+    "code": "2755",
+    "name": "França"
+  },
+  {
+    "id": "91922f75-4c84-48b3-926a-b6154e74566b",
+    "code": "2810",
+    "name": "Gabão"
+  },
+  {
+    "id": "5feb99be-c4f1-4678-9215-843ec024099c",
+    "code": "2852",
+    "name": "Gâmbia"
+  },
+  {
+    "id": "59652668-e11a-45e6-8490-83437c95db90",
+    "code": "2895",
+    "name": "Gana"
+  },
+  {
+    "id": "cafdc1c5-24ab-4767-8680-4caff8c30a5c",
+    "code": "2917",
+    "name": "Geórgia"
+  },
+  {
+    "id": "676fc6be-1a1d-4ba6-b10b-0f4223384e16",
+    "code": "2933",
+    "name": "Gibraltar"
+  },
+  {
+    "id": "674496c9-a828-4200-a0ef-416c5f3419fe",
+    "code": "2976",
+    "name": "Granada"
+  },
+  {
+    "id": "cb4440ae-8238-4bac-8744-d9b4d09534b2",
+    "code": "3018",
+    "name": "Grécia"
+  },
+  {
+    "id": "1a0700e0-a412-4791-b3b5-2e4d28c5f257",
+    "code": "3050",
+    "name": "Gronelândia"
+  },
+  {
+    "id": "3bcac4a0-5d10-43d2-8d34-ed120c835301",
+    "code": "3093",
+    "name": "Guadalupe"
+  },
+  {
+    "id": "b6736b89-9214-4f04-b07a-78ac2e5a1127",
+    "code": "3131",
+    "name": "Guam"
+  },
+  {
+    "id": "e5d7de5d-5b03-4676-94e6-940097297f81",
+    "code": "3174",
+    "name": "Guatemala"
+  },
+  {
+    "id": "c5e86e1b-ace5-4007-98eb-1142590fa972",
+    "code": "3379",
+    "name": "Guiana"
+  },
+  {
+    "id": "748748d3-260e-4177-88fb-bec3197892f0",
+    "code": "3255",
+    "name": "Guiana Francesa"
+  },
+  {
+    "id": "f7f458d9-55b4-4ec8-b90a-5ccb23252d2b",
+    "code": "3298",
+    "name": "Guiné"
+  },
+  {
+    "id": "4e27f331-a99e-4ea2-a227-110b6a0125a1",
+    "code": "3344",
+    "name": "Guiné-Bissau"
+  },
+  {
+    "id": "a5af560b-7a05-4f83-afc4-c6532455146c",
+    "code": "3310",
+    "name": "Guiné Equatorial"
+  },
+  {
+    "id": "037d7d81-9794-45fa-acc0-16064c8c0537",
+    "code": "3417",
+    "name": "Haiti"
+  },
+  {
+    "id": "a0284aff-014a-4905-978c-348ba9353fde",
+    "code": "3450",
+    "name": "Honduras"
+  },
+  {
+    "id": "4663b104-0328-4512-b641-e501c6d0f031",
+    "code": "3514",
+    "name": "Hong Kong"
+  },
+  {
+    "id": "38c473a6-7ca3-44cb-8999-c74a3eb9e234",
+    "code": "3557",
+    "name": "Hungria"
+  },
+  {
+    "id": "9aba1a41-32ba-4a81-8527-1eb010fccca2",
+    "code": "3573",
+    "name": "Iêmen"
+  },
+  {
+    "id": "1c1910e3-754e-46df-ab2a-58f7673dd185",
+    "code": "5118",
+    "name": "Ilha Christmas"
+  },
+  {
+    "id": "9299ba47-e735-4ee3-8810-1a032749e378",
+    "code": "3595",
+    "name": "Ilha de Man"
+  },
+  {
+    "id": "5716f7e6-9dac-40d0-b641-41b2c8f4506e",
+    "code": "5355",
+    "name": "Ilha Norfolk"
+  },
+  {
+    "id": "6866d022-2e42-4791-a956-beae7c19bd86",
+    "code": "1376",
+    "name": "Ilhas Cayman"
+  },
+  {
+    "id": "3124560b-6238-4937-9cce-a35dff78c293",
+    "code": "1651",
+    "name": "Ilhas Cocos"
+  },
+  {
+    "id": "70efcdbb-5bf2-4711-948c-d575c4778ff6",
+    "code": "1830",
+    "name": "Ilhas Cook"
+  },
+  {
+    "id": "b814db3d-2aef-49fe-a8a1-103362ce644d",
+    "code": "2593",
+    "name": "Ilhas Feroé"
+  },
+  {
+    "id": "b245e73e-b37e-4d24-a98a-f39ae51cfc8c",
+    "code": "1504",
+    "name": "Ilhas Jersey"
+  },
+  {
+    "id": "41d0dd38-d0ca-4699-90d8-44ba70a8ba10",
+    "code": "2550",
+    "name": "Ilhas Malvinas"
+  },
+  {
+    "id": "b65b0252-56df-460d-a127-81b490c2596d",
+    "code": "4766",
+    "name": "Ilhas Marshall"
+  },
+  {
+    "id": "372b4e54-3c79-4329-bfa8-2222f1ba72d6",
+    "code": "6777",
+    "name": "Ilhas Salomão"
+  },
+  {
+    "id": "f276e750-fffd-4674-8d0f-852632f9f295",
+    "code": "8230",
+    "name": "Ilhas Turcas e Caicos"
+  },
+  {
+    "id": "66a50eb0-e30b-418b-81cf-b2e47875af20",
+    "code": "8664",
+    "name": "Ilhas Virgens Americanas"
+  },
+  {
+    "id": "e907146e-8769-4c93-a3f6-8afadad1a8bd",
+    "code": "8630",
+    "name": "Ilhas Virgens Britânicas"
+  },
+  {
+    "id": "36e1959f-8a38-490e-983e-c96d9c0a7b28",
+    "code": "3611",
+    "name": "Índia"
+  },
+  {
+    "id": "88b31f82-3ce6-4c03-8530-6b6b90b6212e",
+    "code": "3654",
+    "name": "Indonésia"
+  },
+  {
+    "id": "c0218342-db97-44a1-99ed-760ff8584413",
+    "code": "3727",
+    "name": "Irã"
+  },
+  {
+    "id": "4d473e24-5131-41ba-95f8-d7b579b2cf0c",
+    "code": "3697",
+    "name": "Iraque"
+  },
+  {
+    "id": "9a6c13e0-7a09-4544-a93e-c0c0c9a5a343",
+    "code": "3751",
+    "name": "Irlanda"
+  },
+  {
+    "id": "fa1ee366-d953-4335-a0d3-235b866f8d63",
+    "code": "3794",
+    "name": "Islândia"
+  },
+  {
+    "id": "3ea43dda-7a33-4a9c-bfe3-d25de520a20c",
+    "code": "3832",
+    "name": "Israel"
+  },
+  {
+    "id": "36f72334-7ec9-4a08-9e5f-a469d8423459",
+    "code": "3867",
+    "name": "Itália"
+  },
+  {
+    "id": "ac56a54d-7f64-4272-aec3-00c7ed705d4c",
+    "code": "3913",
+    "name": "Jamaica"
+  },
+  {
+    "id": "a5f082a1-5ecc-44bc-a738-50efbad97a18",
+    "code": "3999",
+    "name": "Japão"
+  },
+  {
+    "id": "699e0643-f10d-47af-9ca5-9aef91930fb7",
+    "code": "4030",
+    "name": "Jordânia"
+  },
+  {
+    "id": "852a990f-b963-4980-a294-7c9e57716093",
+    "code": "4111",
+    "name": "Kiribati"
+  },
+  {
+    "id": "4eb2476e-8f23-4792-b3b3-b9dcd5424102",
+    "code": "1988",
+    "name": "Kuwait"
+  },
+  {
+    "id": "b82772e4-935c-40f0-b046-afc671245751",
+    "code": "4200",
+    "name": "Laos"
+  },
+  {
+    "id": "b8040a7d-5bd1-4a7a-929f-2974b151ce90",
+    "code": "4260",
+    "name": "Lesoto"
+  },
+  {
+    "id": "81555765-5d69-4acc-a1ec-2211c658af1c",
+    "code": "4278",
+    "name": "Letônia"
+  },
+  {
+    "id": "f4ddb509-1639-41e2-89a5-da77893075ca",
+    "code": "4316",
+    "name": "Líbano"
+  },
+  {
+    "id": "5bce1aac-8ba5-4135-ae3d-5be7abe5025c",
+    "code": "4340",
+    "name": "Libéria"
+  },
+  {
+    "id": "b8577716-656e-4151-8308-29dd6a236702",
+    "code": "4383",
+    "name": "Líbia"
+  },
+  {
+    "id": "784f22c8-ab0c-499b-a2bf-016209278021",
+    "code": "4405",
+    "name": "Liechtenstein"
+  },
+  {
+    "id": "dcfef3a1-3f4d-4fa0-8853-d625971a31b0",
+    "code": "4421",
+    "name": "Lituânia"
+  },
+  {
+    "id": "c5b766b7-e51b-4e15-a61b-64baa489fbff",
+    "code": "4456",
+    "name": "Luxemburgo"
+  },
+  {
+    "id": "9904a219-76ca-4361-b618-2f429a557b69",
+    "code": "4472",
+    "name": "Macau"
+  },
+  {
+    "id": "4c464032-c318-48f1-af71-4100d9633369",
+    "code": "4499",
+    "name": "Macedônia"
+  },
+  {
+    "id": "c959bb21-2121-48b2-ad58-499e3277d8b1",
+    "code": "4502",
+    "name": "Madagascar"
+  },
+  {
+    "id": "e3bd2e8c-109d-4d3b-9bbb-e2bed0660eb3",
+    "code": "4553",
+    "name": "Malásia"
+  },
+  {
+    "id": "63f0a33b-e626-4a6c-8157-f00549957997",
+    "code": "4588",
+    "name": "Malaui"
+  },
+  {
+    "id": "f22a5faa-189f-401d-88d2-5ad6b4d0fee6",
+    "code": "4618",
+    "name": "Maldivas"
+  },
+  {
+    "id": "111a0ae4-45d4-48d2-b837-83654460aad3",
+    "code": "4642",
+    "name": "Mali"
+  },
+  {
+    "id": "3f214052-3ea0-4d49-ab4a-e4d46312cb8e",
+    "code": "4677",
+    "name": "Malta"
+  },
+  {
+    "id": "96c4cfbb-3d23-4d98-bb4c-803396ee697d",
+    "code": "4723",
+    "name": "Marianas Setentrionais"
+  },
+  {
+    "id": "2a56d277-5c61-40cd-b391-b1ab2dda3653",
+    "code": "4740",
+    "name": "Marrocos"
+  },
+  {
+    "id": "d21be546-8cc3-4485-a7b2-b7cc4f251c29",
+    "code": "4774",
+    "name": "Martinica"
+  },
+  {
+    "id": "34ffdf59-bcb4-4b65-b316-524ae4f91868",
+    "code": "4855",
+    "name": "Maurícia"
+  },
+  {
+    "id": "025ef821-f62f-4405-99a2-a213a4d87e10",
+    "code": "4880",
+    "name": "Mauritânia"
+  },
+  {
+    "id": "e60f5959-1cf9-410f-92cd-db4ca54f1f6c",
+    "code": "4936",
+    "name": "México"
+  },
+  {
+    "id": "dc232941-fc8f-480f-9c03-60692e9a68fd",
+    "code": "0930",
+    "name": "Mianmar"
+  },
+  {
+    "id": "4ad8f7a3-deff-4b56-ac9c-2153f4cf9f2b",
+    "code": "4995",
+    "name": "Micronésia"
+  },
+  {
+    "id": "72f25770-ca13-482c-9d6e-4d439f0f563f",
+    "code": "5053",
+    "name": "Moçambique"
+  },
+  {
+    "id": "a45b0199-fc70-4a0b-8dc4-e33c38086497",
+    "code": "4944",
+    "name": "Moldávia"
+  },
+  {
+    "id": "6a25dcda-8365-4c02-b2b5-19e16847270c",
+    "code": "4952",
+    "name": "Mônaco"
+  },
+  {
+    "id": "f74a134a-e272-4417-99d2-f5c9895ecb74",
+    "code": "4979",
+    "name": "Mongólia"
+  },
+  {
+    "id": "f76c37f5-9851-4c23-a234-fa7b56d775d9",
+    "code": "5010",
+    "name": "Montserrat"
+  },
+  {
+    "id": "f6e8da2d-7ac0-49c2-bf23-87a6d2152e7c",
+    "code": "5070",
+    "name": "Namíbia"
+  },
+  {
+    "id": "366a35ab-f103-40fd-be73-f8ce993a927c",
+    "code": "5088",
+    "name": "Nauru"
+  },
+  {
+    "id": "7012baf2-4984-4190-a811-c577bb29becc",
+    "code": "5177",
+    "name": "Nepal"
+  },
+  {
+    "id": "5709adce-8179-4105-9b84-f0a49cc31f30",
+    "code": "5215",
+    "name": "Nicarágua"
+  },
+  {
+    "id": "ee211e12-db81-4007-8593-605489d0a4b0",
+    "code": "5258",
+    "name": "Níger"
+  },
+  {
+    "id": "77741c49-1572-4628-9ebe-0d49a4e5b745",
+    "code": "5282",
+    "name": "Nigéria"
+  },
+  {
+    "id": "b61010d6-5e59-4a3a-ae8e-3f57555c1c78",
+    "code": "5312",
+    "name": "Niue"
+  },
+  {
+    "id": "811de7de-e273-4581-9a39-009385cfbb25",
+    "code": "5380",
+    "name": "Noruega"
+  },
+  {
+    "id": "aa342eef-a605-4580-b584-8465994e9118",
+    "code": "5428",
+    "name": "Nova Caledônia"
+  },
+  {
+    "id": "fa010d96-6de5-4275-93ad-be2beae710ba",
+    "code": "5487",
+    "name": "Nova Zelândia"
+  },
+  {
+    "id": "98c24683-284c-40ee-8cc4-b615ce1c117b",
+    "code": "5568",
+    "name": "Omã"
+  },
+  {
+    "id": "a9b085e3-8946-41a5-9bdf-a1d888f279d1",
+    "code": "5738",
+    "name": "Países Baixos"
+  },
+  {
+    "id": "6be197d3-e0b5-45c7-bbf5-184577dde2d8",
+    "code": "5754",
+    "name": "Palau"
+  },
+  {
+    "id": "3fa9b606-cc4d-42ab-8700-7cbeea88f1fd",
+    "code": "5800",
+    "name": "Panamá"
+  },
+  {
+    "id": "c07a64b0-e0dd-4eba-8559-c3257e020b45",
+    "code": "5452",
+    "name": "Papua-Nova Guiné"
+  },
+  {
+    "id": "1ff5afd7-d0a7-4ebf-ad58-1acb2697f566",
+    "code": "5762",
+    "name": "Paquistão"
+  },
+  {
+    "id": "89f7628a-8ac1-4e9f-9446-2c00c9d85813",
+    "code": "5860",
+    "name": "Paraguai"
+  },
+  {
+    "id": "e226a552-97b6-4ca0-b694-72bcaf36a276",
+    "code": "5894",
+    "name": "Peru"
+  },
+  {
+    "id": "8d1483d6-65f0-46de-bee5-7ccfa8ade219",
+    "code": "5932",
+    "name": "Pitcairn"
+  },
+  {
+    "id": "792c552f-474c-44bb-b720-7327670ee298",
+    "code": "5991",
+    "name": "Polinésia Francesa"
+  },
+  {
+    "id": "48c58d77-0a29-4f6a-9575-8426bf917905",
+    "code": "6033",
+    "name": "Polônia"
+  },
+  {
+    "id": "512f17f1-50f1-4a5b-9699-a6b66b3bdee9",
+    "code": "6114",
+    "name": "Porto Rico"
+  },
+  {
+    "id": "86868ee3-9e65-4c59-ac11-5f0fc81aabd7",
+    "code": "6076",
+    "name": "Portugal"
+  },
+  {
+    "id": "460ce983-734e-4d5a-ac6d-b5dece3d1df9",
+    "code": "6238",
+    "name": "Quênia"
+  },
+  {
+    "id": "216b3e55-5a9c-4dcc-a3b9-c1e14920ae43",
+    "code": "6254",
+    "name": "Quirguistão"
+  },
+  {
+    "id": "27aa9730-5178-4d94-b86d-a564e2a8c965",
+    "code": "6408",
+    "name": "República Centro-Africana"
+  },
+  {
+    "id": "59e07aaa-b0a8-4c48-8532-41622be51d97",
+    "code": "7919",
+    "name": "República Checa"
+  },
+  {
+    "id": "f8c3108e-3af2-42f2-9b5c-5b5e06709380",
+    "code": "8885",
+    "name": "República Democrática do Congo"
+  },
+  {
+    "id": "8d474e3f-c360-4640-a104-622c283f471f",
+    "code": "6475",
+    "name": "República Dominicana"
+  },
+  {
+    "id": "1200a9ba-8b29-4c5c-8001-7b2699c8f8f4",
+    "code": "6602",
+    "name": "Reunião"
+  },
+  {
+    "id": "15d591ad-c8d9-4c4a-a62e-2124af6d9939",
+    "code": "6700",
+    "name": "Romênia"
+  },
+  {
+    "id": "d6a9d39a-5478-4e51-86fb-c4c49bc6827b",
+    "code": "6750",
+    "name": "Ruanda"
+  },
+  {
+    "id": "be8bdcc5-434d-4f72-b022-653525753843",
+    "code": "6769",
+    "name": "Rússia"
+  },
+  {
+    "id": "0cdfa23f-0e64-49b7-a975-10682cecc2ac",
+    "code": "6858",
+    "name": "Saara Ocidental"
+  },
+  {
+    "id": "d619c354-1479-4010-a78f-a998dccbb061",
+    "code": "6904",
+    "name": "Samoa"
+  },
+  {
+    "id": "e4bf9002-2e58-41f3-9756-961829970ba6",
+    "code": "6912",
+    "name": "Samoa Americana"
+  },
+  {
+    "id": "86384591-0d5b-4171-93bd-340857b8bdcc",
+    "code": "6971",
+    "name": "San Marino"
+  },
+  {
+    "id": "ae6e1c46-01d6-49df-9905-6111e5834408",
+    "code": "7102",
+    "name": "Santa Helena"
+  },
+  {
+    "id": "e622ea89-8fdd-4959-911e-4fbb295437e2",
+    "code": "7153",
+    "name": "Santa Lúcia"
+  },
+  {
+    "id": "8fac75ff-dd4e-4998-9672-b37715f5d97d",
+    "code": "7200",
+    "name": "São Tomé e Príncipe"
+  },
+  {
+    "id": "6cd0a673-22ef-4f1a-a85a-61e2c9d7a0c5",
+    "code": "7056",
+    "name": "São Vicente e Granadinas"
+  },
+  {
+    "id": "47a01148-1a2c-4d03-8918-17bec38db62b",
+    "code": "7285",
+    "name": "Senegal"
+  },
+  {
+    "id": "24260a2e-6e34-4f92-9641-853093a63e81",
+    "code": "7358",
+    "name": "Serra Leoa"
+  },
+  {
+    "id": "c1c8af96-e04d-4fc1-a7ee-193fd2c36f97",
+    "code": "7315",
+    "name": "Seychelles"
+  },
+  {
+    "id": "62222589-d6a6-4052-8e59-a9b813e33fab",
+    "code": "7412",
+    "name": "Singapura"
+  },
+  {
+    "id": "77586a6f-a785-462f-980d-e89bf59a1650",
+    "code": "7447",
+    "name": "Síria"
+  },
+  {
+    "id": "ba8b08ea-84f6-4699-8563-ad615a13009a",
+    "code": "7480",
+    "name": "Somália"
+  },
+  {
+    "id": "13281bda-6426-4b33-81b3-5344bd89f487",
+    "code": "7501",
+    "name": "Sri Lanka"
+  },
+  {
+    "id": "f86218de-9887-472e-abc1-b5a36bfa32fd",
+    "code": "7544",
+    "name": "Suazilândia"
+  },
+  {
+    "id": "a2f08d94-4e07-4be5-9dbd-6167485e6587",
+    "code": "7595",
+    "name": "Sudão"
+  },
+  {
+    "id": "67a4222f-0c73-4bf2-afce-6fc5de0093d4",
+    "code": "7641",
+    "name": "Suécia"
+  },
+  {
+    "id": "3d597d0e-df84-42c2-b325-6ac5a8767b65",
+    "code": "7676",
+    "name": "Suíça"
+  },
+  {
+    "id": "d75f48e2-52f2-4c4e-8ea4-2787acc8b9f8",
+    "code": "7706",
+    "name": "Suriname"
+  },
+  {
+    "id": "f07e0067-b828-4738-aa89-47a3aa8d9417",
+    "code": "7722",
+    "name": "Tadjiquistão"
+  },
+  {
+    "id": "88308296-4a67-4da6-a34d-0f1ed1e5aedd",
+    "code": "7765",
+    "name": "Tailândia"
+  },
+  {
+    "id": "726fd052-5d33-4a46-b886-34770fc940fc",
+    "code": "1619",
+    "name": "Taiwan"
+  },
+  {
+    "id": "98eebe3f-7c54-4177-a562-1db9cfba3c38",
+    "code": "7803",
+    "name": "Tanzânia"
+  },
+  {
+    "id": "765dbc02-0557-46af-9b94-ba3ec1cabc17",
+    "code": "7820",
+    "name": "Terr. Britânico Oceano Índico"
+  },
+  {
+    "id": "2f507e9f-1acf-41ea-9fec-acbb8df62832",
+    "code": "7951",
+    "name": "Timor-Leste"
+  },
+  {
+    "id": "27b22eba-8402-4c06-b4d2-7196e826e600",
+    "code": "8001",
+    "name": "Togo"
+  },
+  {
+    "id": "d1491b16-fefe-42af-b4c2-52c918048cb3",
+    "code": "8052",
+    "name": "Tokelau"
+  },
+  {
+    "id": "1623690a-4240-452b-9f6e-8ea8505bb395",
+    "code": "8109",
+    "name": "Tonga"
+  },
+  {
+    "id": "8a822e1a-304a-4eff-899c-f7eb3f604de8",
+    "code": "8150",
+    "name": "Trinidad e Tobago"
+  },
+  {
+    "id": "64e304e9-b6e4-403d-9f94-6dec5f28b4de",
+    "code": "8206",
+    "name": "Tunísia"
+  },
+  {
+    "id": "16bd3951-82eb-4397-9d24-885aecb2414b",
+    "code": "8249",
+    "name": "Turcomenistão"
+  },
+  {
+    "id": "9acdd043-ecf4-4d31-8df6-af71fc6fc9ec",
+    "code": "8273",
+    "name": "Turquia"
+  },
+  {
+    "id": "453c6fef-185f-4281-96ec-db5f00d51e00",
+    "code": "8281",
+    "name": "Tuvalu"
+  },
+  {
+    "id": "27b45f5b-d556-4d78-821d-55f0d581b508",
+    "code": "8311",
+    "name": "Ucrânia"
+  },
+  {
+    "id": "4fcac68d-dc07-4e8b-8322-aebdb237e16e",
+    "code": "8338",
+    "name": "Uganda"
+  },
+  {
+    "id": "08e43eef-3055-4bc2-a28e-806793beffc2",
+    "code": "8451",
+    "name": "Uruguai"
+  },
+  {
+    "id": "a54c5474-d8a4-40dd-b06c-ff5b031bb0a5",
+    "code": "8478",
+    "name": "Uzbequistão"
+  },
+  {
+    "id": "45c4f5af-07c9-4923-9ca5-8447db7cb92b",
+    "code": "5517",
+    "name": "Vanuatu"
+  },
+  {
+    "id": "34d7c421-efd7-4076-9c15-e4096892d636",
+    "code": "8486",
+    "name": "Vaticano"
+  },
+  {
+    "id": "81c72000-7555-4379-8dce-f25acb759e06",
+    "code": "8508",
+    "name": "Venezuela"
+  },
+  {
+    "id": "d5462b2d-9917-4451-aefc-ab8b9eed8b70",
+    "code": "8583",
+    "name": "Vietnã"
+  },
+  {
+    "id": "853f4e24-c6c1-4af8-baf9-6eb5d875a1cf",
+    "code": "8753",
+    "name": "Wallis e Futuna"
+  },
+  {
+    "id": "65705524-9d00-4bbb-880c-eee3a6a4efa1",
+    "code": "8907",
+    "name": "Zâmbia"
+  },
+  {
+    "id": "fa5684c8-05d6-4bd8-b23f-481a915e89a6",
+    "code": "6653",
+    "name": "Zimbábue"
+  }
+]

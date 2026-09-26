@@ -50,6 +50,34 @@
       "when": 1790168751590,
       "tag": "0006_bitter_overlord",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790434907981,
+      "tag": "0007_salty_human_torch",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790435587075,
+      "tag": "0008_slippery_gateway",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790436360537,
+      "tag": "0009_wooden_quentin_quire",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790437261048,
+      "tag": "0010_nappy_bulldozer",
+      "breakpoints": true
     }
   ]
 }

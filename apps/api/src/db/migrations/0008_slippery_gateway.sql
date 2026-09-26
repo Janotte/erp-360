@@ -1,0 +1,1 @@
+ALTER TABLE "countries" ALTER COLUMN "code" SET DATA TYPE varchar(4);

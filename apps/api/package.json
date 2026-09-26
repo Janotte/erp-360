@@ -11,7 +11,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "db:setup": "wait-on tcp:localhost:5432 && pnpm db:migrate"
+    "db:setup": "wait-on tcp:localhost:5432 && pnpm db:migrate",
+    "db:seed": "tsx scripts/seed-complete.ts"
   },
   "dependencies": {
     "@erp-360/mod-core": "workspace:*",
