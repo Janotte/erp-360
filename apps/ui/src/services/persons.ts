@@ -39,6 +39,27 @@ export interface PersonAddressInput {
   cityId?: string | null;
 }
 
+export type ContactType = 'Principal' | 'Outro';
+
+export interface PersonContact {
+  id: string;
+  type: ContactType;
+  department: string;
+  name: string;
+  phone: string | null;
+  mobilePhone: string | null;
+  email: string | null;
+}
+
+export interface PersonContactInput {
+  type: ContactType;
+  department: string;
+  name: string;
+  phone?: string;
+  mobilePhone?: string;
+  email?: string;
+}
+
 export interface FiltersPersons {
   page: number;
   limit: number;
@@ -88,6 +109,17 @@ async function parseAddressResponse(
     throw new Error(body.message || body.error || fallback);
   }
   return body as PersonAddress;
+}
+
+async function parseContactResponse(
+  res: Response,
+  fallback: string,
+): Promise<PersonContact> {
+  const body = await readBody(res);
+  if (!res.ok) {
+    throw new Error(body.message || body.error || fallback);
+  }
+  return body as PersonContact;
 }
 export const personsService = {
   list: async (filters: FiltersPersons): Promise<PaginationResponse<Person>> => {
@@ -177,6 +209,49 @@ export const personsService = {
     if (!res.ok) {
       const erro = await readBody(res);
       throw new Error(erro.message || 'Erro ao excluir endereço.');
+    }
+  },
+  listContacts: async (personId: string): Promise<PersonContact[]> => {
+    const res = await fetch(`${API_URL}/persons/${personId}/contacts`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      const erro = await readBody(res);
+      throw new Error(erro.message || erro.error || 'Falha ao carregar contatos.');
+    }
+    return res.json();
+  },
+  createContact: async (
+    personId: string,
+    dados: PersonContactInput,
+  ): Promise<PersonContact> => {
+    const res = await fetch(`${API_URL}/persons/${personId}/contacts`, {
+      method: 'POST',
+      headers: jsonHeaders(),
+      body: JSON.stringify(dados),
+    });
+    return parseContactResponse(res, 'Falha ao cadastrar contato.');
+  },
+  updateContact: async (
+    personId: string,
+    contactId: string,
+    dados: PersonContactInput,
+  ): Promise<PersonContact> => {
+    const res = await fetch(`${API_URL}/persons/${personId}/contacts/${contactId}`, {
+      method: 'PUT',
+      headers: jsonHeaders(),
+      body: JSON.stringify(dados),
+    });
+    return parseContactResponse(res, 'Falha ao atualizar contato.');
+  },
+  deleteContact: async (personId: string, contactId: string): Promise<void> => {
+    const res = await fetch(`${API_URL}/persons/${personId}/contacts/${contactId}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    if (!res.ok) {
+      const erro = await readBody(res);
+      throw new Error(erro.message || 'Erro ao excluir contato.');
     }
   },
 };

@@ -40,6 +40,19 @@ export const PersonAddressSchema = z.object({
 
 export type PersonAddressInput = z.infer<typeof PersonAddressSchema>;
 
+export const personContactTypes = ['Principal', 'Outro'] as const;
+
+export const PersonContactSchema = z.object({
+  type: z.enum(personContactTypes).default('Principal'),
+  department: z.string().min(1, 'Informe o departamento').max(40),
+  name: z.string().min(2, 'O nome deve ter pelo menos 2 caracteres').max(60),
+  phone: z.string().max(20).optional().or(z.literal('')),
+  mobilePhone: z.string().max(20).optional().or(z.literal('')),
+  email: z.string().email('E-mail inválido').max(80).optional().or(z.literal('')),
+});
+
+export type PersonContactInput = z.infer<typeof PersonContactSchema>;
+
 export const API_URL = 'http://localhost:3000';
 
 export * from './utils/FormatCurrency';

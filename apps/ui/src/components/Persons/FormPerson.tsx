@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { type Person, personsService } from '../../services/persons';
 import { Separator } from '../ui/separator';
 import { PersonAddresses } from './PersonAddresses';
+import { PersonContacts } from './PersonContacts';
 interface FormPersonProps {
   personToUpdate?: Person | null;
   onPersisted?: () => void;
@@ -155,6 +156,8 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
 
       <Separator />
       <PersonAddresses personId={personId} />
+      <Separator />
+      <PersonContacts personId={personId} />
     </div>
   );
 }

@@ -100,3 +100,31 @@ export const personAddresses = pgTable(
     }).onDelete('cascade'),
   ],
 );
+
+// Enum para controle do tipo de contato
+export const typePersonContactEnum = pgEnum('type_person_contact', [
+  'Principal',
+  'Outro',
+]);
+
+export const personContacts = pgTable(
+  'person_contacts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ...tenantColumns,
+    personId: uuid('person_id').notNull(),
+    type: typePersonContactEnum('type').default('Principal').notNull(),
+    department: varchar('department', { length: 40 }).notNull(),
+    name: varchar('name', { length: 60 }).notNull(),
+    phone: varchar('phone', { length: 20 }),
+    mobilePhone: varchar('mobile_phone', { length: 20 }),
+    email: varchar('email', { length: 80 }),
+  },
+  (table) => [
+    foreignKey({
+      name: 'person_contacts_person_tenant_fk',
+      columns: [table.personId, table.tenantId],
+      foreignColumns: [persons.id, persons.tenantId],
+    }).onDelete('cascade'),
+  ],
+);

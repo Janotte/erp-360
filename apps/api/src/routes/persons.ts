@@ -7,6 +7,7 @@ import { db } from '../db/index.js';
 import '../types/fastify.js';
 import { accountsPayable, accountsReceivable } from '@erp-360/mod-financial';
 import { personAddressRoutes } from './person-addresses.js';
+import { personContactRoutes } from './person-contacts.js';
 
 const listPersonsQuery = z.object({
   type: z.enum(['cliente', 'fornecedor', 'colaborador']).optional(),
@@ -20,6 +21,7 @@ const listPersonsQuery = z.object({
 export const personsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
   await fastify.register(personAddressRoutes);
+  await fastify.register(personContactRoutes);
 
   // 1. Rota para Cadastrar uma Pessoa (Protegida por Tenant)
   fastify.post(
