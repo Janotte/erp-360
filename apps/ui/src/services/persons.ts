@@ -1,17 +1,29 @@
-import { API_URL } from '@erp-360/shared';
+import { API_URL, parseTaxpayerType } from '@erp-360/shared';
 
 import { authStorage } from '../utils/auth';
+
+export type TaxpayerType = 1 | 2 | 9;
+
 export interface Person {
   id: string;
   name: string;
-  document?: string;
-  email?: string;
-  phone?: string;
+  taxId?: string | null;
+  taxpayerType?: TaxpayerType | null;
+  stateRegistration?: string | null;
+  isRuralProducer: boolean;
+  birthDate?: string | null;
+  nfeEmail?: string | null;
+  documentEmails?: string[] | null;
+  notes?: string | null;
+  isActive: boolean;
+  isVisible: boolean;
   isClient: boolean;
   isSupplier: boolean;
   isEmployee: boolean;
   createdAt?: string;
 }
+
+export type PersonInput = Omit<Person, 'id' | 'createdAt'>;
 
 export type AddressType = 'Principal' | 'Faturamento' | 'Entrega' | 'Outro';
 
@@ -36,7 +48,7 @@ export interface PersonAddressInput {
   number?: string;
   complement?: string;
   neighborhood?: string;
-  cityId?: string | null;
+  cityId: string;
 }
 
 export type ContactType = 'Principal' | 'Outro';
@@ -44,19 +56,21 @@ export type ContactType = 'Principal' | 'Outro';
 export interface PersonContact {
   id: string;
   type: ContactType;
-  department: string;
+  relationship: string | null;
   name: string;
   phone: string | null;
   mobilePhone: string | null;
+  whatsapp: string | null;
   email: string | null;
 }
 
 export interface PersonContactInput {
   type: ContactType;
-  department: string;
+  relationship?: string;
   name: string;
   phone?: string;
   mobilePhone?: string;
+  whatsapp?: string;
   email?: string;
 }
 
@@ -97,7 +111,14 @@ async function parsePersonResponse(res: Response, fallback: string): Promise<Per
   if (!res.ok) {
     throw new Error(body.message || body.error || fallback);
   }
-  return body as Person;
+  return normalizePerson(body);
+}
+
+function normalizePerson(person: Person & { taxpayer_type?: unknown }): Person {
+  return {
+    ...person,
+    taxpayerType: parseTaxpayerType(person.taxpayerType ?? person.taxpayer_type),
+  };
 }
 
 async function parseAddressResponse(
@@ -139,9 +160,19 @@ export const personsService = {
       const erro = await res.json().catch(() => ({}));
       throw new Error(erro.message || erro.error || 'Falha ao carregar pessoas.');
     }
-    return res.json();
+    const body = await res.json();
+    return {
+      ...body,
+      data: Array.isArray(body.data) ? body.data.map(normalizePerson) : [],
+    };
   },
-  create: async (dados: Omit<Person, 'id'>): Promise<Person> => {
+  get: async (id: string): Promise<Person> => {
+    const res = await fetch(`${API_URL}/persons/${id}`, {
+      headers: authHeaders(),
+    });
+    return parsePersonResponse(res, 'Falha ao carregar pessoa.');
+  },
+  create: async (dados: PersonInput): Promise<Person> => {
     const res = await fetch(`${API_URL}/persons`, {
       method: 'POST',
       headers: jsonHeaders(),
@@ -149,7 +180,7 @@ export const personsService = {
     });
     return parsePersonResponse(res, 'Falha ao cadastrar.');
   },
-  update: async (id: string, dados: Partial<Person>): Promise<Person> => {
+  update: async (id: string, dados: PersonInput): Promise<Person> => {
     const res = await fetch(`${API_URL}/persons/${id}`, {
       method: 'PUT',
       headers: jsonHeaders(),

@@ -18,10 +18,11 @@ const contactParams = personParams.extend({
 const contactColumns = {
   id: personContacts.id,
   type: personContacts.type,
-  department: personContacts.department,
+  relationship: personContacts.relationship,
   name: personContacts.name,
   phone: personContacts.phone,
   mobilePhone: personContacts.mobilePhone,
+  whatsapp: personContacts.whatsapp,
   email: personContacts.email,
 };
 
@@ -32,10 +33,11 @@ function emptyToNull(value?: string | null) {
 function toContactValues(data: PersonContactInput) {
   return {
     type: data.type,
-    department: data.department,
+    relationship: emptyToNull(data.relationship),
     name: data.name,
     phone: emptyToNull(data.phone),
     mobilePhone: emptyToNull(data.mobilePhone),
+    whatsapp: emptyToNull(data.whatsapp),
     email: emptyToNull(data.email),
   };
 }

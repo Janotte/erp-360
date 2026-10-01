@@ -29,24 +29,28 @@ const contactTypes: ContactType[] = ['Principal', 'Outro'];
 
 interface ContactFormState {
   type: ContactType;
-  department: string;
+  relationship: string;
   name: string;
   phone: string;
   mobilePhone: string;
+  whatsapp: string;
   email: string;
 }
 
 const emptyForm = (): ContactFormState => ({
   type: 'Principal',
-  department: '',
+  relationship: '',
   name: '',
   phone: '',
   mobilePhone: '',
+  whatsapp: '',
   email: '',
 });
 
 function formatContact(contact: PersonContact) {
-  return [contact.phone, contact.mobilePhone, contact.email].filter(Boolean).join(' · ');
+  return [contact.phone, contact.mobilePhone, contact.whatsapp, contact.email]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 interface PersonContactsProps {
@@ -69,10 +73,11 @@ export function PersonContacts({ personId }: PersonContactsProps) {
     mutationFn: (dados: ContactFormState) => {
       const payload = {
         type: dados.type,
-        department: dados.department,
+        relationship: dados.relationship || undefined,
         name: dados.name,
         phone: dados.phone || undefined,
         mobilePhone: dados.mobilePhone || undefined,
+        whatsapp: dados.whatsapp || undefined,
         email: dados.email || undefined,
       };
       return editingId
@@ -115,10 +120,11 @@ export function PersonContacts({ personId }: PersonContactsProps) {
     setEditingId(contact.id);
     setForm({
       type: contact.type,
-      department: contact.department,
+      relationship: contact.relationship ?? '',
       name: contact.name,
       phone: contact.phone ?? '',
       mobilePhone: contact.mobilePhone ?? '',
+      whatsapp: contact.whatsapp ?? '',
       email: contact.email ?? '',
     });
   };
@@ -162,7 +168,9 @@ export function PersonContacts({ personId }: PersonContactsProps) {
                   {contact.name}{' '}
                   <span className="font-normal text-zinc-500">· {contact.type}</span>
                 </p>
-                <p className="text-sm text-zinc-600">{contact.department}</p>
+                {contact.relationship && (
+                  <p className="text-sm text-zinc-600">{contact.relationship}</p>
+                )}
                 {formatContact(contact) && (
                   <p className="text-sm text-zinc-600">{formatContact(contact)}</p>
                 )}
@@ -231,13 +239,12 @@ export function PersonContacts({ personId }: PersonContactsProps) {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="department">Departamento</Label>
+              <Label htmlFor="relationship">Departamento / Relacionamento</Label>
               <Input
-                id="department"
-                value={form.department}
+                id="relationship"
+                value={form.relationship}
                 maxLength={40}
-                required
-                onChange={(event) => updateForm({ department: event.target.value })}
+                onChange={(event) => updateForm({ relationship: event.target.value })}
               />
             </div>
           </div>
@@ -263,15 +270,26 @@ export function PersonContacts({ personId }: PersonContactsProps) {
             </div>
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="contactEmail">E-mail</Label>
-            <Input
-              id="contactEmail"
-              type="email"
-              value={form.email}
-              maxLength={80}
-              onChange={(event) => updateForm({ email: event.target.value })}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="whatsapp">WhatsApp</Label>
+              <Input
+                id="whatsapp"
+                value={form.whatsapp}
+                maxLength={20}
+                onChange={(event) => updateForm({ whatsapp: event.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="contactEmail">E-mail</Label>
+              <Input
+                id="contactEmail"
+                type="email"
+                value={form.email}
+                maxLength={80}
+                onChange={(event) => updateForm({ email: event.target.value })}
+              />
+            </div>
           </div>
 
           {saveMutation.isError && (

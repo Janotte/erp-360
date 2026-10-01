@@ -6,10 +6,10 @@
  */
 
 import { config } from 'dotenv';
+import { eq } from 'drizzle-orm';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { eq } from 'drizzle-orm';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 config({ path: join(scriptDir, '..', '.env') });
@@ -181,9 +181,9 @@ async function seedComplete() {
       code: city.code,
       name: city.name,
       stateId,
-      is_capital: city.is_capital,
-      latitude: toCoordinate(city.latitude),
-      longitude: toCoordinate(city.longitude),
+      isCapital: city.is_capital,
+      latitude: city.latitude ? parseFloat(city.latitude.toString()) : null,
+      longitude: city.longitude ? parseFloat(city.longitude.toString()) : null,
       population: city.population,
       timezone: city.timezone,
     });

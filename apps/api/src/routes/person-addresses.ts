@@ -41,7 +41,7 @@ function toAddressValues(data: PersonAddressInput) {
     number: emptyToNull(data.number),
     complement: emptyToNull(data.complement),
     neighborhood: emptyToNull(data.neighborhood),
-    cityId: emptyToNull(data.cityId),
+    cityId: data.cityId,
   };
 }
 

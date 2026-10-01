@@ -1,4 +1,5 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { parseTaxpayerType, taxpayerTypeLabels, taxpayerTypes } from '@erp-360/shared';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -6,40 +7,80 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
-import { type Person, personsService } from '../../services/persons';
+import { type Person, type PersonInput, personsService } from '../../services/persons';
 import { Separator } from '../ui/separator';
 import { PersonAddresses } from './PersonAddresses';
 import { PersonContacts } from './PersonContacts';
+
+function toDateInput(value?: string | null) {
+  if (!value) return '';
+  return String(value).slice(0, 10);
+}
+
+function parseEmails(raw: string) {
+  return raw
+    .split(/[,;\n]/)
+    .map((email) => email.trim())
+    .filter(Boolean);
+}
+
 interface FormPersonProps {
   personToUpdate?: Person | null;
-  onPersisted?: () => void;
+  onPersisted?: (person: Person) => void;
 }
+
 export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
   const queryClient = useQueryClient();
   const [personId, setPersonId] = useState(personToUpdate?.id);
   const [name, setName] = useState('');
-  const [document, setDocument] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const [taxId, setTaxId] = useState('');
+  const [taxpayerType, setTaxpayerType] = useState('');
+  const [stateRegistration, setStateRegistration] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [nfeEmail, setNfeEmail] = useState('');
+  const [documentEmails, setDocumentEmails] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isRuralProducer, setIsRuralProducer] = useState(false);
+  const [isActive, setIsActive] = useState(true);
+  const [isVisible, setIsVisible] = useState(true);
   const [isClient, setIsClient] = useState(false);
   const [isSupplier, setIsSupplier] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false);
 
+  const { data: personLoaded } = useQuery({
+    queryKey: ['person', personId],
+    enabled: Boolean(personId),
+    staleTime: 0,
+    queryFn: () => personsService.get(personId!),
+  });
+
   useEffect(() => {
-    if (personToUpdate) {
-      setName(personToUpdate.name);
-      setDocument(personToUpdate.document || '');
-      setEmail(personToUpdate.email || '');
-      setPhone(personToUpdate.phone || '');
-      setIsClient(personToUpdate.isClient);
-      setIsSupplier(personToUpdate.isSupplier);
-      setIsEmployee(personToUpdate.isEmployee);
-    }
-  }, [personToUpdate]);
+    if (!personLoaded && !personToUpdate) return;
+
+    const person = { ...personToUpdate, ...personLoaded };
+    const taxpayer =
+      parseTaxpayerType(personLoaded?.taxpayerType) ??
+      parseTaxpayerType(personToUpdate?.taxpayerType) ??
+      parseTaxpayerType((person as { taxpayer_type?: unknown }).taxpayer_type);
+
+    setName(person.name ?? '');
+    setTaxId(person.taxId || '');
+    setTaxpayerType(taxpayer != null ? String(taxpayer) : '');
+    setStateRegistration(person.stateRegistration || '');
+    setBirthDate(toDateInput(person.birthDate));
+    setNfeEmail(person.nfeEmail || '');
+    setDocumentEmails((person.documentEmails ?? []).join(', '));
+    setNotes(person.notes || '');
+    setIsRuralProducer(Boolean(person.isRuralProducer));
+    setIsActive(person.isActive !== false);
+    setIsVisible(person.isVisible !== false);
+    setIsClient(Boolean(person.isClient));
+    setIsSupplier(Boolean(person.isSupplier));
+    setIsEmployee(Boolean(person.isEmployee));
+  }, [personLoaded, personToUpdate]);
 
   const mutation = useMutation({
-    mutationFn: (dados: Omit<Person, 'id'>) => {
+    mutationFn: (dados: PersonInput) => {
       return personId
         ? personsService.update(personId, dados)
         : personsService.create(dados);
@@ -47,8 +88,12 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
     onSuccess: (saved) => {
       const created = !personId;
       setPersonId(saved.id);
-      if (created) onPersisted?.();
+      const savedType = parseTaxpayerType(saved.taxpayerType)?.toString();
+      setTaxpayerType(savedType || taxpayerType);
+      queryClient.setQueryData(['person', saved.id], saved);
+      queryClient.invalidateQueries({ queryKey: ['person', saved.id] });
       queryClient.invalidateQueries({ queryKey: ['listaPessoas'] });
+      onPersisted?.(saved);
       toast.success(
         created ? 'Pessoa cadastrada com sucesso!' : 'Pessoa atualizada com sucesso!',
       );
@@ -62,9 +107,16 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
     e.preventDefault();
     mutation.mutate({
       name,
-      document: document || undefined,
-      email: email || undefined,
-      phone: phone || undefined,
+      taxId: taxId || null,
+      taxpayerType: parseTaxpayerType(taxpayerType),
+      stateRegistration: stateRegistration || null,
+      isRuralProducer,
+      birthDate: birthDate || null,
+      nfeEmail: nfeEmail || null,
+      documentEmails: parseEmails(documentEmails),
+      notes: notes || null,
+      isActive,
+      isVisible,
       isClient,
       isSupplier,
       isEmployee,
@@ -79,37 +131,95 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
           <Input
             id="nome"
             value={name}
+            maxLength={120}
             onChange={(e) => setName(e.target.value)}
             required
           />
         </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <Label htmlFor="document">Documento</Label>
+            <Label htmlFor="taxId">CPF / CNPJ</Label>
             <Input
-              id="document"
-              value={document}
-              onChange={(e) => setDocument(e.target.value)}
+              id="taxId"
+              value={taxId}
+              maxLength={19}
+              onChange={(e) => setTaxId(e.target.value)}
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="phone">Telefone</Label>
-            <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <Label htmlFor="birthDate">Nascimento / Fundação</Label>
+            <Input
+              id="birthDate"
+              type="date"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
+            />
           </div>
         </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="taxpayerType">Indicador de contribuinte</Label>
+            <select
+              id="taxpayerType"
+              value={taxpayerType}
+              onChange={(event) => setTaxpayerType(event.target.value)}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="">Selecione</option>
+              {taxpayerTypes.map((value) => (
+                <option key={value} value={String(value)}>
+                  {taxpayerTypeLabels[value]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="stateRegistration">RG / IE</Label>
+            <Input
+              id="stateRegistration"
+              value={stateRegistration}
+              maxLength={20}
+              onChange={(e) => setStateRegistration(e.target.value)}
+            />
+          </div>
+        </div>
+
         <div className="space-y-1">
-          <Label htmlFor="email">E-mail</Label>
+          <Label htmlFor="nfeEmail">E-mail da NF-e</Label>
           <Input
-            id="email"
+            id="nfeEmail"
             type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={nfeEmail}
+            maxLength={60}
+            onChange={(e) => setNfeEmail(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="documentEmails">E-mails de documentos</Label>
+          <Input
+            id="documentEmails"
+            value={documentEmails}
+            placeholder="Separe por vírgula"
+            onChange={(e) => setDocumentEmails(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="notes">Observações</Label>
+          <textarea
+            id="notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="flex min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
 
         <div className="flex flex-col gap-2 pt-2">
           <Label>Perfil da Pessoa</Label>
-          <div className="flex gap-6 mt-1">
+          <div className="flex flex-wrap gap-6 mt-1">
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="cliente"
@@ -140,6 +250,39 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
                 Colaborador
               </label>
             </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-6">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="rural"
+              checked={isRuralProducer}
+              onCheckedChange={(v) => setIsRuralProducer(!!v)}
+            />
+            <label htmlFor="rural" className="text-sm font-medium">
+              Produtor rural
+            </label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="ativo"
+              checked={isActive}
+              onCheckedChange={(v) => setIsActive(!!v)}
+            />
+            <label htmlFor="ativo" className="text-sm font-medium">
+              Ativo
+            </label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="visivel"
+              checked={isVisible}
+              onCheckedChange={(v) => setIsVisible(!!v)}
+            />
+            <label htmlFor="visivel" className="text-sm font-medium">
+              Visível
+            </label>
           </div>
         </div>
 

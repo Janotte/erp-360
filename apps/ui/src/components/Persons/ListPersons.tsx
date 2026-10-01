@@ -1,3 +1,4 @@
+import { parseTaxpayerType, taxpayerTypeLabels } from '@erp-360/shared';
 import {
   keepPreviousData,
   useMutation,
@@ -56,6 +57,11 @@ import {
   SelectValue,
 } from '../ui/select';
 import { FormPerson } from './FormPerson';
+
+function formatTaxpayerType(value: Person['taxpayerType']) {
+  const parsed = parseTaxpayerType(value);
+  return parsed ? taxpayerTypeLabels[parsed] : '-';
+}
 export function ListPersons() {
   const queryClient = useQueryClient();
   const [openDialog, setOpenDialog] = useState(false);
@@ -155,7 +161,7 @@ export function ListPersons() {
         <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
           <Input
-            placeholder="Buscar por nome, e-mail..."
+            placeholder="Buscar por nome, CPF/CNPJ..."
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             className="pl-9"
@@ -205,8 +211,9 @@ export function ListPersons() {
                   Nome {renderIconeOrdenacao('name')}
                 </div>
               </TableHead>
-              <TableHead>Documento</TableHead>
-              <TableHead>E-mail</TableHead>
+              <TableHead>CPF / CNPJ</TableHead>
+              <TableHead>Indicador IE</TableHead>
+              <TableHead>E-mail NF-e</TableHead>
               <TableHead
                 onClick={() => changeSort('createdAt')}
                 className="cursor-pointer select-none hover:bg-zinc-50"
@@ -222,7 +229,7 @@ export function ListPersons() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-4">
+                <TableCell colSpan={7} className="text-center py-4">
                   Carregando dados...
                 </TableCell>
               </TableRow>
@@ -230,8 +237,9 @@ export function ListPersons() {
               persons.map((person) => (
                 <TableRow key={person.id}>
                   <TableCell className="font-medium">{person.name}</TableCell>
-                  <TableCell>{person.document || '-'}</TableCell>
-                  <TableCell>{person.email || '-'}</TableCell>
+                  <TableCell>{person.taxId || '-'}</TableCell>
+                  <TableCell>{formatTaxpayerType(person.taxpayerType)}</TableCell>
+                  <TableCell>{person.nfeEmail || '-'}</TableCell>
                   <TableCell>
                     {person.createdAt
                       ? new Date(person.createdAt).toLocaleDateString('pt-BR')
@@ -282,7 +290,7 @@ export function ListPersons() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-4 text-zinc-500">
+                <TableCell colSpan={7} className="text-center py-4 text-zinc-500">
                   Nenhuma pessoa encontrada.
                 </TableCell>
               </TableRow>
@@ -332,7 +340,7 @@ export function ListPersons() {
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>
               {personSelected || personPersisted
@@ -343,7 +351,10 @@ export function ListPersons() {
           <FormPerson
             key={personSelected?.id ?? 'new'}
             personToUpdate={personSelected}
-            onPersisted={() => setPersonPersisted(true)}
+            onPersisted={(saved) => {
+              setPersonSelected(saved);
+              setPersonPersisted(true);
+            }}
           />
         </DialogContent>
       </Dialog>

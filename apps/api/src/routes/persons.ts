@@ -1,5 +1,5 @@
 import { persons } from '@erp-360/mod-persons';
-import { PersonSchema, type Person } from '@erp-360/shared';
+import { parseTaxpayerType, PersonSchema, type Person } from '@erp-360/shared';
 import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
@@ -8,6 +8,41 @@ import '../types/fastify.js';
 import { accountsPayable, accountsReceivable } from '@erp-360/mod-financial';
 import { personAddressRoutes } from './person-addresses.js';
 import { personContactRoutes } from './person-contacts.js';
+
+function emptyToNull(value?: string | null) {
+  return value ? value : null;
+}
+
+function readTaxpayerType(person: object) {
+  const row = person as Record<string, unknown>;
+  return parseTaxpayerType(row.taxpayerType ?? row.taxpayer_type);
+}
+
+function serializePerson(person: typeof persons.$inferSelect) {
+  return {
+    ...person,
+    taxpayerType: readTaxpayerType(person),
+  };
+}
+
+function toPersonValues(data: Person) {
+  return {
+    name: data.name,
+    taxId: emptyToNull(data.taxId),
+    taxpayerType: parseTaxpayerType(data.taxpayerType),
+    stateRegistration: emptyToNull(data.stateRegistration),
+    isRuralProducer: data.isRuralProducer,
+    birthDate: emptyToNull(data.birthDate),
+    nfeEmail: emptyToNull(data.nfeEmail),
+    documentEmails: data.documentEmails?.length ? data.documentEmails : null,
+    notes: emptyToNull(data.notes),
+    isActive: data.isActive,
+    isVisible: data.isVisible,
+    isClient: data.isClient,
+    isSupplier: data.isSupplier,
+    isEmployee: data.isEmployee,
+  };
+}
 
 const listPersonsQuery = z.object({
   type: z.enum(['cliente', 'fornecedor', 'colaborador']).optional(),
@@ -36,12 +71,12 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
       const [newPerson] = await db
         .insert(persons)
         .values({
-          ...data,
+          ...toPersonValues(data),
           tenantId,
         })
         .returning();
 
-      return reply.status(201).send(newPerson);
+      return reply.status(201).send(serializePerson(newPerson));
     },
   );
 
@@ -70,13 +105,13 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
       if (type === 'fornecedor') conditions.push(eq(persons.isSupplier, true));
       if (type === 'colaborador') conditions.push(eq(persons.isEmployee, true));
 
-      // 2. Filtro por Busca Textual (Nome, Documento ou E-mail)
+      // 2. Filtro por Busca Textual (Nome, CPF/CNPJ ou e-mail da NF-e)
       if (search) {
         conditions.push(
           or(
             ilike(persons.name, `%${search}%`),
-            ilike(persons.document, `%${search}%`),
-            ilike(persons.email, `%${search}%`),
+            ilike(persons.taxId, `%${search}%`),
+            ilike(persons.nfeEmail, `%${search}%`),
           )!,
         );
       }
@@ -106,7 +141,7 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Retorna a estrutura envelopada com os metadados de paginação
       return reply.send({
-        data,
+        data: data.map(serializePerson),
         meta: {
           total: Number(totalCount?.count || 0),
           page,
@@ -139,7 +174,7 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Pessoa não encontrada' });
       }
 
-      return person;
+      return serializePerson(person);
     },
   );
 
@@ -160,7 +195,7 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
 
       const [person] = await db
         .update(persons)
-        .set(data)
+        .set(toPersonValues(data))
         .where(and(eq(persons.id, id), eq(persons.tenantId, tenantId)))
         .returning();
 
@@ -168,7 +203,7 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ message: 'Pessoa não encontrada' });
       }
 
-      return person;
+      return serializePerson(person);
     },
   );
 

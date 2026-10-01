@@ -106,7 +106,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
         number: dados.number || undefined,
         complement: dados.complement || undefined,
         neighborhood: dados.neighborhood || undefined,
-        cityId: dados.cityId || null,
+        cityId: dados.cityId,
       };
       return editingId
         ? personsService.updateAddress(personId!, editingId, payload)
@@ -239,6 +239,10 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
           className="space-y-3 rounded-md border border-zinc-200 p-3"
           onSubmit={(event) => {
             event.preventDefault();
+            if (!form.cityId) {
+              toast.error('Selecione a cidade.');
+              return;
+            }
             saveMutation.mutate(form);
           }}
         >
@@ -276,7 +280,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
               <Input
                 id="number"
                 value={form.number}
-                maxLength={10}
+                maxLength={60}
                 onChange={(event) => updateForm({ number: event.target.value })}
               />
             </div>
@@ -298,7 +302,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
               <Input
                 id="complement"
                 value={form.complement}
-                maxLength={30}
+                maxLength={60}
                 onChange={(event) => updateForm({ complement: event.target.value })}
               />
             </div>
@@ -307,7 +311,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
               <Input
                 id="neighborhood"
                 value={form.neighborhood}
-                maxLength={50}
+                maxLength={60}
                 onChange={(event) => updateForm({ neighborhood: event.target.value })}
               />
             </div>

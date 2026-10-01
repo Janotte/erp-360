@@ -3,7 +3,10 @@ import * as personsSchema from '@erp-360/mod-persons';
 import * as financialSchema from '@erp-360/mod-financial';
 import 'dotenv/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+import { Pool, types } from 'pg';
+
+// node-pg devolve smallint (INT2) como string; o front precisa de número 1 | 2 | 9
+types.setTypeParser(21, (value) => (value == null ? null : Number.parseInt(value, 10)));
 
 const schema = {
   ...coreSchema,
