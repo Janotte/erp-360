@@ -106,6 +106,20 @@
       "when": 1790816601079,
       "tag": "0014_bumpy_wildside",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1790875350815,
+      "tag": "0015_silly_miracleman",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790879118055,
+      "tag": "0016_milky_screwball",
+      "breakpoints": true
     }
   ]
 }

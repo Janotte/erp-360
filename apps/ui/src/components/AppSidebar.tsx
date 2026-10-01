@@ -1,5 +1,6 @@
 import {
   ArrowUpRight,
+  BookOpen,
   ChevronRight,
   CreditCard,
   LayoutDashboard,
@@ -45,8 +46,9 @@ const itensMenu: ItemMenu[] = [
     title: 'Financeiro',
     icon: CreditCard,
     filhos: [
-      { title: 'Contas a Pagar', icon: CreditCard, url: '/payables' },
-      { title: 'Contas a Receber', icon: ArrowUpRight, url: '/receivables' },
+      { title: 'Pagar', icon: CreditCard, url: '/payables' },
+      { title: 'Receber', icon: ArrowUpRight, url: '/receivables' },
+      { title: 'Plano de Contas', icon: BookOpen, url: '/plan-accounts' },
     ],
   },
   { title: 'Configurações', icon: Settings, url: '/settings' },
@@ -59,7 +61,10 @@ interface AppSidebarProps {
 
 export function AppSidebar({ pathAtivo, onNavigate }: AppSidebarProps) {
   const { isMobile, setOpenMobile } = useSidebar();
-  const rotaFinanceira = pathAtivo === '/payables' || pathAtivo === '/receivables';
+  const rotaFinanceira =
+    pathAtivo === '/payables' ||
+    pathAtivo === '/receivables' ||
+    pathAtivo === '/plan-accounts';
   const [financeiroAberto, setFinanceiroAberto] = useState(rotaFinanceira);
 
   useEffect(() => {

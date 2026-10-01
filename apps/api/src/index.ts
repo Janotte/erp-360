@@ -14,6 +14,8 @@ import './types/fastify.js';
 import { locationsRoutes } from './routes/locations.ts';
 import { payablesRoutes } from './routes/payables.ts';
 import { receivablesRoutes } from './routes/receivables.ts';
+import { financialCatalogRoutes } from './routes/financial-catalogs.ts';
+import { planAccountsRoutes } from './routes/plan-accounts.ts';
 
 const fastify = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
 
@@ -42,6 +44,8 @@ fastify.register(personsRoutes, { prefix: '/persons' });
 fastify.register(locationsRoutes, { prefix: '/locations' });
 fastify.register(payablesRoutes, { prefix: '/payables' });
 fastify.register(receivablesRoutes, { prefix: '/receivables' });
+fastify.register(financialCatalogRoutes, { prefix: '/financial' });
+fastify.register(planAccountsRoutes, { prefix: '/plan-accounts' });
 
 const start = async () => {
   try {

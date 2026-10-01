@@ -5,7 +5,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import '../types/fastify.js';
-import { accountsPayable, accountsReceivable } from '@erp-360/mod-financial';
+import { payables, receivables } from '@erp-360/mod-financial';
 import { personAddressRoutes } from './person-addresses.js';
 import { personContactRoutes } from './person-contacts.js';
 
@@ -45,7 +45,7 @@ function toPersonValues(data: Person) {
 }
 
 const listPersonsQuery = z.object({
-  type: z.enum(['cliente', 'fornecedor', 'colaborador']).optional(),
+  type: z.enum(['cliente', 'fornecedor', 'colaborador', 'instituicao']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   sortField: z.enum(['nome', 'createdAt']).default('nome'),
@@ -104,6 +104,7 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
       if (type === 'cliente') conditions.push(eq(persons.isClient, true));
       if (type === 'fornecedor') conditions.push(eq(persons.isSupplier, true));
       if (type === 'colaborador') conditions.push(eq(persons.isEmployee, true));
+      if (type === 'instituicao') conditions.push(eq(persons.isFinancialInstitution, true));
 
       // 2. Filtro por Busca Textual (Nome, CPF/CNPJ ou e-mail da NF-e)
       if (search) {
@@ -221,25 +222,16 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
       const { id } = request.params as { id: string };
 
       try {
-        // 🌟 1. Verifica se a pessoa possui vínculos em contas a pagar
         const [hasPayable] = await db
           .select()
-          .from(accountsPayable)
-          .where(
-            and(eq(accountsPayable.personId, id), eq(accountsPayable.tenantId, tenantId)),
-          )
+          .from(payables)
+          .where(and(eq(payables.creditorId, id), eq(payables.tenantId, tenantId)))
           .limit(1);
 
-        // 🌟 2. Verifica se a pessoa possui vínculos em contas a receber
         const [hasReceivable] = await db
           .select()
-          .from(accountsReceivable)
-          .where(
-            and(
-              eq(accountsReceivable.personId, id),
-              eq(accountsReceivable.tenantId, tenantId),
-            ),
-          )
+          .from(receivables)
+          .where(and(eq(receivables.debtorId, id), eq(receivables.tenantId, tenantId)))
           .limit(1);
 
         // Se houver qualquer vínculo, bloqueia e retorna erro 400

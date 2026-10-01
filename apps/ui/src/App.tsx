@@ -7,6 +7,7 @@ import { Login } from './components/Auth/Login';
 import { Register } from './components/Auth/Register';
 import { Dashboard } from './components/Dashboard';
 import { PayableList } from './components/Financial/Payables/PayableList';
+import { ListPlanAccounts } from './components/Financial/PlanAccounts/ListPlanAccounts';
 import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
 import { Navbar } from './components/Navbar';
 import { ListPersons } from './components/Persons/ListPersons';
@@ -30,10 +31,12 @@ function rotaInicial() {
   if (hash === '#persons') return '/persons';
   if (hash === '#receivables') return '/receivables';
   if (hash === '#payables') return '/payables';
+  if (hash === '#plan-accounts') return '/plan-accounts';
   if (hash === '#settings') return '/settings';
   if (path === '/persons') return '/persons';
   if (path === '/receivables') return '/receivables';
   if (path === '/payables') return '/payables';
+  if (path === '/plan-accounts') return '/plan-accounts';
   if (path === '/settings') return '/settings';
   return '/dashboard';
 }
@@ -95,6 +98,10 @@ function App() {
         ) : path === '/receivables' ? (
           <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 md:p-6">
             <ReceivableList />
+          </main>
+        ) : path === '/plan-accounts' ? (
+          <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 md:p-6">
+            <ListPlanAccounts />
           </main>
         ) : (
           <Dashboard />

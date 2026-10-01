@@ -16,27 +16,26 @@ interface PayModalProps {
 
 export function PayModal({ tipo, account, onSuccess }: PayModalProps) {
   const queryClient = useQueryClient();
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
-  // Inicia sugerindo o valor total original em formato decimal string
-  const [valorPagoStr, setValorPagoStr] = useState((account.amount / 100).toString());
+  const [settledOn, setSettledOn] = useState(new Date().toISOString().split('T')[0]);
+  const [valorPagoStr, setValorPagoStr] = useState(
+    (account.installmentAmount / 100).toString(),
+  );
 
   const mutation = useMutation({
-    mutationFn: (data: { paymentDate: string; amountPaid: number }) =>
+    mutationFn: (data: { settledOn: string; settledAmount: number }) =>
       financialService.pay(tipo, account.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['financial', tipo] });
       toast.success('Baixa processada com sucesso!');
       onSuccess();
     },
-    onError: (err: any) => toast.error(`Erro: ${err.message}`),
+    onError: (err: Error) => toast.error(`Erro: ${err.message}`),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const amountPaidCentavos = Math.round(
-      parseFloat(valorPagoStr.replace(',', '.')) * 100,
-    );
-    mutation.mutate({ paymentDate, amountPaid: amountPaidCentavos });
+    const settledAmount = Math.round(parseFloat(valorPagoStr.replace(',', '.')) * 100);
+    mutation.mutate({ settledOn, settledAmount });
   };
 
   return (
@@ -47,19 +46,21 @@ export function PayModal({ tipo, account, onSuccess }: PayModalProps) {
         </p>
         <p className="text-zinc-500">
           Valor Original:{' '}
-          <strong className="text-zinc-900">{formatCurrency(account.amount)}</strong>
+          <strong className="text-zinc-900">
+            {formatCurrency(account.installmentAmount)}
+          </strong>
         </p>
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="paymentDate">
+        <Label htmlFor="settledOn">
           Data do {tipo === 'payable' ? 'Pagamento' : 'Recebimento'}
         </Label>
         <Input
-          id="paymentDate"
+          id="settledOn"
           type="date"
-          value={paymentDate}
-          onChange={(e) => setPaymentDate(e.target.value)}
+          value={settledOn}
+          onChange={(e) => setSettledOn(e.target.value)}
           required
         />
       </div>

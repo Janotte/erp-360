@@ -19,16 +19,20 @@ interface PayableFormProps {
   onSuccess: () => void;
 }
 
+const NONE = '__none__';
+
 export function PayableForm({ onSuccess }: PayableFormProps) {
   const queryClient = useQueryClient();
   const [personId, setPersonId] = useState('');
-  const [document, setDocument] = useState('');
+  const [documentNumber, setDocumentNumber] = useState('');
   const [description, setDescription] = useState('');
+  const [issueOn, setIssueOn] = useState(new Date().toISOString().split('T')[0]);
+  const [dueOn, setDueOn] = useState('');
   const [amountStr, setAmountStr] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [planAccountId, setPlanAccountId] = useState(NONE);
 
   const { data: personsResponse } = useQuery({
-    queryKey: ['personsList', 'payable'],
+    queryKey: ['personsList', 'payable', 'fornecedor'],
     queryFn: () =>
       personsService.list({
         page: 1,
@@ -40,33 +44,40 @@ export function PayableForm({ onSuccess }: PayableFormProps) {
   });
   const persons = personsResponse?.data;
 
+  const { data: planAccounts = [] } = useQuery({
+    queryKey: ['financial', 'plan-accounts'],
+    queryFn: () => financialService.listPlanAccounts(),
+  });
+
   const mutation = useMutation({
-    mutationFn: (data: any) => financialService.create('payable', data),
+    mutationFn: financialService.create.bind(null, 'payable'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['financial', 'payable'] });
       toast.success('Conta a pagar lançada com sucesso!');
       onSuccess();
     },
-    onError: (err: any) => toast.error(`Erro: ${err.message}`),
+    onError: (err: Error) => toast.error(`Erro: ${err.message}`),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!personId || !description || !amountStr || !dueDate) return;
+    if (!personId || !description || !amountStr || !dueOn) return;
 
-    const amountCentavos = Math.round(parseFloat(amountStr.replace(',', '.')) * 100);
+    const installmentAmount = Math.round(parseFloat(amountStr.replace(',', '.')) * 100);
 
     mutation.mutate({
       personId,
-      document: document || undefined,
+      documentNumber: documentNumber || undefined,
       description,
-      amount: amountCentavos,
-      dueDate,
+      issueOn: issueOn || undefined,
+      installmentAmount,
+      dueOn,
+      planAccountId: planAccountId === NONE ? undefined : planAccountId,
     });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+    <form onSubmit={handleSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pt-2">
       <div className="space-y-1">
         <Label>Fornecedor / Favorecido</Label>
         <Select value={personId} onValueChange={setPersonId} required>
@@ -83,25 +94,14 @@ export function PayableForm({ onSuccess }: PayableFormProps) {
         </Select>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="document">Nº Documento / NF</Label>
-          <Input
-            id="document"
-            value={document}
-            onChange={(e) => setDocument(e.target.value)}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="dueDate">Vencimento</Label>
-          <Input
-            id="dueDate"
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            required
-          />
-        </div>
+      <div className="space-y-1">
+        <Label htmlFor="documentNumber">Nº Documento / NF</Label>
+        <Input
+          id="documentNumber"
+          value={documentNumber}
+          maxLength={44}
+          onChange={(e) => setDocumentNumber(e.target.value)}
+        />
       </div>
 
       <div className="space-y-1">
@@ -109,13 +109,37 @@ export function PayableForm({ onSuccess }: PayableFormProps) {
         <Input
           id="description"
           value={description}
+          maxLength={255}
           onChange={(e) => setDescription(e.target.value)}
           required
         />
       </div>
 
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <Label htmlFor="issueOn">Emissão</Label>
+          <Input
+            id="issueOn"
+            type="date"
+            value={issueOn}
+            onChange={(e) => setIssueOn(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="dueOn">Vencimento</Label>
+          <Input
+            id="dueOn"
+            type="date"
+            value={dueOn}
+            onChange={(e) => setDueOn(e.target.value)}
+            required
+          />
+        </div>
+      </div>
+
       <div className="space-y-1">
-        <Label htmlFor="amount">Valor Original (R\$)</Label>
+        <Label htmlFor="amount">Valor (R$)</Label>
         <Input
           id="amount"
           type="number"
@@ -126,7 +150,24 @@ export function PayableForm({ onSuccess }: PayableFormProps) {
         />
       </div>
 
-      <Button type="submit" className="w-full mt-2" disabled={mutation.isPending}>
+      <div className="space-y-1">
+        <Label>Plano de contas</Label>
+        <Select value={planAccountId} onValueChange={setPlanAccountId}>
+          <SelectTrigger>
+            <SelectValue placeholder="Opcional" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>Nenhum</SelectItem>
+            {planAccounts.map((item) => (
+              <SelectItem key={item.id} value={item.id}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Button type="submit" className="mt-2 w-full" disabled={mutation.isPending}>
         {mutation.isPending ? 'Salvando...' : 'Confirmar Lançamento'}
       </Button>
     </form>
