@@ -1,7 +1,9 @@
 import { formatCurrency, formatRawDate } from '@erp-360/shared';
 import {
   keepPreviousData,
+  useMutation,
   useQuery,
+  useQueryClient,
 } from '@tanstack/react-query';
 import {
   ArrowDown,
@@ -10,19 +12,39 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  MoreHorizontal,
+  Pencil,
   Plus,
+  RotateCcw,
   Search,
+  Trash2,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -48,10 +70,15 @@ import {
 import { PayableForm } from './PayableForm';
 import { PayModal } from './PayModal';
 
+type ConfirmAction = 'delete' | 'reverse' | null;
+
 export function PayableList() {
+  const queryClient = useQueryClient();
   const [openPay, setOpenPay] = useState(false);
+  const [openForm, setOpenForm] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<FinancialAccount | null>(null);
-  const [openInsertPayable, setOpenInsertPayable] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState('');
@@ -115,13 +142,54 @@ export function PayableList() {
   const meta = response?.meta;
   const accounts = response?.data;
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => financialService.delete('payable', id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['financial', 'payable'] });
+      setConfirmAction(null);
+      setActionError(null);
+      toast.success('Conta a pagar excluída com sucesso!');
+    },
+    onError: (error: Error) => setActionError(error.message),
+  });
+
+  const reverseMutation = useMutation({
+    mutationFn: (id: string) => financialService.reverse('payable', id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['financial', 'payable'] });
+      setConfirmAction(null);
+      setActionError(null);
+      toast.success('Pagamento estornado com sucesso!');
+    },
+    onError: (error: Error) => setActionError(error.message),
+  });
+
+  const openCreate = () => {
+    setSelectedAccount(null);
+    setOpenForm(true);
+  };
+
+  const openEdit = (account: FinancialAccount) => {
+    setSelectedAccount(account);
+    setOpenForm(true);
+  };
+
   const handlePay = (account: FinancialAccount) => {
     setSelectedAccount(account);
     setOpenPay(true);
   };
 
+  const openConfirm = (account: FinancialAccount, action: ConfirmAction) => {
+    setSelectedAccount(account);
+    setActionError(null);
+    setConfirmAction(action);
+  };
+
   if (isLoading && !response)
     return <p className="text-sm text-zinc-500">Carregando contas a pagar...</p>;
+
+  const confirmPending =
+    deleteMutation.isPending || reverseMutation.isPending;
 
   return (
     <div className="space-y-4">
@@ -130,19 +198,9 @@ export function PayableList() {
           <h3 className="text-lg font-bold text-zinc-900">Contas a Pagar</h3>
           <p className="text-sm text-zinc-500">Gerencie contas a pagar.</p>
         </div>
-        <Dialog open={openInsertPayable} onOpenChange={setOpenInsertPayable}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-2">
-              <Plus className="h-4 w-4" /> Novo Pagar
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Lançar Conta a Pagar</DialogTitle>
-            </DialogHeader>
-            <PayableForm onSuccess={() => setOpenInsertPayable(false)} />
-          </DialogContent>
-        </Dialog>
+        <Button size="sm" className="gap-2" onClick={openCreate}>
+          <Plus className="h-4 w-4" /> Novo Pagar
+        </Button>
       </div>
 
       <div className="flex flex-col gap-3 bg-white p-4 rounded-lg border border-zinc-200">
@@ -233,7 +291,7 @@ export function PayableList() {
               </TableHead>
               <TableHead>Pago</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-[100px]" />
+              <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -267,16 +325,40 @@ export function PayableList() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {acc.status === 'pendente' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePay(acc)}
-                        className="h-7 text-xs border-emerald-200 text-emerald-600 hover:bg-emerald-50 gap-1"
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Pagar
-                      </Button>
-                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Ações de ${acc.description}`}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {acc.status === 'pendente' && (
+                          <>
+                            <DropdownMenuItem onClick={() => openEdit(acc)}>
+                              <Pencil className="h-4 w-4" /> Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handlePay(acc)}>
+                              <CheckCircle2 className="h-4 w-4" /> Pagar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-600 focus:text-red-600"
+                              onClick={() => openConfirm(acc, 'delete')}
+                            >
+                              <Trash2 className="h-4 w-4" /> Excluir
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                        {acc.status === 'pago' && (
+                          <DropdownMenuItem onClick={() => openConfirm(acc, 'reverse')}>
+                            <RotateCcw className="h-4 w-4" /> Estornar
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
@@ -321,7 +403,37 @@ export function PayableList() {
         </div>
       )}
 
-      <Dialog open={openPay} onOpenChange={setOpenPay}>
+      <Dialog
+        open={openForm}
+        onOpenChange={(open) => {
+          setOpenForm(open);
+          if (!open) setSelectedAccount(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedAccount ? 'Editar Conta a Pagar' : 'Lançar Conta a Pagar'}
+            </DialogTitle>
+          </DialogHeader>
+          <PayableForm
+            key={selectedAccount?.id ?? 'new'}
+            accountToUpdate={selectedAccount}
+            onSuccess={() => {
+              setOpenForm(false);
+              setSelectedAccount(null);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={openPay}
+        onOpenChange={(open) => {
+          setOpenPay(open);
+          if (!open) setSelectedAccount(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Liquidar Conta a Pagar</DialogTitle>
@@ -330,11 +442,64 @@ export function PayableList() {
             <PayModal
               tipo="payable"
               account={selectedAccount}
-              onSuccess={() => setOpenPay(false)}
+              onSuccess={() => {
+                setOpenPay(false);
+                setSelectedAccount(null);
+              }}
             />
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmAction(null);
+            setActionError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmAction === 'delete' ? 'Excluir conta a pagar' : 'Estornar pagamento'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {actionError ??
+                (confirmAction === 'delete'
+                  ? `Deseja excluir ${selectedAccount?.description ?? 'esta conta'}? Essa ação não pode ser desfeita.`
+                  : `Deseja estornar o pagamento de ${selectedAccount?.description ?? 'esta conta'}? O título voltará para pendente.`)}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className={
+                confirmAction === 'delete'
+                  ? 'bg-red-600 hover:bg-red-700'
+                  : 'bg-amber-600 hover:bg-amber-700'
+              }
+              disabled={confirmPending || !!actionError}
+              onClick={(event) => {
+                event.preventDefault();
+                if (!selectedAccount) return;
+                if (confirmAction === 'delete') {
+                  deleteMutation.mutate(selectedAccount.id);
+                } else if (confirmAction === 'reverse') {
+                  reverseMutation.mutate(selectedAccount.id);
+                }
+              }}
+            >
+              {confirmPending
+                ? 'Processando...'
+                : confirmAction === 'delete'
+                  ? 'Excluir'
+                  : 'Estornar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

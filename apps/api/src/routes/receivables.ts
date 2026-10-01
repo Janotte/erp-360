@@ -157,6 +157,21 @@ export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
       const { id } = request.params as { id: string };
       const { receivedOn, receivedAmount } = request.body as z.infer<typeof receiveSchema>;
 
+      const [existing] = await db
+        .select({ status: receivables.status })
+        .from(receivables)
+        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
+        .limit(1);
+
+      if (!existing) {
+        return reply.status(404).send({ message: 'Conta a receber não encontrada.' });
+      }
+      if (existing.status !== 'pendente') {
+        return reply.status(400).send({
+          message: 'Somente contas pendentes podem ser liquidadas.',
+        });
+      }
+
       const [updatedAccount] = await db
         .update(receivables)
         .set({
@@ -167,11 +182,135 @@ export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
         .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
         .returning();
 
-      if (!updatedAccount) {
+      return updatedAccount;
+    },
+  );
+
+  fastify.put(
+    '/:id',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: createReceivableSchema,
+      },
+    },
+    async (request, reply) => {
+      const { tenantId } = request.user;
+      const { id } = request.params as { id: string };
+      const data = request.body as z.infer<typeof createReceivableSchema>;
+
+      const [existing] = await db
+        .select({ status: receivables.status })
+        .from(receivables)
+        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
+        .limit(1);
+
+      if (!existing) {
         return reply.status(404).send({ message: 'Conta a receber não encontrada.' });
       }
+      if (existing.status !== 'pendente') {
+        return reply.status(400).send({
+          message: 'Somente contas pendentes podem ser editadas.',
+        });
+      }
 
-      return updatedAccount;
+      const [updated] = await db
+        .update(receivables)
+        .set({
+          debtorId: data.debtorId,
+          documentNumber: data.documentNumber || null,
+          description: data.description,
+          issueOn: data.issueOn,
+          installmentAmount: data.installmentAmount,
+          dueOn: data.dueOn,
+          planAccountId: data.planAccountId || null,
+          bearerName: data.bearerName || null,
+          barcode: data.barcode || null,
+          bankSlipOurNumber: data.bankSlipOurNumber || null,
+          invoiceNumber: data.invoiceNumber || null,
+          financialInstitutionId: data.financialInstitutionId || null,
+          paymentMethodId: data.paymentMethodId || null,
+          cardBrandId: data.cardBrandId || null,
+          transactionAuthorization: data.transactionAuthorization || null,
+        })
+        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
+        .returning();
+
+      return updated;
+    },
+  );
+
+  fastify.delete(
+    '/:id',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+      },
+    },
+    async (request, reply) => {
+      const { tenantId } = request.user;
+      const { id } = request.params as { id: string };
+
+      const [existing] = await db
+        .select({ status: receivables.status })
+        .from(receivables)
+        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
+        .limit(1);
+
+      if (!existing) {
+        return reply.status(404).send({ message: 'Conta a receber não encontrada.' });
+      }
+      if (existing.status !== 'pendente') {
+        return reply.status(400).send({
+          message: 'Somente contas pendentes podem ser excluídas.',
+        });
+      }
+
+      await db
+        .delete(receivables)
+        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)));
+
+      return { success: true };
+    },
+  );
+
+  fastify.post(
+    '/:id/reverse',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+      },
+    },
+    async (request, reply) => {
+      const { tenantId } = request.user;
+      const { id } = request.params as { id: string };
+
+      const [existing] = await db
+        .select({ status: receivables.status })
+        .from(receivables)
+        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
+        .limit(1);
+
+      if (!existing) {
+        return reply.status(404).send({ message: 'Conta a receber não encontrada.' });
+      }
+      if (existing.status !== 'recebido') {
+        return reply.status(400).send({
+          message: 'Somente contas recebidas podem ser estornadas.',
+        });
+      }
+
+      const [updated] = await db
+        .update(receivables)
+        .set({
+          receivedOn: null,
+          receivedAmount: null,
+          status: 'pendente',
+        })
+        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
+        .returning();
+
+      return updated;
     },
   );
 };

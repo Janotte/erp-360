@@ -1,27 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { PersonSearchSelect } from '@/components/Persons/PersonSearchSelect';
 import { Button } from '@/components/ui/button';
+import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { financialService } from '@/services/financials';
-import { personsService } from '@/services/persons';
+  type CreatePayableInput,
+  type FinancialAccount,
+  financialService,
+} from '@/services/financials';
 
 interface PayableFormProps {
+  accountToUpdate?: FinancialAccount | null;
   onSuccess: () => void;
 }
 
-const NONE = '__none__';
-
-export function PayableForm({ onSuccess }: PayableFormProps) {
+export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
   const queryClient = useQueryClient();
   const [personId, setPersonId] = useState('');
   const [documentNumber, setDocumentNumber] = useState('');
@@ -29,20 +26,18 @@ export function PayableForm({ onSuccess }: PayableFormProps) {
   const [issueOn, setIssueOn] = useState(new Date().toISOString().split('T')[0]);
   const [dueOn, setDueOn] = useState('');
   const [amountStr, setAmountStr] = useState('');
-  const [planAccountId, setPlanAccountId] = useState(NONE);
+  const [planAccountId, setPlanAccountId] = useState('');
 
-  const { data: personsResponse } = useQuery({
-    queryKey: ['personsList', 'payable', 'fornecedor'],
-    queryFn: () =>
-      personsService.list({
-        page: 1,
-        limit: 100,
-        sortField: 'name',
-        sortOrder: 'asc',
-        type: 'fornecedor',
-      }),
-  });
-  const persons = personsResponse?.data;
+  useEffect(() => {
+    if (!accountToUpdate) return;
+    setPersonId(accountToUpdate.personId);
+    setDocumentNumber(accountToUpdate.documentNumber || '');
+    setDescription(accountToUpdate.description);
+    setIssueOn(accountToUpdate.issueOn?.slice(0, 10) || '');
+    setDueOn(accountToUpdate.dueOn?.slice(0, 10) || '');
+    setAmountStr((accountToUpdate.installmentAmount / 100).toString());
+    setPlanAccountId(accountToUpdate.planAccountId || '');
+  }, [accountToUpdate]);
 
   const { data: planAccounts = [] } = useQuery({
     queryKey: ['financial', 'plan-accounts'],
@@ -50,10 +45,17 @@ export function PayableForm({ onSuccess }: PayableFormProps) {
   });
 
   const mutation = useMutation({
-    mutationFn: financialService.create.bind(null, 'payable'),
+    mutationFn: (dados: CreatePayableInput) =>
+      accountToUpdate
+        ? financialService.update('payable', accountToUpdate.id, dados)
+        : financialService.create('payable', dados),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['financial', 'payable'] });
-      toast.success('Conta a pagar lançada com sucesso!');
+      toast.success(
+        accountToUpdate
+          ? 'Conta a pagar atualizada com sucesso!'
+          : 'Conta a pagar lançada com sucesso!',
+      );
       onSuccess();
     },
     onError: (err: Error) => toast.error(`Erro: ${err.message}`),
@@ -72,7 +74,7 @@ export function PayableForm({ onSuccess }: PayableFormProps) {
       issueOn: issueOn || undefined,
       installmentAmount,
       dueOn,
-      planAccountId: planAccountId === NONE ? undefined : planAccountId,
+      planAccountId: planAccountId || undefined,
     });
   };
 
@@ -80,18 +82,13 @@ export function PayableForm({ onSuccess }: PayableFormProps) {
     <form onSubmit={handleSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pt-2">
       <div className="space-y-1">
         <Label>Fornecedor / Favorecido</Label>
-        <Select value={personId} onValueChange={setPersonId} required>
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione um fornecedor..." />
-          </SelectTrigger>
-          <SelectContent>
-            {persons?.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <PersonSearchSelect
+          value={personId}
+          onChange={setPersonId}
+          type="fornecedor"
+          placeholder="Buscar fornecedor por nome ou documento..."
+          required
+        />
       </div>
 
       <div className="space-y-1">
@@ -152,23 +149,22 @@ export function PayableForm({ onSuccess }: PayableFormProps) {
 
       <div className="space-y-1">
         <Label>Plano de contas</Label>
-        <Select value={planAccountId} onValueChange={setPlanAccountId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Opcional" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>Nenhum</SelectItem>
-            {planAccounts.map((item) => (
-              <SelectItem key={item.id} value={item.id}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <CatalogSearchSelect
+          value={planAccountId}
+          onChange={setPlanAccountId}
+          options={planAccounts}
+          placeholder="Buscar plano de contas..."
+          emptyMessage="Nenhum plano de contas cadastrado."
+          allowClear
+        />
       </div>
 
       <Button type="submit" className="mt-2 w-full" disabled={mutation.isPending}>
-        {mutation.isPending ? 'Salvando...' : 'Confirmar Lançamento'}
+        {mutation.isPending
+          ? 'Salvando...'
+          : accountToUpdate
+            ? 'Atualizar'
+            : 'Confirmar Lançamento'}
       </Button>
     </form>
   );

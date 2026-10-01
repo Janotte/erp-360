@@ -1,27 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { PersonSearchSelect } from '@/components/Persons/PersonSearchSelect';
 import { Button } from '@/components/ui/button';
+import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { financialService } from '@/services/financials';
-import { personsService } from '@/services/persons';
+  type CreateReceivableInput,
+  type FinancialAccount,
+  financialService,
+} from '@/services/financials';
 
 interface ReceivableFormProps {
+  accountToUpdate?: FinancialAccount | null;
   onSuccess: () => void;
 }
 
-const NONE = '__none__';
-
-export function ReceivableForm({ onSuccess }: ReceivableFormProps) {
+export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormProps) {
   const queryClient = useQueryClient();
   const [personId, setPersonId] = useState('');
   const [documentNumber, setDocumentNumber] = useState('');
@@ -30,40 +27,33 @@ export function ReceivableForm({ onSuccess }: ReceivableFormProps) {
   const [issueOn, setIssueOn] = useState(new Date().toISOString().split('T')[0]);
   const [dueOn, setDueOn] = useState('');
   const [amountStr, setAmountStr] = useState('');
-  const [planAccountId, setPlanAccountId] = useState(NONE);
-  const [financialInstitutionId, setFinancialInstitutionId] = useState(NONE);
-  const [paymentMethodId, setPaymentMethodId] = useState(NONE);
-  const [cardBrandId, setCardBrandId] = useState(NONE);
+  const [planAccountId, setPlanAccountId] = useState('');
+  const [financialInstitutionId, setFinancialInstitutionId] = useState('');
+  const [paymentMethodId, setPaymentMethodId] = useState('');
+  const [cardBrandId, setCardBrandId] = useState('');
   const [bearerName, setBearerName] = useState('');
   const [barcode, setBarcode] = useState('');
   const [bankSlipOurNumber, setBankSlipOurNumber] = useState('');
   const [transactionAuthorization, setTransactionAuthorization] = useState('');
 
-  const { data: clientsResponse } = useQuery({
-    queryKey: ['personList', 'receivable', 'cliente'],
-    queryFn: () =>
-      personsService.list({
-        page: 1,
-        limit: 100,
-        sortField: 'name',
-        sortOrder: 'asc',
-        type: 'cliente',
-      }),
-  });
-  const clients = clientsResponse?.data;
-
-  const { data: institutionsResponse } = useQuery({
-    queryKey: ['personList', 'receivable', 'instituicao'],
-    queryFn: () =>
-      personsService.list({
-        page: 1,
-        limit: 100,
-        sortField: 'name',
-        sortOrder: 'asc',
-        type: 'instituicao',
-      }),
-  });
-  const institutions = institutionsResponse?.data;
+  useEffect(() => {
+    if (!accountToUpdate) return;
+    setPersonId(accountToUpdate.personId);
+    setDocumentNumber(accountToUpdate.documentNumber || '');
+    setInvoiceNumber(accountToUpdate.invoiceNumber || '');
+    setDescription(accountToUpdate.description);
+    setIssueOn(accountToUpdate.issueOn?.slice(0, 10) || '');
+    setDueOn(accountToUpdate.dueOn?.slice(0, 10) || '');
+    setAmountStr((accountToUpdate.installmentAmount / 100).toString());
+    setPlanAccountId(accountToUpdate.planAccountId || '');
+    setFinancialInstitutionId(accountToUpdate.financialInstitutionId || '');
+    setPaymentMethodId(accountToUpdate.paymentMethodId || '');
+    setCardBrandId(accountToUpdate.cardBrandId || '');
+    setBearerName(accountToUpdate.bearerName || '');
+    setBarcode(accountToUpdate.barcode || '');
+    setBankSlipOurNumber(accountToUpdate.bankSlipOurNumber || '');
+    setTransactionAuthorization(accountToUpdate.transactionAuthorization || '');
+  }, [accountToUpdate]);
 
   const { data: planAccounts = [] } = useQuery({
     queryKey: ['financial', 'plan-accounts'],
@@ -81,16 +71,23 @@ export function ReceivableForm({ onSuccess }: ReceivableFormProps) {
   });
 
   const mutation = useMutation({
-    mutationFn: financialService.create.bind(null, 'receivable'),
+    mutationFn: (dados: CreateReceivableInput) =>
+      accountToUpdate
+        ? financialService.update('receivable', accountToUpdate.id, dados)
+        : financialService.create('receivable', dados),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['financial', 'receivable'] });
-      toast.success('Conta a receber lançada com sucesso!');
+      toast.success(
+        accountToUpdate
+          ? 'Conta a receber atualizada com sucesso!'
+          : 'Conta a receber lançada com sucesso!',
+      );
       onSuccess();
     },
     onError: (err: Error) => toast.error(`Erro: ${err.message}`),
   });
 
-  const optionalId = (value: string) => (value === NONE ? undefined : value);
+  const optionalId = (value: string) => (value ? value : undefined);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,18 +118,13 @@ export function ReceivableForm({ onSuccess }: ReceivableFormProps) {
     <form onSubmit={handleSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pt-2">
       <div className="space-y-1">
         <Label>Cliente</Label>
-        <Select value={personId} onValueChange={setPersonId} required>
-          <SelectTrigger>
-            <SelectValue placeholder="Selecione um cliente..." />
-          </SelectTrigger>
-          <SelectContent>
-            {clients?.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <PersonSearchSelect
+          value={personId}
+          onChange={setPersonId}
+          type="cliente"
+          placeholder="Buscar cliente por nome ou documento..."
+          required
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -204,73 +196,49 @@ export function ReceivableForm({ onSuccess }: ReceivableFormProps) {
 
       <div className="space-y-1">
         <Label>Plano de contas</Label>
-        <Select value={planAccountId} onValueChange={setPlanAccountId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Opcional" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>Nenhum</SelectItem>
-            {planAccounts.map((item) => (
-              <SelectItem key={item.id} value={item.id}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <CatalogSearchSelect
+          value={planAccountId}
+          onChange={setPlanAccountId}
+          options={planAccounts}
+          placeholder="Buscar plano de contas..."
+          emptyMessage="Nenhum plano de contas cadastrado."
+          allowClear
+        />
       </div>
 
       <div className="space-y-1">
         <Label>Instituição financeira</Label>
-        <Select
+        <PersonSearchSelect
           value={financialInstitutionId}
-          onValueChange={setFinancialInstitutionId}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Opcional" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>Nenhuma</SelectItem>
-            {institutions?.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={setFinancialInstitutionId}
+          type="instituicao"
+          placeholder="Buscar instituição (opcional)..."
+          allowClear
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <Label>Forma de pagamento</Label>
-          <Select value={paymentMethodId} onValueChange={setPaymentMethodId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Opcional" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>Nenhuma</SelectItem>
-              {paymentMethods.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <CatalogSearchSelect
+            value={paymentMethodId}
+            onChange={setPaymentMethodId}
+            options={paymentMethods}
+            placeholder="Buscar forma de pagamento..."
+            emptyMessage="Nenhuma forma de pagamento cadastrada."
+            allowClear
+          />
         </div>
         <div className="space-y-1">
           <Label>Bandeira do cartão</Label>
-          <Select value={cardBrandId} onValueChange={setCardBrandId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Opcional" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>Nenhuma</SelectItem>
-              {cardBrands.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <CatalogSearchSelect
+            value={cardBrandId}
+            onChange={setCardBrandId}
+            options={cardBrands}
+            placeholder="Buscar bandeira..."
+            emptyMessage="Nenhuma bandeira cadastrada."
+            allowClear
+          />
         </div>
       </div>
 
@@ -320,7 +288,11 @@ export function ReceivableForm({ onSuccess }: ReceivableFormProps) {
         className="mt-2 w-full bg-zinc-900 text-white hover:bg-zinc-800"
         disabled={mutation.isPending}
       >
-        {mutation.isPending ? 'Salvando...' : 'Confirmar Lançamento'}
+        {mutation.isPending
+          ? 'Salvando...'
+          : accountToUpdate
+            ? 'Atualizar'
+            : 'Confirmar Lançamento'}
       </Button>
     </form>
   );

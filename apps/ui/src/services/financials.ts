@@ -13,6 +13,15 @@ export interface FinancialAccount {
   settledOn?: string;
   settledAmount?: number;
   status: 'pendente' | 'pago' | 'recebido' | 'cancelado';
+  planAccountId?: string;
+  invoiceNumber?: string;
+  bearerName?: string;
+  barcode?: string;
+  bankSlipOurNumber?: string;
+  financialInstitutionId?: string;
+  paymentMethodId?: string;
+  cardBrandId?: string;
+  transactionAuthorization?: string;
 }
 
 type FinancialTipo = 'payable' | 'receivable';
@@ -29,6 +38,10 @@ const jsonHeaders = () => ({
 const collection = (tipo: FinancialTipo) =>
   tipo === 'payable' ? 'payables' : 'receivables';
 
+function optionalString(value: unknown) {
+  return value ? String(value) : undefined;
+}
+
 function normalizeAccount(
   item: Record<string, unknown>,
   tipo: FinancialTipo,
@@ -41,22 +54,71 @@ function normalizeAccount(
   return {
     id: String(item.id),
     personId,
-    documentNumber: item.documentNumber ? String(item.documentNumber) : undefined,
+    documentNumber: optionalString(item.documentNumber),
     description: String(item.description ?? ''),
     issueOn: String(item.issueOn ?? ''),
     installmentAmount: Number(item.installmentAmount ?? 0),
     dueOn: String(item.dueOn ?? ''),
     settledOn:
-      (item.paidOn as string | undefined) || (item.receivedOn as string | undefined),
+      optionalString(item.paidOn) || optionalString(item.receivedOn),
     settledAmount:
       (item.paidAmount as number | undefined) ??
       (item.receivedAmount as number | undefined),
     status: (item.status as FinancialAccount['status']) ?? 'pendente',
+    planAccountId: optionalString(item.planAccountId),
+    invoiceNumber: optionalString(item.invoiceNumber),
+    bearerName: optionalString(item.bearerName),
+    barcode: optionalString(item.barcode),
+    bankSlipOurNumber: optionalString(item.bankSlipOurNumber),
+    financialInstitutionId: optionalString(item.financialInstitutionId),
+    paymentMethodId: optionalString(item.paymentMethodId),
+    cardBrandId: optionalString(item.cardBrandId),
+    transactionAuthorization: optionalString(item.transactionAuthorization),
   };
 }
 
 async function parseJson(res: Response) {
   return res.json().catch(() => ({}));
+}
+
+function toCreatePayload(
+  tipo: FinancialTipo,
+  dados: CreatePayableInput | CreateReceivableInput,
+) {
+  if (tipo === 'payable') {
+    return {
+      creditorId: dados.personId,
+      documentNumber: dados.documentNumber,
+      description: dados.description,
+      issueOn: dados.issueOn,
+      installmentAmount: dados.installmentAmount,
+      dueOn: dados.dueOn,
+      planAccountId: dados.planAccountId,
+    };
+  }
+
+  return {
+    debtorId: dados.personId,
+    documentNumber: dados.documentNumber,
+    description: dados.description,
+    issueOn: dados.issueOn,
+    installmentAmount: dados.installmentAmount,
+    dueOn: dados.dueOn,
+    planAccountId: dados.planAccountId,
+    bearerName: 'bearerName' in dados ? dados.bearerName : undefined,
+    barcode: 'barcode' in dados ? dados.barcode : undefined,
+    bankSlipOurNumber:
+      'bankSlipOurNumber' in dados ? dados.bankSlipOurNumber : undefined,
+    invoiceNumber: 'invoiceNumber' in dados ? dados.invoiceNumber : undefined,
+    financialInstitutionId:
+      'financialInstitutionId' in dados ? dados.financialInstitutionId : undefined,
+    paymentMethodId: 'paymentMethodId' in dados ? dados.paymentMethodId : undefined,
+    cardBrandId: 'cardBrandId' in dados ? dados.cardBrandId : undefined,
+    transactionAuthorization:
+      'transactionAuthorization' in dados
+        ? dados.transactionAuthorization
+        : undefined,
+  };
 }
 
 export interface CreatePayableInput {
@@ -198,51 +260,51 @@ export const financialService = {
     tipo: FinancialTipo,
     dados: CreatePayableInput | CreateReceivableInput,
   ): Promise<FinancialAccount> => {
-    const payload =
-      tipo === 'payable'
-        ? {
-            creditorId: dados.personId,
-            documentNumber: dados.documentNumber,
-            description: dados.description,
-            issueOn: dados.issueOn,
-            installmentAmount: dados.installmentAmount,
-            dueOn: dados.dueOn,
-            planAccountId: dados.planAccountId,
-          }
-        : {
-            debtorId: dados.personId,
-            documentNumber: dados.documentNumber,
-            description: dados.description,
-            issueOn: dados.issueOn,
-            installmentAmount: dados.installmentAmount,
-            dueOn: dados.dueOn,
-            planAccountId: dados.planAccountId,
-            bearerName: 'bearerName' in dados ? dados.bearerName : undefined,
-            barcode: 'barcode' in dados ? dados.barcode : undefined,
-            bankSlipOurNumber:
-              'bankSlipOurNumber' in dados ? dados.bankSlipOurNumber : undefined,
-            invoiceNumber: 'invoiceNumber' in dados ? dados.invoiceNumber : undefined,
-            financialInstitutionId:
-              'financialInstitutionId' in dados
-                ? dados.financialInstitutionId
-                : undefined,
-            paymentMethodId:
-              'paymentMethodId' in dados ? dados.paymentMethodId : undefined,
-            cardBrandId: 'cardBrandId' in dados ? dados.cardBrandId : undefined,
-            transactionAuthorization:
-              'transactionAuthorization' in dados
-                ? dados.transactionAuthorization
-                : undefined,
-          };
-
     const res = await fetch(`${API_URL}/${collection(tipo)}`, {
       method: 'POST',
       headers: jsonHeaders(),
-      body: JSON.stringify(payload),
+      body: JSON.stringify(toCreatePayload(tipo, dados)),
     });
     const body = await parseJson(res);
     if (!res.ok) {
       throw new Error(body.message || body.error || 'Falha ao lançar conta.');
+    }
+    return normalizeAccount(body as Record<string, unknown>, tipo);
+  },
+  update: async (
+    tipo: FinancialTipo,
+    id: string,
+    dados: CreatePayableInput | CreateReceivableInput,
+  ): Promise<FinancialAccount> => {
+    const res = await fetch(`${API_URL}/${collection(tipo)}/${id}`, {
+      method: 'PUT',
+      headers: jsonHeaders(),
+      body: JSON.stringify(toCreatePayload(tipo, dados)),
+    });
+    const body = await parseJson(res);
+    if (!res.ok) {
+      throw new Error(body.message || body.error || 'Falha ao atualizar conta.');
+    }
+    return normalizeAccount(body as Record<string, unknown>, tipo);
+  },
+  delete: async (tipo: FinancialTipo, id: string): Promise<void> => {
+    const res = await fetch(`${API_URL}/${collection(tipo)}/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    const body = await parseJson(res);
+    if (!res.ok) {
+      throw new Error(body.message || body.error || 'Falha ao excluir conta.');
+    }
+  },
+  reverse: async (tipo: FinancialTipo, id: string): Promise<FinancialAccount> => {
+    const res = await fetch(`${API_URL}/${collection(tipo)}/${id}/reverse`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    const body = await parseJson(res);
+    if (!res.ok) {
+      throw new Error(body.message || body.error || 'Falha ao estornar liquidação.');
     }
     return normalizeAccount(body as Record<string, unknown>, tipo);
   },

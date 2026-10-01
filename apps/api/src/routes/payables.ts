@@ -137,6 +137,21 @@ export const payablesRoutes: FastifyPluginAsync = async (fastify) => {
       const { id } = request.params as { id: string };
       const { paidOn, paidAmount } = request.body as z.infer<typeof paySchema>;
 
+      const [existing] = await db
+        .select({ status: payables.status })
+        .from(payables)
+        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
+        .limit(1);
+
+      if (!existing) {
+        return reply.status(404).send({ message: 'Conta a pagar não encontrada.' });
+      }
+      if (existing.status !== 'pendente') {
+        return reply.status(400).send({
+          message: 'Somente contas pendentes podem ser liquidadas.',
+        });
+      }
+
       const [updatedAccount] = await db
         .update(payables)
         .set({
@@ -147,11 +162,127 @@ export const payablesRoutes: FastifyPluginAsync = async (fastify) => {
         .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
         .returning();
 
-      if (!updatedAccount) {
+      return updatedAccount;
+    },
+  );
+
+  fastify.put(
+    '/:id',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: createPayableSchema,
+      },
+    },
+    async (request, reply) => {
+      const { tenantId } = request.user;
+      const { id } = request.params as { id: string };
+      const data = request.body as z.infer<typeof createPayableSchema>;
+
+      const [existing] = await db
+        .select({ status: payables.status })
+        .from(payables)
+        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
+        .limit(1);
+
+      if (!existing) {
         return reply.status(404).send({ message: 'Conta a pagar não encontrada.' });
       }
+      if (existing.status !== 'pendente') {
+        return reply.status(400).send({
+          message: 'Somente contas pendentes podem ser editadas.',
+        });
+      }
 
-      return updatedAccount;
+      const [updated] = await db
+        .update(payables)
+        .set({
+          creditorId: data.creditorId,
+          documentNumber: data.documentNumber || null,
+          description: data.description,
+          issueOn: data.issueOn,
+          installmentAmount: data.installmentAmount,
+          dueOn: data.dueOn,
+          planAccountId: data.planAccountId || null,
+        })
+        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
+        .returning();
+
+      return updated;
+    },
+  );
+
+  fastify.delete(
+    '/:id',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+      },
+    },
+    async (request, reply) => {
+      const { tenantId } = request.user;
+      const { id } = request.params as { id: string };
+
+      const [existing] = await db
+        .select({ status: payables.status })
+        .from(payables)
+        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
+        .limit(1);
+
+      if (!existing) {
+        return reply.status(404).send({ message: 'Conta a pagar não encontrada.' });
+      }
+      if (existing.status !== 'pendente') {
+        return reply.status(400).send({
+          message: 'Somente contas pendentes podem ser excluídas.',
+        });
+      }
+
+      await db
+        .delete(payables)
+        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)));
+
+      return { success: true };
+    },
+  );
+
+  fastify.post(
+    '/:id/reverse',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+      },
+    },
+    async (request, reply) => {
+      const { tenantId } = request.user;
+      const { id } = request.params as { id: string };
+
+      const [existing] = await db
+        .select({ status: payables.status })
+        .from(payables)
+        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
+        .limit(1);
+
+      if (!existing) {
+        return reply.status(404).send({ message: 'Conta a pagar não encontrada.' });
+      }
+      if (existing.status !== 'pago') {
+        return reply.status(400).send({
+          message: 'Somente contas pagas podem ser estornadas.',
+        });
+      }
+
+      const [updated] = await db
+        .update(payables)
+        .set({
+          paidOn: null,
+          paidAmount: null,
+          status: 'pendente',
+        })
+        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
+        .returning();
+
+      return updated;
     },
   );
 };

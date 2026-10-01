@@ -1,7 +1,9 @@
 import { formatCurrency, formatRawDate } from '@erp-360/shared';
 import {
   keepPreviousData,
+  useMutation,
   useQuery,
+  useQueryClient,
 } from '@tanstack/react-query';
 import {
   ArrowDown,
@@ -10,19 +12,39 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
+  MoreHorizontal,
+  Pencil,
   Plus,
+  RotateCcw,
   Search,
+  Trash2,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -48,10 +70,15 @@ import {
 import { PayModal } from '../Payables/PayModal';
 import { ReceivableForm } from './ReceivableForm';
 
+type ConfirmAction = 'delete' | 'reverse' | null;
+
 export function ReceivableList() {
+  const queryClient = useQueryClient();
   const [openReceive, setOpenReceive] = useState(false);
+  const [openForm, setOpenForm] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<FinancialAccount | null>(null);
-  const [openInsertReceivable, setOpenInsertReceivable] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState('');
@@ -115,13 +142,54 @@ export function ReceivableList() {
   const meta = response?.meta;
   const accounts = response?.data;
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => financialService.delete('receivable', id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['financial', 'receivable'] });
+      setConfirmAction(null);
+      setActionError(null);
+      toast.success('Conta a receber excluída com sucesso!');
+    },
+    onError: (error: Error) => setActionError(error.message),
+  });
+
+  const reverseMutation = useMutation({
+    mutationFn: (id: string) => financialService.reverse('receivable', id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['financial', 'receivable'] });
+      setConfirmAction(null);
+      setActionError(null);
+      toast.success('Recebimento estornado com sucesso!');
+    },
+    onError: (error: Error) => setActionError(error.message),
+  });
+
+  const openCreate = () => {
+    setSelectedAccount(null);
+    setOpenForm(true);
+  };
+
+  const openEdit = (account: FinancialAccount) => {
+    setSelectedAccount(account);
+    setOpenForm(true);
+  };
+
   const handleReceive = (account: FinancialAccount) => {
     setSelectedAccount(account);
     setOpenReceive(true);
   };
 
+  const openConfirm = (account: FinancialAccount, action: ConfirmAction) => {
+    setSelectedAccount(account);
+    setActionError(null);
+    setConfirmAction(action);
+  };
+
   if (isLoading && !response)
     return <p className="text-sm text-zinc-500">Carregando contas a receber...</p>;
+
+  const confirmPending =
+    deleteMutation.isPending || reverseMutation.isPending;
 
   return (
     <div className="space-y-4">
@@ -130,19 +198,9 @@ export function ReceivableList() {
           <h3 className="text-lg font-bold text-zinc-900">Contas a Receber</h3>
           <p className="text-sm text-zinc-500">Gerencie contas a receber.</p>
         </div>
-        <Dialog open={openInsertReceivable} onOpenChange={setOpenInsertReceivable}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-2">
-              <Plus className="h-4 w-4" /> Novo Receber
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Lançar Conta a Receber</DialogTitle>
-            </DialogHeader>
-            <ReceivableForm onSuccess={() => setOpenInsertReceivable(false)} />
-          </DialogContent>
-        </Dialog>
+        <Button size="sm" className="gap-2" onClick={openCreate}>
+          <Plus className="h-4 w-4" /> Novo Receber
+        </Button>
       </div>
 
       <div className="flex flex-col gap-3 bg-white p-4 rounded-lg border border-zinc-200">
@@ -233,7 +291,7 @@ export function ReceivableList() {
               </TableHead>
               <TableHead>Recebido</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-[100px]" />
+              <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -267,16 +325,40 @@ export function ReceivableList() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {acc.status === 'pendente' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleReceive(acc)}
-                        className="h-7 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50 gap-1"
-                      >
-                        <ArrowDownLeft className="h-3.5 w-3.5" /> Receber
-                      </Button>
-                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Ações de ${acc.description}`}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {acc.status === 'pendente' && (
+                          <>
+                            <DropdownMenuItem onClick={() => openEdit(acc)}>
+                              <Pencil className="h-4 w-4" /> Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleReceive(acc)}>
+                              <ArrowDownLeft className="h-4 w-4" /> Receber
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-600 focus:text-red-600"
+                              onClick={() => openConfirm(acc, 'delete')}
+                            >
+                              <Trash2 className="h-4 w-4" /> Excluir
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                        {acc.status === 'recebido' && (
+                          <DropdownMenuItem onClick={() => openConfirm(acc, 'reverse')}>
+                            <RotateCcw className="h-4 w-4" /> Estornar
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
@@ -321,7 +403,37 @@ export function ReceivableList() {
         </div>
       )}
 
-      <Dialog open={openReceive} onOpenChange={setOpenReceive}>
+      <Dialog
+        open={openForm}
+        onOpenChange={(open) => {
+          setOpenForm(open);
+          if (!open) setSelectedAccount(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedAccount ? 'Editar Conta a Receber' : 'Lançar Conta a Receber'}
+            </DialogTitle>
+          </DialogHeader>
+          <ReceivableForm
+            key={selectedAccount?.id ?? 'new'}
+            accountToUpdate={selectedAccount}
+            onSuccess={() => {
+              setOpenForm(false);
+              setSelectedAccount(null);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={openReceive}
+        onOpenChange={(open) => {
+          setOpenReceive(open);
+          if (!open) setSelectedAccount(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Receber Conta a Receber</DialogTitle>
@@ -330,11 +442,66 @@ export function ReceivableList() {
             <PayModal
               tipo="receivable"
               account={selectedAccount}
-              onSuccess={() => setOpenReceive(false)}
+              onSuccess={() => {
+                setOpenReceive(false);
+                setSelectedAccount(null);
+              }}
             />
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmAction(null);
+            setActionError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmAction === 'delete'
+                ? 'Excluir conta a receber'
+                : 'Estornar recebimento'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {actionError ??
+                (confirmAction === 'delete'
+                  ? `Deseja excluir ${selectedAccount?.description ?? 'esta conta'}? Essa ação não pode ser desfeita.`
+                  : `Deseja estornar o recebimento de ${selectedAccount?.description ?? 'esta conta'}? O título voltará para pendente.`)}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className={
+                confirmAction === 'delete'
+                  ? 'bg-red-600 hover:bg-red-700'
+                  : 'bg-amber-600 hover:bg-amber-700'
+              }
+              disabled={confirmPending || !!actionError}
+              onClick={(event) => {
+                event.preventDefault();
+                if (!selectedAccount) return;
+                if (confirmAction === 'delete') {
+                  deleteMutation.mutate(selectedAccount.id);
+                } else if (confirmAction === 'reverse') {
+                  reverseMutation.mutate(selectedAccount.id);
+                }
+              }}
+            >
+              {confirmPending
+                ? 'Processando...'
+                : confirmAction === 'delete'
+                  ? 'Excluir'
+                  : 'Estornar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
