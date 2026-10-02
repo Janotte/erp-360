@@ -4,6 +4,7 @@ import {
   boolean,
   check,
   date,
+  pgEnum,
   pgTable,
   smallint,
   text,
@@ -13,11 +14,19 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
+// Enum de controle do tipo de pessoa
+export const typePersonEnum = pgEnum('type_person', [
+  'individual',
+  'company',
+  'foreigner',
+]);
+
 export const persons = pgTable(
   'persons',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     ...tenantColumns,
+    type: typePersonEnum('type').default('individual').notNull(),
     name: varchar('name', { length: 120 }).notNull(),
     // CPF, CPNJ ou documento de estrangeiro
     taxId: varchar('tax_id', { length: 19 }),

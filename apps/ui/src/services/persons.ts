@@ -1,11 +1,13 @@
-import { API_URL, parseTaxpayerType } from '@erp-360/shared';
+import { API_URL, parsePersonKind, parseTaxpayerType } from '@erp-360/shared';
 
 import { authStorage } from '../utils/auth';
 
+export type PersonKind = 'individual' | 'company' | 'foreigner';
 export type TaxpayerType = 1 | 2 | 9;
 
 export interface Person {
   id: string;
+  type: PersonKind;
   name: string;
   taxId?: string | null;
   taxpayerType?: TaxpayerType | null;
@@ -20,6 +22,7 @@ export interface Person {
   isClient: boolean;
   isSupplier: boolean;
   isEmployee: boolean;
+  isFinancialInstitution: boolean;
   createdAt?: string;
 }
 
@@ -80,6 +83,7 @@ export interface FiltersPersons {
   sortField: 'name' | 'createdAt';
   sortOrder: 'asc' | 'desc';
   type?: string | string[];
+  kind?: 'individual' | 'company' | 'foreigner';
   search?: string;
 }
 
@@ -117,7 +121,9 @@ async function parsePersonResponse(res: Response, fallback: string): Promise<Per
 function normalizePerson(person: Person & { taxpayer_type?: unknown }): Person {
   return {
     ...person,
+    type: parsePersonKind(person.type),
     taxpayerType: parseTaxpayerType(person.taxpayerType ?? person.taxpayer_type),
+    isFinancialInstitution: Boolean(person.isFinancialInstitution),
   };
 }
 
@@ -152,6 +158,7 @@ export const personsService = {
       ...(filters.type && {
         type: Array.isArray(filters.type) ? filters.type.join(',') : filters.type,
       }),
+      ...(filters.kind && { kind: filters.kind }),
       ...(filters.search && { busca: filters.search }),
     });
 

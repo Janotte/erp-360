@@ -1,4 +1,4 @@
-import { parseTaxpayerType, taxpayerTypeLabels } from '@erp-360/shared';
+import { parseTaxpayerType, personKindLabels, personKinds, taxpayerTypeLabels } from '@erp-360/shared';
 import {
   keepPreviousData,
   useMutation,
@@ -74,6 +74,7 @@ export function ListPersons() {
   const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState('');
   const [type, setType] = useState<string>('todos');
+  const [kind, setKind] = useState<string>('todos');
   const [page, setPage] = useState(1);
   const [sortField, setSortField] = useState<'name' | 'createdAt'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -91,7 +92,7 @@ export function ListPersons() {
 
   // 2. O TanStack Query escuta as mudanças de estados e faz o "refetch" automático
   const { data: response, isLoading } = useQuery({
-    queryKey: ['listaPessoas', { page, type, search, sortField, sortOrder }],
+    queryKey: ['listaPessoas', { page, type, kind, search, sortField, sortOrder }],
     placeholderData: keepPreviousData,
     queryFn: () =>
       personsService.list({
@@ -100,6 +101,7 @@ export function ListPersons() {
         sortField,
         sortOrder,
         type: type === 'todos' ? undefined : type,
+        kind: kind === 'todos' ? undefined : (kind as Person['type']),
         search: search || undefined,
       }),
   });
@@ -168,7 +170,26 @@ export function ListPersons() {
           />
         </div>
 
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Select
+            value={kind}
+            onValueChange={(v) => {
+              setKind(v);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-45">
+              <SelectValue placeholder="Filtrar por Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os tipos</SelectItem>
+              {personKinds.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {personKindLabels[value]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select
             value={type}
             onValueChange={(v) => {
@@ -180,10 +201,11 @@ export function ListPersons() {
               <SelectValue placeholder="Filtrar por Perfil" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">👥 Todos os Perfis</SelectItem>
-              <SelectItem value="cliente">🔵 Clientes</SelectItem>
-              <SelectItem value="fornecedor">🟡 Fornecedores</SelectItem>
-              <SelectItem value="colaborador">🟣 Colaboradores</SelectItem>
+              <SelectItem value="todos">Todos os perfis</SelectItem>
+              <SelectItem value="cliente">Clientes</SelectItem>
+              <SelectItem value="fornecedor">Fornecedores</SelectItem>
+              <SelectItem value="colaborador">Colaboradores</SelectItem>
+              <SelectItem value="instituicao">Instituições</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -259,6 +281,11 @@ export function ListPersons() {
                     {person.isEmployee && (
                       <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-50 text-purple-600">
                         Colaborador
+                      </span>
+                    )}
+                    {person.isFinancialInstitution && (
+                      <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700">
+                        Instituição
                       </span>
                     )}
                   </TableCell>

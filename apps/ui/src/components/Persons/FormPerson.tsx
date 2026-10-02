@@ -1,4 +1,16 @@
-import { parseTaxpayerType, taxpayerTypeLabels, taxpayerTypes } from '@erp-360/shared';
+import {
+  formatCnpj,
+  formatCpf,
+  isValidCnpj,
+  isValidCpf,
+  parsePersonKind,
+  parseTaxpayerType,
+  personKindLabels,
+  personKinds,
+  taxpayerTypeLabels,
+  taxpayerTypes,
+  type PersonKind,
+} from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -13,6 +25,30 @@ import { Separator } from '../ui/separator';
 import { PersonAddresses } from './PersonAddresses';
 import { PersonContacts } from './PersonContacts';
 
+const fieldLabels: Record<
+  PersonKind,
+  { name: string; taxId: string; stateRegistration: string; birthDate: string }
+> = {
+  individual: {
+    name: 'Nome',
+    taxId: 'CPF',
+    stateRegistration: 'RG',
+    birthDate: 'Data de nascimento',
+  },
+  company: {
+    name: 'Razão social',
+    taxId: 'CNPJ',
+    stateRegistration: 'IE',
+    birthDate: 'Data de fundação',
+  },
+  foreigner: {
+    name: 'Nome',
+    taxId: 'Documento',
+    stateRegistration: 'Documento 2',
+    birthDate: 'Nascimento/Fundação',
+  },
+};
+
 function toDateInput(value?: string | null) {
   if (!value) return '';
   return String(value).slice(0, 10);
@@ -25,6 +61,18 @@ function parseEmails(raw: string) {
     .filter(Boolean);
 }
 
+function formatTaxId(kind: PersonKind, value: string) {
+  if (kind === 'individual') return formatCpf(value);
+  if (kind === 'company') return formatCnpj(value);
+  return value.slice(0, 19);
+}
+
+function taxIdMaxLength(kind: PersonKind) {
+  if (kind === 'individual') return 14;
+  if (kind === 'company') return 18;
+  return 19;
+}
+
 interface FormPersonProps {
   personToUpdate?: Person | null;
   onPersisted?: (person: Person) => void;
@@ -33,9 +81,11 @@ interface FormPersonProps {
 export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
   const queryClient = useQueryClient();
   const [personId, setPersonId] = useState(personToUpdate?.id);
+  const [personKind, setPersonKind] = useState<PersonKind>('individual');
   const [name, setName] = useState('');
   const [taxId, setTaxId] = useState('');
-  const [taxpayerType, setTaxpayerType] = useState('');
+  const [taxIdError, setTaxIdError] = useState('');
+  const [taxpayerType, setTaxpayerType] = useState('9');
   const [stateRegistration, setStateRegistration] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [nfeEmail, setNfeEmail] = useState('');
@@ -47,6 +97,7 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
   const [isClient, setIsClient] = useState(false);
   const [isSupplier, setIsSupplier] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false);
+  const [isFinancialInstitution, setIsFinancialInstitution] = useState(false);
 
   const { data: personLoaded } = useQuery({
     queryKey: ['person', personId],
@@ -59,13 +110,18 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
     if (!personLoaded && !personToUpdate) return;
 
     const person = { ...personToUpdate, ...personLoaded };
+    const kind = parsePersonKind(person.type);
     const taxpayer =
-      parseTaxpayerType(personLoaded?.taxpayerType) ??
-      parseTaxpayerType(personToUpdate?.taxpayerType) ??
-      parseTaxpayerType((person as { taxpayer_type?: unknown }).taxpayer_type);
+      kind === 'individual'
+        ? 9
+        : (parseTaxpayerType(personLoaded?.taxpayerType) ??
+          parseTaxpayerType(personToUpdate?.taxpayerType) ??
+          parseTaxpayerType((person as { taxpayer_type?: unknown }).taxpayer_type));
 
+    setPersonKind(kind);
     setName(person.name ?? '');
-    setTaxId(person.taxId || '');
+    setTaxId(formatTaxId(kind, person.taxId || ''));
+    setTaxIdError('');
     setTaxpayerType(taxpayer != null ? String(taxpayer) : '');
     setStateRegistration(person.stateRegistration || '');
     setBirthDate(toDateInput(person.birthDate));
@@ -78,6 +134,7 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
     setIsClient(Boolean(person.isClient));
     setIsSupplier(Boolean(person.isSupplier));
     setIsEmployee(Boolean(person.isEmployee));
+    setIsFinancialInstitution(Boolean(person.isFinancialInstitution));
   }, [personLoaded, personToUpdate]);
 
   const mutation = useMutation({
@@ -89,8 +146,14 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
     onSuccess: (saved) => {
       const created = !personId;
       setPersonId(saved.id);
-      const savedType = parseTaxpayerType(saved.taxpayerType)?.toString();
-      setTaxpayerType(savedType || taxpayerType);
+      const savedKind = parsePersonKind(saved.type);
+      setPersonKind(savedKind);
+      setTaxId(formatTaxId(savedKind, saved.taxId || ''));
+      const savedType =
+        savedKind === 'individual'
+          ? '9'
+          : (parseTaxpayerType(saved.taxpayerType)?.toString() ?? taxpayerType);
+      setTaxpayerType(savedType);
       queryClient.setQueryData(['person', saved.id], saved);
       queryClient.invalidateQueries({ queryKey: ['person', saved.id] });
       queryClient.invalidateQueries({ queryKey: ['listaPessoas'] });
@@ -104,12 +167,37 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
     },
   });
 
+  const labels = fieldLabels[personKind];
+  const showTaxpayerType = personKind === 'company';
+
+  const handleKindChange = (next: PersonKind) => {
+    setPersonKind(next);
+    setTaxId((current) => formatTaxId(next, current));
+    setTaxIdError('');
+    if (next === 'individual') setTaxpayerType('9');
+  };
+
+  const handleTaxIdChange = (value: string) => {
+    setTaxId(formatTaxId(personKind, value));
+    setTaxIdError('');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (personKind === 'individual' && taxId && !isValidCpf(taxId)) {
+      setTaxIdError('CPF inválido');
+      return;
+    }
+    if (personKind === 'company' && taxId && !isValidCnpj(taxId)) {
+      setTaxIdError('CNPJ inválido');
+      return;
+    }
+
     mutation.mutate({
+      type: personKind,
       name,
       taxId: taxId || null,
-      taxpayerType: parseTaxpayerType(taxpayerType),
+      taxpayerType: personKind === 'individual' ? 9 : parseTaxpayerType(taxpayerType),
       stateRegistration: stateRegistration || null,
       isRuralProducer,
       birthDate: birthDate || null,
@@ -121,14 +209,35 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
       isClient,
       isSupplier,
       isEmployee,
+      isFinancialInstitution,
     });
   };
+
+  const selectClassName =
+    'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
 
   return (
     <div className="space-y-6 pt-4">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1">
-          <Label htmlFor="nome">Nome / Razão Social</Label>
+          <Label htmlFor="personKind">Tipo de pessoa</Label>
+          <select
+            id="personKind"
+            value={personKind}
+            onChange={(event) => handleKindChange(parsePersonKind(event.target.value))}
+            className={selectClassName}
+            required
+          >
+            {personKinds.map((kind) => (
+              <option key={kind} value={kind}>
+                {personKindLabels[kind]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="nome">{labels.name}</Label>
           <Input
             id="nome"
             value={name}
@@ -140,16 +249,21 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <Label htmlFor="taxId">CPF / CNPJ</Label>
+            <Label htmlFor="taxId">{labels.taxId}</Label>
             <Input
               id="taxId"
               value={taxId}
-              maxLength={19}
-              onChange={(e) => setTaxId(e.target.value)}
+              maxLength={taxIdMaxLength(personKind)}
+              inputMode={personKind === 'foreigner' ? 'text' : 'numeric'}
+              autoComplete="off"
+              onChange={(e) => handleTaxIdChange(e.target.value)}
             />
+            {taxIdError ? (
+              <p className="text-sm text-destructive">{taxIdError}</p>
+            ) : null}
           </div>
           <div className="space-y-1">
-            <Label htmlFor="birthDate">Nascimento / Fundação</Label>
+            <Label htmlFor="birthDate">{labels.birthDate}</Label>
             <Input
               id="birthDate"
               type="date"
@@ -159,25 +273,37 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <Label htmlFor="taxpayerType">Indicador de contribuinte</Label>
-            <select
-              id="taxpayerType"
-              value={taxpayerType}
-              onChange={(event) => setTaxpayerType(event.target.value)}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <option value="">Selecione</option>
-              {taxpayerTypes.map((value) => (
-                <option key={value} value={String(value)}>
-                  {taxpayerTypeLabels[value]}
-                </option>
-              ))}
-            </select>
+        {showTaxpayerType ? (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="taxpayerType">Indicador de contribuinte</Label>
+              <select
+                id="taxpayerType"
+                value={taxpayerType}
+                onChange={(event) => setTaxpayerType(event.target.value)}
+                className={selectClassName}
+              >
+                <option value="">Selecione</option>
+                {taxpayerTypes.map((value) => (
+                  <option key={value} value={String(value)}>
+                    {taxpayerTypeLabels[value]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="stateRegistration">{labels.stateRegistration}</Label>
+              <Input
+                id="stateRegistration"
+                value={stateRegistration}
+                maxLength={20}
+                onChange={(e) => setStateRegistration(e.target.value)}
+              />
+            </div>
           </div>
+        ) : (
           <div className="space-y-1">
-            <Label htmlFor="stateRegistration">RG / IE</Label>
+            <Label htmlFor="stateRegistration">{labels.stateRegistration}</Label>
             <Input
               id="stateRegistration"
               value={stateRegistration}
@@ -185,7 +311,7 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
               onChange={(e) => setStateRegistration(e.target.value)}
             />
           </div>
-        </div>
+        )}
 
         <div className="space-y-1">
           <Label htmlFor="nfeEmail">E-mail da NF-e</Label>
@@ -249,6 +375,16 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
               />
               <label htmlFor="colaborador" className="text-sm font-medium">
                 Colaborador
+              </label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="instituicao"
+                checked={isFinancialInstitution}
+                onCheckedChange={(v) => setIsFinancialInstitution(!!v)}
+              />
+              <label htmlFor="instituicao" className="text-sm font-medium">
+                Instituição financeira
               </label>
             </div>
           </div>

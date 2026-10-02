@@ -1,5 +1,12 @@
 import { persons } from '@erp-360/mod-persons';
-import { parseTaxpayerType, PersonSchema, type Person } from '@erp-360/shared';
+import {
+  isValidCnpj,
+  isValidCpf,
+  parsePersonKind,
+  parseTaxpayerType,
+  PersonSchema,
+  type Person,
+} from '@erp-360/shared';
 import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
@@ -13,6 +20,15 @@ function emptyToNull(value?: string | null) {
   return value ? value : null;
 }
 
+function personDocumentError(data: Person) {
+  const taxId = data.taxId?.trim();
+  if (!taxId) return null;
+  const type = parsePersonKind(data.type);
+  if (type === 'individual' && !isValidCpf(taxId)) return 'CPF inválido';
+  if (type === 'company' && !isValidCnpj(taxId)) return 'CNPJ inválido';
+  return null;
+}
+
 function readTaxpayerType(person: object) {
   const row = person as Record<string, unknown>;
   return parseTaxpayerType(row.taxpayerType ?? row.taxpayer_type);
@@ -21,15 +37,18 @@ function readTaxpayerType(person: object) {
 function serializePerson(person: typeof persons.$inferSelect) {
   return {
     ...person,
-    taxpayerType: readTaxpayerType(person),
+    taxpayerType:
+      person.type === 'individual' ? 9 : readTaxpayerType(person),
   };
 }
 
 function toPersonValues(data: Person) {
+  const type = parsePersonKind(data.type);
   return {
+    type,
     name: data.name,
     taxId: emptyToNull(data.taxId),
-    taxpayerType: parseTaxpayerType(data.taxpayerType),
+    taxpayerType: type === 'individual' ? 9 : parseTaxpayerType(data.taxpayerType),
     stateRegistration: emptyToNull(data.stateRegistration),
     isRuralProducer: data.isRuralProducer,
     birthDate: emptyToNull(data.birthDate),
@@ -41,6 +60,7 @@ function toPersonValues(data: Person) {
     isClient: data.isClient,
     isSupplier: data.isSupplier,
     isEmployee: data.isEmployee,
+    isFinancialInstitution: Boolean(data.isFinancialInstitution),
   };
 }
 
@@ -70,6 +90,7 @@ function personTypeCondition(type: z.infer<typeof personTypeEnum>) {
 
 const listPersonsQuery = z.object({
   type: z.preprocess(normalizePersonTypes, z.array(personTypeEnum).optional()),
+  kind: z.enum(['individual', 'company', 'foreigner']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   sortField: z.enum(['nome', 'createdAt']).default('nome'),
@@ -91,6 +112,10 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const { tenantId } = request.user;
       const data = request.body as Person;
+      const documentError = personDocumentError(data);
+      if (documentError) {
+        return reply.status(400).send({ message: documentError });
+      }
 
       const [newPerson] = await db
         .insert(persons)
@@ -118,6 +143,7 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
         sortField,
         sortOrder,
         type,
+        kind,
         busca: search,
       } = request.query as z.infer<typeof listPersonsQuery>;
 
@@ -131,6 +157,8 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
           typeFilters.length === 1 ? typeFilters[0] : or(...typeFilters)!,
         );
       }
+
+      if (kind) conditions.push(eq(persons.type, kind));
 
       // 2. Filtro por Busca Textual (Nome, CPF/CNPJ ou e-mail da NF-e)
       if (search) {
@@ -219,6 +247,10 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
       const { tenantId } = request.user;
       const { id } = request.params as { id: string };
       const data = request.body as Person;
+      const documentError = personDocumentError(data);
+      if (documentError) {
+        return reply.status(400).send({ message: documentError });
+      }
 
       const [person] = await db
         .update(persons)

@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+import {
+  formatCnpj,
+  formatCpf,
+  isValidCnpj,
+  isValidCpf,
+  onlyDigits,
+} from './utils/brazilianDocuments.ts';
+
 export const UserSchema = z.object({
   id: z.string().uuid({ message: 'ID precisa ser um UUID válido' }),
   name: z.string().min(3, { message: 'Nome deve ter no mínimo 3 caracteres' }),
@@ -24,11 +32,26 @@ export function parseTaxpayerType(value: unknown): TaxpayerType | null {
   return null;
 }
 
+export const personKinds = ['individual', 'company', 'foreigner'] as const;
+export type PersonKind = (typeof personKinds)[number];
+
+export const personKindLabels: Record<PersonKind, string> = {
+  individual: 'Física',
+  company: 'Jurídica',
+  foreigner: 'Estrangeiro',
+};
+
+export function parsePersonKind(value: unknown): PersonKind {
+  if (value === 'company' || value === 'foreigner') return value;
+  return 'individual';
+}
+
 const optionalText = (max: number) =>
   z.string().max(max).optional().or(z.literal('')).nullable();
 
 // Schema de validação do Zod para criação de Pessoas
 export const PersonSchema = z.object({
+  type: z.enum(personKinds).default('individual'),
   name: z.string().min(2, 'O nome deve ter pelo menos 2 caracteres').max(120),
   taxId: optionalText(19),
   taxpayerType: z.union([z.number(), z.string(), z.null()]).optional(),
@@ -54,6 +77,7 @@ export const PersonSchema = z.object({
   isClient: z.boolean().default(false),
   isSupplier: z.boolean().default(false),
   isEmployee: z.boolean().default(false),
+  isFinancialInstitution: z.boolean().default(false),
 });
 
 export type Person = z.infer<typeof PersonSchema>;
@@ -96,5 +120,6 @@ const nodeEnv = (globalThis as { process?: { env?: Record<string, string | undef
 
 export const API_URL = nodeEnv?.APP_BASE_URL ?? 'http://localhost:3000';
 
+export { formatCnpj, formatCpf, isValidCnpj, isValidCpf, onlyDigits };
 export * from './utils/FormatCurrency';
 export * from './utils/FormatRawDate';
