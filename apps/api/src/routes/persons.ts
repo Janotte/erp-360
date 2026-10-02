@@ -104,7 +104,8 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
       if (type === 'cliente') conditions.push(eq(persons.isClient, true));
       if (type === 'fornecedor') conditions.push(eq(persons.isSupplier, true));
       if (type === 'colaborador') conditions.push(eq(persons.isEmployee, true));
-      if (type === 'instituicao') conditions.push(eq(persons.isFinancialInstitution, true));
+      if (type === 'instituicao')
+        conditions.push(eq(persons.isFinancialInstitution, true));
 
       // 2. Filtro por Busca Textual (Nome, CPF/CNPJ ou e-mail da NF-e)
       if (search) {

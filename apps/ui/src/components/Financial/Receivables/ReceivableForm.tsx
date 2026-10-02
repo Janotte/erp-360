@@ -115,7 +115,10 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pt-2">
+    <form
+      onSubmit={handleSubmit}
+      className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pt-2"
+    >
       <div className="space-y-1">
         <Label>Cliente</Label>
         <PersonSearchSelect

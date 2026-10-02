@@ -27,6 +27,9 @@ export const planAccounts = pgTable(
   },
   (table) => [
     unique('plan_accounts_id_tenant_id_unique').on(table.id, table.tenantId),
-    unique('plan_accounts_tenant_account_code_unique').on(table.tenantId, table.accountCode),
+    unique('plan_accounts_tenant_account_code_unique').on(
+      table.tenantId,
+      table.accountCode,
+    ),
   ],
 );

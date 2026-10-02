@@ -79,7 +79,10 @@ export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pt-2">
+    <form
+      onSubmit={handleSubmit}
+      className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pt-2"
+    >
       <div className="space-y-1">
         <Label>Fornecedor / Favorecido</Label>
         <PersonSearchSelect

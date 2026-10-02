@@ -92,12 +92,8 @@
           "name": "users_tenant_id_tenants_id_fk",
           "tableFrom": "users",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -107,9 +103,7 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -219,12 +213,8 @@
           "name": "person_addresses_tenant_id_tenants_id_fk",
           "tableFrom": "person_addresses",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -232,12 +222,8 @@
           "name": "person_addresses_city_id_cities_id_fk",
           "tableFrom": "person_addresses",
           "tableTo": "cities",
-          "columnsFrom": [
-            "city_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["city_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -245,14 +231,8 @@
           "name": "person_addresses_person_tenant_fk",
           "tableFrom": "person_addresses",
           "tableTo": "persons",
-          "columnsFrom": [
-            "person_id",
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id",
-            "tenant_id"
-          ],
+          "columnsFrom": ["person_id", "tenant_id"],
+          "columnsTo": ["id", "tenant_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -347,12 +327,8 @@
           "name": "cities_state_id_states_id_fk",
           "tableFrom": "cities",
           "tableTo": "states",
-          "columnsFrom": [
-            "state_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["state_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -362,18 +338,12 @@
         "cities_state_name_unique": {
           "name": "cities_state_name_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "state_id",
-            "name"
-          ]
+          "columns": ["state_id", "name"]
         },
         "cities_state_code_unique": {
           "name": "cities_state_code_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "state_id",
-            "code"
-          ]
+          "columns": ["state_id", "code"]
         }
       },
       "policies": {},
@@ -477,12 +447,8 @@
           "name": "person_contacts_tenant_id_tenants_id_fk",
           "tableFrom": "person_contacts",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -490,14 +456,8 @@
           "name": "person_contacts_person_tenant_fk",
           "tableFrom": "person_contacts",
           "tableTo": "persons",
-          "columnsFrom": [
-            "person_id",
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id",
-            "tenant_id"
-          ],
+          "columnsFrom": ["person_id", "tenant_id"],
+          "columnsTo": ["id", "tenant_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -539,16 +499,12 @@
         "countries_name_unique": {
           "name": "countries_name_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "name"
-          ]
+          "columns": ["name"]
         },
         "countries_code_unique": {
           "name": "countries_code_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "code"
-          ]
+          "columns": ["code"]
         }
       },
       "policies": {},
@@ -689,12 +645,8 @@
           "name": "persons_tenant_id_tenants_id_fk",
           "tableFrom": "persons",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -704,18 +656,12 @@
         "persons_id_tenant_id_unique": {
           "name": "persons_id_tenant_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id",
-            "tenant_id"
-          ]
+          "columns": ["id", "tenant_id"]
         },
         "persons_tenant_tax_id_unique": {
           "name": "persons_tenant_tax_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "tenant_id",
-            "tax_id"
-          ]
+          "columns": ["tenant_id", "tax_id"]
         }
       },
       "policies": {},
@@ -779,12 +725,8 @@
           "name": "states_country_id_countries_id_fk",
           "tableFrom": "states",
           "tableTo": "countries",
-          "columnsFrom": [
-            "country_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["country_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -794,26 +736,17 @@
         "states_country_name_unique": {
           "name": "states_country_name_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "country_id",
-            "name"
-          ]
+          "columns": ["country_id", "name"]
         },
         "states_country_code_unique": {
           "name": "states_country_code_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "country_id",
-            "code"
-          ]
+          "columns": ["country_id", "code"]
         },
         "states_country_abbreviation_unique": {
           "name": "states_country_abbreviation_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "country_id",
-            "abbreviation"
-          ]
+          "columns": ["country_id", "abbreviation"]
         }
       },
       "policies": {},
@@ -851,16 +784,12 @@
         "card_brands_code_unique": {
           "name": "card_brands_code_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "code"
-          ]
+          "columns": ["code"]
         },
         "card_brands_name_unique": {
           "name": "card_brands_name_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "name"
-          ]
+          "columns": ["name"]
         }
       },
       "policies": {},
@@ -954,12 +883,8 @@
           "name": "payables_tenant_id_tenants_id_fk",
           "tableFrom": "payables",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -967,14 +892,8 @@
           "name": "payables_creditor_tenant_fk",
           "tableFrom": "payables",
           "tableTo": "persons",
-          "columnsFrom": [
-            "creditor_id",
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id",
-            "tenant_id"
-          ],
+          "columnsFrom": ["creditor_id", "tenant_id"],
+          "columnsTo": ["id", "tenant_id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -982,14 +901,8 @@
           "name": "payables_plan_account_tenant_fk",
           "tableFrom": "payables",
           "tableTo": "plan_accounts",
-          "columnsFrom": [
-            "plan_account_id",
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id",
-            "tenant_id"
-          ],
+          "columnsFrom": ["plan_account_id", "tenant_id"],
+          "columnsTo": ["id", "tenant_id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1031,9 +944,7 @@
         "payment_methods_type_code_unique": {
           "name": "payment_methods_type_code_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "payment_type_code"
-          ]
+          "columns": ["payment_type_code"]
         }
       },
       "policies": {},
@@ -1118,12 +1029,8 @@
           "name": "plan_accounts_tenant_id_tenants_id_fk",
           "tableFrom": "plan_accounts",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1133,18 +1040,12 @@
         "plan_accounts_id_tenant_id_unique": {
           "name": "plan_accounts_id_tenant_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id",
-            "tenant_id"
-          ]
+          "columns": ["id", "tenant_id"]
         },
         "plan_accounts_tenant_account_code_unique": {
           "name": "plan_accounts_tenant_account_code_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "tenant_id",
-            "account_code"
-          ]
+          "columns": ["tenant_id", "account_code"]
         }
       },
       "policies": {},
@@ -1286,12 +1187,8 @@
           "name": "receivables_tenant_id_tenants_id_fk",
           "tableFrom": "receivables",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1299,12 +1196,8 @@
           "name": "receivables_payment_method_id_payment_methods_id_fk",
           "tableFrom": "receivables",
           "tableTo": "payment_methods",
-          "columnsFrom": [
-            "payment_method_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["payment_method_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1312,12 +1205,8 @@
           "name": "receivables_card_brand_id_card_brands_id_fk",
           "tableFrom": "receivables",
           "tableTo": "card_brands",
-          "columnsFrom": [
-            "card_brand_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["card_brand_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1325,14 +1214,8 @@
           "name": "receivables_debtor_tenant_fk",
           "tableFrom": "receivables",
           "tableTo": "persons",
-          "columnsFrom": [
-            "debtor_id",
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id",
-            "tenant_id"
-          ],
+          "columnsFrom": ["debtor_id", "tenant_id"],
+          "columnsTo": ["id", "tenant_id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1340,14 +1223,8 @@
           "name": "receivables_plan_account_tenant_fk",
           "tableFrom": "receivables",
           "tableTo": "plan_accounts",
-          "columnsFrom": [
-            "plan_account_id",
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id",
-            "tenant_id"
-          ],
+          "columnsFrom": ["plan_account_id", "tenant_id"],
+          "columnsTo": ["id", "tenant_id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1355,14 +1232,8 @@
           "name": "receivables_financial_institution_tenant_fk",
           "tableFrom": "receivables",
           "tableTo": "persons",
-          "columnsFrom": [
-            "financial_institution_id",
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id",
-            "tenant_id"
-          ],
+          "columnsFrom": ["financial_institution_id", "tenant_id"],
+          "columnsTo": ["id", "tenant_id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1378,38 +1249,22 @@
     "public.type_person_address": {
       "name": "type_person_address",
       "schema": "public",
-      "values": [
-        "Principal",
-        "Faturamento",
-        "Entrega",
-        "Outro"
-      ]
+      "values": ["Principal", "Faturamento", "Entrega", "Outro"]
     },
     "public.type_person_contact": {
       "name": "type_person_contact",
       "schema": "public",
-      "values": [
-        "Principal",
-        "Outro"
-      ]
+      "values": ["Principal", "Outro"]
     },
     "public.status_payable": {
       "name": "status_payable",
       "schema": "public",
-      "values": [
-        "pendente",
-        "pago",
-        "cancelado"
-      ]
+      "values": ["pendente", "pago", "cancelado"]
     },
     "public.status_receivable": {
       "name": "status_receivable",
       "schema": "public",
-      "values": [
-        "pendente",
-        "recebido",
-        "cancelado"
-      ]
+      "values": ["pendente", "recebido", "cancelado"]
     }
   },
   "schemas": {},

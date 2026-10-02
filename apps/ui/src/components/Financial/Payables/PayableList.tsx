@@ -63,8 +63,8 @@ import {
 } from '@/components/ui/table';
 import {
   type FinancialAccount,
-  type FinancialSortField,
   financialService,
+  type FinancialSortField,
 } from '@/services/financials';
 
 import { PayableForm } from './PayableForm';

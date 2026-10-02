@@ -8,14 +8,15 @@ import {
 } from 'fastify-type-provider-zod';
 
 import { API_URL } from '@erp-360/shared';
+import { env } from './config/index.ts';
 import { authRoutes } from './routes/auth.js';
-import { personsRoutes } from './routes/persons.ts';
-import './types/fastify.js';
+import { financialCatalogRoutes } from './routes/financial-catalogs.ts';
 import { locationsRoutes } from './routes/locations.ts';
 import { payablesRoutes } from './routes/payables.ts';
-import { receivablesRoutes } from './routes/receivables.ts';
-import { financialCatalogRoutes } from './routes/financial-catalogs.ts';
+import { personsRoutes } from './routes/persons.ts';
 import { planAccountsRoutes } from './routes/plan-accounts.ts';
+import { receivablesRoutes } from './routes/receivables.ts';
+import './types/fastify.js';
 
 const fastify = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
 
@@ -49,7 +50,7 @@ fastify.register(planAccountsRoutes, { prefix: '/plan-accounts' });
 
 const start = async () => {
   try {
-    await fastify.listen({ port: 3000, host: '0.0.0.0' });
+    await fastify.listen({ port: env.app.port, host: env.app.host });
     console.log(`🚀 Servidor Fastify pronto em ${API_URL}`);
   } catch (err) {
     fastify.log.error(err);

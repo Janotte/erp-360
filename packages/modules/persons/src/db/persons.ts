@@ -49,6 +49,9 @@ export const persons = pgTable(
     unique('persons_id_tenant_id_unique').on(table.id, table.tenantId),
     unique('persons_tenant_tax_id_unique').on(table.tenantId, table.taxId),
     check('persons_taxpayer_type_check', sql`${table.taxpayerType} in (1, 2, 9)`),
-    check('persons_tax_id_not_blank', sql`${table.taxId} is null or length(trim(${table.taxId})) > 0`),
+    check(
+      'persons_tax_id_not_blank',
+      sql`${table.taxId} is null or length(trim(${table.taxId})) > 0`,
+    ),
   ],
 );
