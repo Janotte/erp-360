@@ -155,7 +155,9 @@ export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const { tenantId } = request.user;
       const { id } = request.params as { id: string };
-      const { receivedOn, receivedAmount } = request.body as z.infer<typeof receiveSchema>;
+      const { receivedOn, receivedAmount } = request.body as z.infer<
+        typeof receiveSchema
+      >;
 
       const [updatedAccount] = await db
         .update(receivables)

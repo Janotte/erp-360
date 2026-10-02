@@ -63,9 +63,7 @@ async function parsePlanAccount(res: Response, fallback: string): Promise<PlanAc
 }
 
 export const planAccountsService = {
-  list: async (
-    filters: PlanAccountFilters,
-  ): Promise<PaginationResponse<PlanAccount>> => {
+  list: async (filters: PlanAccountFilters): Promise<PaginationResponse<PlanAccount>> => {
     const params = new URLSearchParams({
       page: filters.page.toString(),
       limit: filters.limit.toString(),
@@ -79,7 +77,9 @@ export const planAccountsService = {
     });
     const body = await readBody(res);
     if (!res.ok) {
-      throw new Error(body.message || body.error || 'Falha ao carregar planos de contas.');
+      throw new Error(
+        body.message || body.error || 'Falha ao carregar planos de contas.',
+      );
     }
     return {
       data: Array.isArray(body.data) ? body.data : [],

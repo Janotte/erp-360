@@ -34,9 +34,7 @@ function normalizeAccount(
   tipo: FinancialTipo,
 ): FinancialAccount {
   const personId =
-    tipo === 'payable'
-      ? String(item.creditorId ?? '')
-      : String(item.debtorId ?? '');
+    tipo === 'payable' ? String(item.creditorId ?? '') : String(item.debtorId ?? '');
 
   return {
     id: String(item.id),
@@ -136,7 +134,9 @@ export const financialService = {
     });
     const body = await parseJson(res);
     if (!res.ok) {
-      throw new Error(body.message || body.error || 'Falha ao listar formas de pagamento.');
+      throw new Error(
+        body.message || body.error || 'Falha ao listar formas de pagamento.',
+      );
     }
     if (!Array.isArray(body)) return [];
     return body.map(

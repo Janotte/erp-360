@@ -1,8 +1,5 @@
 import { formatCurrency, formatRawDate } from '@erp-360/shared';
-import {
-  keepPreviousData,
-  useQuery,
-} from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   ArrowDown,
   ArrowUp,
@@ -41,8 +38,8 @@ import {
 } from '@/components/ui/table';
 import {
   type FinancialAccount,
-  type FinancialSortField,
   financialService,
+  type FinancialSortField,
 } from '@/services/financials';
 
 import { PayableForm } from './PayableForm';

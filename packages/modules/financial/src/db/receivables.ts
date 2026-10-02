@@ -1,7 +1,15 @@
 import { tenantColumns } from '@erp-360/mod-core';
 import { persons } from '@erp-360/mod-persons';
 import { sql } from 'drizzle-orm';
-import { date, foreignKey, integer, pgEnum, pgTable, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  date,
+  foreignKey,
+  integer,
+  pgEnum,
+  pgTable,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { cardBrands } from './card_brands.ts';
 import { paymentMethods } from './payment_methods.ts';
 import { planAccounts } from './plan_accounts.ts';

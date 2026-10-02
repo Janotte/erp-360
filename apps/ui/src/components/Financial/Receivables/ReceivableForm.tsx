@@ -118,7 +118,10 @@ export function ReceivableForm({ onSuccess }: ReceivableFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pt-2">
+    <form
+      onSubmit={handleSubmit}
+      className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pt-2"
+    >
       <div className="space-y-1">
         <Label>Cliente</Label>
         <Select value={personId} onValueChange={setPersonId} required>
@@ -221,10 +224,7 @@ export function ReceivableForm({ onSuccess }: ReceivableFormProps) {
 
       <div className="space-y-1">
         <Label>Instituição financeira</Label>
-        <Select
-          value={financialInstitutionId}
-          onValueChange={setFinancialInstitutionId}
-        >
+        <Select value={financialInstitutionId} onValueChange={setFinancialInstitutionId}>
           <SelectTrigger>
             <SelectValue placeholder="Opcional" />
           </SelectTrigger>
