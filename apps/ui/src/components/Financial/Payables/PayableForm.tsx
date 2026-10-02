@@ -1,3 +1,4 @@
+import { formatCurrencyInput, maskCurrencyInput, parseCurrencyToCents } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -35,7 +36,7 @@ export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
     setDescription(accountToUpdate.description);
     setIssueOn(accountToUpdate.issueOn?.slice(0, 10) || '');
     setDueOn(accountToUpdate.dueOn?.slice(0, 10) || '');
-    setAmountStr((accountToUpdate.installmentAmount / 100).toString());
+    setAmountStr(formatCurrencyInput(accountToUpdate.installmentAmount));
     setPlanAccountId(accountToUpdate.planAccountId || '');
   }, [accountToUpdate]);
 
@@ -63,9 +64,8 @@ export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!personId || !description || !amountStr || !dueOn) return;
-
-    const installmentAmount = Math.round(parseFloat(amountStr.replace(',', '.')) * 100);
+    const installmentAmount = parseCurrencyToCents(amountStr);
+    if (!personId || !description || !dueOn || installmentAmount <= 0) return;
 
     mutation.mutate({
       personId,
@@ -84,12 +84,12 @@ export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
       className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pt-2"
     >
       <div className="space-y-1">
-        <Label>Fornecedor / Favorecido</Label>
+        <Label>Credor</Label>
         <PersonSearchSelect
           value={personId}
           onChange={setPersonId}
-          type="fornecedor"
-          placeholder="Buscar fornecedor por nome ou documento..."
+          type={['fornecedor', 'colaborador', 'instituicao']}
+          placeholder="Buscar fornecedor, colaborador ou instituição..."
           required
         />
       </div>
@@ -142,10 +142,12 @@ export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
         <Label htmlFor="amount">Valor (R$)</Label>
         <Input
           id="amount"
-          type="number"
-          step="0.01"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="0,00"
           value={amountStr}
-          onChange={(e) => setAmountStr(e.target.value)}
+          onChange={(e) => setAmountStr(maskCurrencyInput(e.target.value))}
           required
         />
       </div>

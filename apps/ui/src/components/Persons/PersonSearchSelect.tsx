@@ -12,7 +12,7 @@ type PersonType = 'cliente' | 'fornecedor' | 'instituicao' | 'colaborador';
 interface PersonSearchSelectProps {
   value: string;
   onChange: (id: string) => void;
-  type: PersonType;
+  type: PersonType | PersonType[];
   placeholder?: string;
   allowClear?: boolean;
   required?: boolean;
@@ -26,6 +26,7 @@ export function PersonSearchSelect({
   allowClear = false,
   required = false,
 }: PersonSearchSelectProps) {
+  const types = Array.isArray(type) ? type : [type];
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -68,7 +69,7 @@ export function PersonSearchSelect({
   }, []);
 
   const { data: response, isFetching } = useQuery({
-    queryKey: ['personSearchSelect', type, search],
+    queryKey: ['personSearchSelect', types, search],
     enabled: open,
     queryFn: () =>
       personsService.list({
@@ -76,7 +77,7 @@ export function PersonSearchSelect({
         limit: 20,
         sortField: 'name',
         sortOrder: 'asc',
-        type,
+        type: types,
         search: search || undefined,
       }),
   });

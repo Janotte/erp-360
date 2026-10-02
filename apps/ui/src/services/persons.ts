@@ -79,7 +79,7 @@ export interface FiltersPersons {
   limit: number;
   sortField: 'name' | 'createdAt';
   sortOrder: 'asc' | 'desc';
-  type?: string;
+  type?: string | string[];
   search?: string;
 }
 
@@ -149,7 +149,9 @@ export const personsService = {
       limit: filters.limit.toString(),
       sortField: filters.sortField === 'name' ? 'nome' : filters.sortField,
       sortOrder: filters.sortOrder,
-      ...(filters.type && { type: filters.type }),
+      ...(filters.type && {
+        type: Array.isArray(filters.type) ? filters.type.join(',') : filters.type,
+      }),
       ...(filters.search && { busca: filters.search }),
     });
 

@@ -44,8 +44,32 @@ function toPersonValues(data: Person) {
   };
 }
 
+const personTypeEnum = z.enum([
+  'cliente',
+  'fornecedor',
+  'colaborador',
+  'instituicao',
+]);
+
+function normalizePersonTypes(value: unknown) {
+  if (value == null || value === '') return undefined;
+  const parts = Array.isArray(value) ? value : [value];
+  const types = parts
+    .flatMap((item) => String(item).split(','))
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return types.length ? types : undefined;
+}
+
+function personTypeCondition(type: z.infer<typeof personTypeEnum>) {
+  if (type === 'cliente') return eq(persons.isClient, true);
+  if (type === 'fornecedor') return eq(persons.isSupplier, true);
+  if (type === 'colaborador') return eq(persons.isEmployee, true);
+  return eq(persons.isFinancialInstitution, true);
+}
+
 const listPersonsQuery = z.object({
-  type: z.enum(['cliente', 'fornecedor', 'colaborador', 'instituicao']).optional(),
+  type: z.preprocess(normalizePersonTypes, z.array(personTypeEnum).optional()),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   sortField: z.enum(['nome', 'createdAt']).default('nome'),
@@ -100,12 +124,13 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
       const offset = (page - 1) * limit;
       const conditions = [eq(persons.tenantId, tenantId)];
 
-      // 1. Filtros por Perfil
-      if (type === 'cliente') conditions.push(eq(persons.isClient, true));
-      if (type === 'fornecedor') conditions.push(eq(persons.isSupplier, true));
-      if (type === 'colaborador') conditions.push(eq(persons.isEmployee, true));
-      if (type === 'instituicao')
-        conditions.push(eq(persons.isFinancialInstitution, true));
+      // 1. Filtros por Perfil (OR quando há mais de um tipo)
+      if (type?.length) {
+        const typeFilters = type.map(personTypeCondition);
+        conditions.push(
+          typeFilters.length === 1 ? typeFilters[0] : or(...typeFilters)!,
+        );
+      }
 
       // 2. Filtro por Busca Textual (Nome, CPF/CNPJ ou e-mail da NF-e)
       if (search) {
