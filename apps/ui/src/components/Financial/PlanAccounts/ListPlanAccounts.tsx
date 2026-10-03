@@ -181,7 +181,7 @@ export function ListPlanAccounts() {
               </TableHead>
               <TableHead>Descrição contábil</TableHead>
               <TableHead>Código contábil</TableHead>
-              <TableHead>Saldo</TableHead>
+              <TableHead className="text-right">Saldo</TableHead>
               <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
@@ -199,7 +199,7 @@ export function ListPlanAccounts() {
                   <TableCell>{account.name}</TableCell>
                   <TableCell>{account.accountingDescription || '-'}</TableCell>
                   <TableCell>{account.accountingAccountCode || '-'}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-right tabular-nums">
                     {account.balance != null ? formatCurrency(account.balance) : '-'}
                   </TableCell>
                   <TableCell>

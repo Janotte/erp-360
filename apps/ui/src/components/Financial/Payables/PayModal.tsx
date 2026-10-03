@@ -1,4 +1,9 @@
-import { formatCurrency } from '@erp-360/shared';
+import {
+  formatCurrency,
+  formatCurrencyInput,
+  maskCurrencyInput,
+  parseCurrencyToCents,
+} from '@erp-360/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { toast } from 'sonner';
@@ -18,7 +23,7 @@ export function PayModal({ tipo, account, onSuccess }: PayModalProps) {
   const queryClient = useQueryClient();
   const [settledOn, setSettledOn] = useState(new Date().toISOString().split('T')[0]);
   const [valorPagoStr, setValorPagoStr] = useState(
-    (account.installmentAmount / 100).toString(),
+    formatCurrencyInput(account.installmentAmount),
   );
 
   const mutation = useMutation({
@@ -34,7 +39,8 @@ export function PayModal({ tipo, account, onSuccess }: PayModalProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const settledAmount = Math.round(parseFloat(valorPagoStr.replace(',', '.')) * 100);
+    const settledAmount = parseCurrencyToCents(valorPagoStr);
+    if (settledAmount <= 0) return;
     mutation.mutate({ settledOn, settledAmount });
   };
 
@@ -71,10 +77,12 @@ export function PayModal({ tipo, account, onSuccess }: PayModalProps) {
         </Label>
         <Input
           id="valorPago"
-          type="number"
-          step="0.01"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="0,00"
           value={valorPagoStr}
-          onChange={(e) => setValorPagoStr(e.target.value)}
+          onChange={(e) => setValorPagoStr(maskCurrencyInput(e.target.value))}
           required
         />
       </div>

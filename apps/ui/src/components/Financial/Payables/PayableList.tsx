@@ -283,13 +283,13 @@ export function PayableList() {
               </TableHead>
               <TableHead
                 onClick={() => changeSort('installmentAmount')}
-                className="cursor-pointer select-none hover:bg-zinc-50"
+                className="cursor-pointer select-none hover:bg-zinc-50 text-right"
               >
-                <div className="flex items-center">
+                <div className="flex items-center justify-end">
                   Valor {renderSortIcon('installmentAmount')}
                 </div>
               </TableHead>
-              <TableHead>Pago</TableHead>
+              <TableHead className="text-right">Pago</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-12" />
             </TableRow>
@@ -307,10 +307,10 @@ export function PayableList() {
                   <TableCell>{acc.documentNumber || '-'}</TableCell>
                   <TableCell className="font-medium">{acc.description}</TableCell>
                   <TableCell>{formatRawDate(acc.dueOn)}</TableCell>
-                  <TableCell className="text-red-600">
+                  <TableCell className="text-right tabular-nums text-red-600">
                     {formatCurrency(acc.installmentAmount)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-right tabular-nums">
                     {acc.settledAmount ? formatCurrency(acc.settledAmount) : '-'}
                   </TableCell>
                   <TableCell>
