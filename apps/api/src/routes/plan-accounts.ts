@@ -5,12 +5,17 @@ import { z } from 'zod';
 import { db } from '../db/index.ts';
 import '../types/fastify.ts';
 
+const planAccountTypes = ['revenue', 'expense', 'bank', 'withdrawal'] as const;
+
 const planAccountBodySchema = z.object({
-  accountCode: z.string().min(1, 'Código é obrigatório').max(30),
+  accountCode: z.string().min(1, 'Código é obrigatório').max(10),
   name: z.string().min(1, 'Nome é obrigatório').max(120),
+  type: z.enum(planAccountTypes),
+  parentAccountCode: z.string().max(10).optional().nullable(),
   accountingDescription: z.string().max(60).optional().nullable(),
   accountIdentifier: z.string().max(10).optional().nullable(),
   accountingAccountCode: z.string().max(20).optional().nullable(),
+  isActive: z.boolean().optional().default(true),
 });
 
 const listPlanAccountsQuery = z.object({
@@ -29,9 +34,12 @@ function toPlanAccountValues(data: z.infer<typeof planAccountBodySchema>) {
   return {
     accountCode: data.accountCode.trim(),
     name: data.name.trim(),
+    type: data.type,
+    parentAccountCode: emptyToNull(data.parentAccountCode),
     accountingDescription: emptyToNull(data.accountingDescription),
     accountIdentifier: emptyToNull(data.accountIdentifier),
     accountingAccountCode: emptyToNull(data.accountingAccountCode),
+    isActive: data.isActive ?? true,
   };
 }
 

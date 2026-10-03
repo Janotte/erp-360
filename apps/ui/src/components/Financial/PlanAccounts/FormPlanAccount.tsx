@@ -4,13 +4,23 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   type PlanAccount,
   type PlanAccountInput,
+  type PlanAccountType,
+  planAccountTypeLabels,
+  planAccountTypes,
   planAccountsService,
 } from '@/services/planAccounts';
+
+function parsePlanAccountType(value: unknown): PlanAccountType | '' {
+  return planAccountTypes.includes(value as PlanAccountType)
+    ? (value as PlanAccountType)
+    : '';
+}
 
 interface FormPlanAccountProps {
   accountToUpdate?: PlanAccount | null;
@@ -20,11 +30,24 @@ interface FormPlanAccountProps {
 export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountProps) {
   const queryClient = useQueryClient();
   const [accountId, setAccountId] = useState(accountToUpdate?.id);
-  const [accountCode, setAccountCode] = useState('');
-  const [name, setName] = useState('');
-  const [accountingDescription, setAccountingDescription] = useState('');
-  const [accountIdentifier, setAccountIdentifier] = useState('');
-  const [accountingAccountCode, setAccountingAccountCode] = useState('');
+  const [accountCode, setAccountCode] = useState(accountToUpdate?.accountCode ?? '');
+  const [name, setName] = useState(accountToUpdate?.name ?? '');
+  const [type, setType] = useState<PlanAccountType | ''>(
+    parsePlanAccountType(accountToUpdate?.type),
+  );
+  const [parentAccountCode, setParentAccountCode] = useState(
+    accountToUpdate?.parentAccountCode || '',
+  );
+  const [isActive, setIsActive] = useState(accountToUpdate?.isActive !== false);
+  const [accountingDescription, setAccountingDescription] = useState(
+    accountToUpdate?.accountingDescription || '',
+  );
+  const [accountIdentifier, setAccountIdentifier] = useState(
+    accountToUpdate?.accountIdentifier || '',
+  );
+  const [accountingAccountCode, setAccountingAccountCode] = useState(
+    accountToUpdate?.accountingAccountCode || '',
+  );
 
   const { data: accountLoaded } = useQuery({
     queryKey: ['plan-account', accountId],
@@ -38,6 +61,9 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
     const account = { ...accountToUpdate, ...accountLoaded };
     setAccountCode(account.accountCode ?? '');
     setName(account.name ?? '');
+    setType(parsePlanAccountType(account.type));
+    setParentAccountCode(account.parentAccountCode || '');
+    setIsActive(account.isActive !== false);
     setAccountingDescription(account.accountingDescription || '');
     setAccountIdentifier(account.accountIdentifier || '');
     setAccountingAccountCode(account.accountingAccountCode || '');
@@ -68,9 +94,13 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    if (!type) return;
     mutation.mutate({
       accountCode,
       name,
+      type,
+      parentAccountCode: parentAccountCode || null,
+      isActive,
       accountingDescription: accountingDescription || null,
       accountIdentifier: accountIdentifier || null,
       accountingAccountCode: accountingAccountCode || null,
@@ -85,9 +115,37 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
           <Input
             id="accountCode"
             value={accountCode}
-            maxLength={30}
+            maxLength={10}
             onChange={(e) => setAccountCode(e.target.value)}
             required
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="planAccountType">Tipo</Label>
+          <select
+            id="planAccountType"
+            value={type}
+            onChange={(event) => setType(parsePlanAccountType(event.target.value))}
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            required
+          >
+            <option value="" disabled>
+              Selecione o tipo
+            </option>
+            {planAccountTypes.map((planType) => (
+              <option key={planType} value={planType}>
+                {planAccountTypeLabels[planType]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="parentAccountCode">Conta pai</Label>
+          <Input
+            id="parentAccountCode"
+            value={parentAccountCode}
+            maxLength={10}
+            onChange={(e) => setParentAccountCode(e.target.value)}
           />
         </div>
         <div className="space-y-1">
@@ -130,6 +188,17 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
           maxLength={20}
           onChange={(e) => setAccountingAccountCode(e.target.value)}
         />
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          id="isActive"
+          checked={isActive}
+          onCheckedChange={(v) => setIsActive(!!v)}
+        />
+        <label htmlFor="isActive" className="text-sm font-medium">
+          Ativo
+        </label>
       </div>
 
       <div className="flex justify-end pt-2">

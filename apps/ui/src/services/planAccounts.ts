@@ -2,10 +2,23 @@ import { API_URL } from '@erp-360/shared';
 
 import { authStorage } from '../utils/auth';
 
+export const planAccountTypes = ['revenue', 'expense', 'bank', 'withdrawal'] as const;
+export type PlanAccountType = (typeof planAccountTypes)[number];
+
+export const planAccountTypeLabels: Record<PlanAccountType, string> = {
+  revenue: 'Receita',
+  expense: 'Despesa',
+  bank: 'Banco',
+  withdrawal: 'Retirada',
+};
+
 export interface PlanAccount {
   id: string;
   accountCode: string;
   name: string;
+  type: PlanAccountType;
+  parentAccountCode?: string | null;
+  isActive: boolean;
   dayBalance?: number | null;
   monthBalance?: number | null;
   yearBalance?: number | null;
@@ -18,6 +31,9 @@ export interface PlanAccount {
 export interface PlanAccountInput {
   accountCode: string;
   name: string;
+  type: PlanAccountType;
+  parentAccountCode?: string | null;
+  isActive?: boolean;
   accountingDescription?: string | null;
   accountIdentifier?: string | null;
   accountingAccountCode?: string | null;

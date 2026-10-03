@@ -1,5 +1,5 @@
 import { cardBrands, paymentMethods, planAccounts } from '@erp-360/mod-financial';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { db } from '../db/index.ts';
 import '../types/fastify.ts';
@@ -16,7 +16,7 @@ export const financialCatalogRoutes: FastifyPluginAsync = async (fastify) => {
         name: planAccounts.name,
       })
       .from(planAccounts)
-      .where(eq(planAccounts.tenantId, tenantId))
+      .where(and(eq(planAccounts.tenantId, tenantId), eq(planAccounts.isActive, true)))
       .orderBy(asc(planAccounts.accountCode));
   });
 
