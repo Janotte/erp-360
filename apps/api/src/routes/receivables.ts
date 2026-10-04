@@ -3,11 +3,18 @@ import { and, asc, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.ts';
+import { SettlementError, previewSettlement, reverseSettlement, settleTitle } from '../services/settlement.ts';
 import '../types/fastify.ts';
 
 const dateString = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de data deve ser YYYY-MM-DD');
+
+/** Query string "false" não pode passar por z.coerce.boolean — Boolean("false") === true. */
+const queryBoolean = z
+  .union([z.boolean(), z.literal('true'), z.literal('false'), z.literal('1'), z.literal('0')])
+  .optional()
+  .transform((value) => value === true || value === 'true' || value === '1');
 
 const createReceivableSchema = z.object({
   debtorId: z.string().uuid({ message: 'Debtor ID precisa ser um UUID válido' }),
@@ -28,8 +35,15 @@ const createReceivableSchema = z.object({
 });
 
 const receiveSchema = z.object({
-  receivedOn: dateString,
-  receivedAmount: z.number().int('O valor recebido deve ser em centavos (inteiro)'),
+  settledOn: dateString,
+  settledAmount: z.number().int('O valor recebido deve ser em centavos (inteiro)'),
+  treasury: z.enum(['cash', 'bank']),
+  bankAccountId: z.string().uuid().optional().nullable(),
+  waiveCharges: z.boolean().optional().default(false),
+  remainderMode: z.enum(['none', 'new_title', 'plan_account']).optional().default('none'),
+  differencePlanAccountId: z.string().uuid().optional().nullable(),
+  remainderDueOn: dateString.optional().nullable(),
+  includeChargesOnNewTitle: z.boolean().optional().default(false),
 });
 
 const listReceivablesQuery = z.object({
@@ -144,6 +158,41 @@ export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
+  fastify.get(
+    '/:id/settlement-preview',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        querystring: z.object({
+          settledOn: dateString,
+          waiveCharges: queryBoolean,
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { tenantId } = request.user;
+      const { id } = request.params as { id: string };
+      const { settledOn, waiveCharges } = request.query as {
+        settledOn: string;
+        waiveCharges?: boolean;
+      };
+      try {
+        return await previewSettlement({
+          kind: 'receivable',
+          tenantId,
+          titleId: id,
+          settledOn,
+          waiveCharges,
+        });
+      } catch (error) {
+        if (error instanceof SettlementError) {
+          return reply.status(error.status).send({ message: error.message });
+        }
+        throw error;
+      }
+    },
+  );
+
   fastify.post(
     '/:id/receive',
     {
@@ -155,36 +204,30 @@ export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const { tenantId } = request.user;
       const { id } = request.params as { id: string };
-      const { receivedOn, receivedAmount } = request.body as z.infer<
-        typeof receiveSchema
-      >;
+      const data = request.body as z.infer<typeof receiveSchema>;
 
-      const [existing] = await db
-        .select({ status: receivables.status })
-        .from(receivables)
-        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
-        .limit(1);
-
-      if (!existing) {
-        return reply.status(404).send({ message: 'Conta a receber não encontrada.' });
-      }
-      if (existing.status !== 'pendente') {
-        return reply.status(400).send({
-          message: 'Somente contas pendentes podem ser liquidadas.',
+      try {
+        const result = await settleTitle({
+          kind: 'receivable',
+          tenantId,
+          titleId: id,
+          settledOn: data.settledOn,
+          settledAmount: data.settledAmount,
+          treasury: data.treasury,
+          bankAccountId: data.bankAccountId,
+          waiveCharges: data.waiveCharges,
+          remainderMode: data.remainderMode,
+          differencePlanAccountId: data.differencePlanAccountId,
+          remainderDueOn: data.remainderDueOn,
+          includeChargesOnNewTitle: data.includeChargesOnNewTitle,
         });
+        return result.title;
+      } catch (error) {
+        if (error instanceof SettlementError) {
+          return reply.status(error.status).send({ message: error.message });
+        }
+        throw error;
       }
-
-      const [updatedAccount] = await db
-        .update(receivables)
-        .set({
-          receivedOn,
-          receivedAmount,
-          status: 'recebido',
-        })
-        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
-        .returning();
-
-      return updatedAccount;
     },
   );
 
@@ -287,32 +330,19 @@ export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
       const { tenantId } = request.user;
       const { id } = request.params as { id: string };
 
-      const [existing] = await db
-        .select({ status: receivables.status })
-        .from(receivables)
-        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
-        .limit(1);
-
-      if (!existing) {
-        return reply.status(404).send({ message: 'Conta a receber não encontrada.' });
-      }
-      if (existing.status !== 'recebido') {
-        return reply.status(400).send({
-          message: 'Somente contas recebidas podem ser estornadas.',
+      try {
+        const updated = await reverseSettlement({
+          kind: 'receivable',
+          tenantId,
+          titleId: id,
         });
+        return updated;
+      } catch (error) {
+        if (error instanceof SettlementError) {
+          return reply.status(error.status).send({ message: error.message });
+        }
+        throw error;
       }
-
-      const [updated] = await db
-        .update(receivables)
-        .set({
-          receivedOn: null,
-          receivedAmount: null,
-          status: 'pendente',
-        })
-        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
-        .returning();
-
-      return updated;
     },
   );
 };

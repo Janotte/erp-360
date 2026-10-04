@@ -7,6 +7,7 @@ import {
   integer,
   pgEnum,
   pgTable,
+  unique,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
@@ -66,6 +67,7 @@ export const receivables = pgTable(
     /** Autorização da transação */
     transactionAuthorization: varchar('transaction_authorization', { length: 128 }),
     status: statusReceivableEnum('status').default('pendente').notNull(),
+    originalTitleId: uuid('original_title_id'),
   },
   (table) => [
     foreignKey({
@@ -82,6 +84,12 @@ export const receivables = pgTable(
       name: 'receivables_financial_institution_tenant_fk',
       columns: [table.financialInstitutionId, table.tenantId],
       foreignColumns: [persons.id, persons.tenantId],
+    }).onDelete('restrict'),
+    unique('receivables_id_tenant_id_unique').on(table.id, table.tenantId),
+    foreignKey({
+      name: 'receivables_original_title_tenant_fk',
+      columns: [table.originalTitleId, table.tenantId],
+      foreignColumns: [table.id, table.tenantId],
     }).onDelete('restrict'),
   ],
 );

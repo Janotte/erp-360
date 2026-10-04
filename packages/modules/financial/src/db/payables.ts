@@ -7,6 +7,7 @@ import {
   integer,
   pgEnum,
   pgTable,
+  unique,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
@@ -43,6 +44,8 @@ export const payables = pgTable(
     paidAmount: integer('paid_amount'),
     /** Identificador do plano de contas */
     planAccountId: uuid('plan_account_id'),
+    /** Título original em caso de restante de baixa parcial */
+    originalTitleId: uuid('original_title_id'),
     /** Status do pagamento */
     status: statusPayableEnum('status').default('pendente').notNull(),
   },
@@ -56,6 +59,12 @@ export const payables = pgTable(
       name: 'payables_plan_account_tenant_fk',
       columns: [table.planAccountId, table.tenantId],
       foreignColumns: [planAccounts.id, planAccounts.tenantId],
+    }).onDelete('restrict'),
+    unique('payables_id_tenant_id_unique').on(table.id, table.tenantId),
+    foreignKey({
+      name: 'payables_original_title_tenant_fk',
+      columns: [table.originalTitleId, table.tenantId],
+      foreignColumns: [table.id, table.tenantId],
     }).onDelete('restrict'),
   ],
 );

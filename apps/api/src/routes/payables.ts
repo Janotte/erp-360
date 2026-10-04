@@ -3,6 +3,7 @@ import { and, asc, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.ts';
+import { SettlementError, previewSettlement, reverseSettlement, settleTitle } from '../services/settlement.ts';
 import '../types/fastify.ts';
 
 const dateString = z
@@ -20,8 +21,13 @@ const createPayableSchema = z.object({
 });
 
 const paySchema = z.object({
-  paidOn: dateString,
-  paidAmount: z.number().int('O valor pago deve ser em centavos (inteiro)'),
+  settledOn: dateString,
+  settledAmount: z.number().int('O valor pago deve ser em centavos (inteiro)'),
+  treasury: z.enum(['cash', 'bank']),
+  bankAccountId: z.string().uuid().optional().nullable(),
+  remainderMode: z.enum(['none', 'new_title', 'plan_account']).optional().default('none'),
+  differencePlanAccountId: z.string().uuid().optional().nullable(),
+  remainderDueOn: dateString.optional().nullable(),
 });
 
 const listPayablesQuery = z.object({
@@ -124,6 +130,36 @@ export const payablesRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
+  fastify.get(
+    '/:id/settlement-preview',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        querystring: z.object({
+          settledOn: dateString,
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { tenantId } = request.user;
+      const { id } = request.params as { id: string };
+      const { settledOn } = request.query as { settledOn: string };
+      try {
+        return await previewSettlement({
+          kind: 'payable',
+          tenantId,
+          titleId: id,
+          settledOn,
+        });
+      } catch (error) {
+        if (error instanceof SettlementError) {
+          return reply.status(error.status).send({ message: error.message });
+        }
+        throw error;
+      }
+    },
+  );
+
   fastify.post(
     '/:id/pay',
     {
@@ -135,34 +171,28 @@ export const payablesRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const { tenantId } = request.user;
       const { id } = request.params as { id: string };
-      const { paidOn, paidAmount } = request.body as z.infer<typeof paySchema>;
+      const data = request.body as z.infer<typeof paySchema>;
 
-      const [existing] = await db
-        .select({ status: payables.status })
-        .from(payables)
-        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
-        .limit(1);
-
-      if (!existing) {
-        return reply.status(404).send({ message: 'Conta a pagar não encontrada.' });
-      }
-      if (existing.status !== 'pendente') {
-        return reply.status(400).send({
-          message: 'Somente contas pendentes podem ser liquidadas.',
+      try {
+        const result = await settleTitle({
+          kind: 'payable',
+          tenantId,
+          titleId: id,
+          settledOn: data.settledOn,
+          settledAmount: data.settledAmount,
+          treasury: data.treasury,
+          bankAccountId: data.bankAccountId,
+          remainderMode: data.remainderMode,
+          differencePlanAccountId: data.differencePlanAccountId,
+          remainderDueOn: data.remainderDueOn,
         });
+        return result.title;
+      } catch (error) {
+        if (error instanceof SettlementError) {
+          return reply.status(error.status).send({ message: error.message });
+        }
+        throw error;
       }
-
-      const [updatedAccount] = await db
-        .update(payables)
-        .set({
-          paidOn,
-          paidAmount,
-          status: 'pago',
-        })
-        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
-        .returning();
-
-      return updatedAccount;
     },
   );
 
@@ -257,32 +287,19 @@ export const payablesRoutes: FastifyPluginAsync = async (fastify) => {
       const { tenantId } = request.user;
       const { id } = request.params as { id: string };
 
-      const [existing] = await db
-        .select({ status: payables.status })
-        .from(payables)
-        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
-        .limit(1);
-
-      if (!existing) {
-        return reply.status(404).send({ message: 'Conta a pagar não encontrada.' });
-      }
-      if (existing.status !== 'pago') {
-        return reply.status(400).send({
-          message: 'Somente contas pagas podem ser estornadas.',
+      try {
+        const updated = await reverseSettlement({
+          kind: 'payable',
+          tenantId,
+          titleId: id,
         });
+        return updated;
+      } catch (error) {
+        if (error instanceof SettlementError) {
+          return reply.status(error.status).send({ message: error.message });
+        }
+        throw error;
       }
-
-      const [updated] = await db
-        .update(payables)
-        .set({
-          paidOn: null,
-          paidAmount: null,
-          status: 'pendente',
-        })
-        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
-        .returning();
-
-      return updated;
     },
   );
 };

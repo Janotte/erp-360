@@ -3,3 +3,8 @@ export * from './db/receivables.ts';
 export * from './db/plan_accounts.ts';
 export * from './db/payment_methods.ts';
 export * from './db/card_brands.ts';
+export * from './db/bank_accounts.ts';
+export * from './db/financial_settings.ts';
+export * from './db/settlements.ts';
+export * from './db/cash_entries.ts';
+export * from './db/bank_entries.ts';

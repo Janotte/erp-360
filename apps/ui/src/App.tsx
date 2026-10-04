@@ -6,9 +6,13 @@ import { AppSidebar } from './components/AppSidebar';
 import { Login } from './components/Auth/Login';
 import { Register } from './components/Auth/Register';
 import { Dashboard } from './components/Dashboard';
+import { ListBankAccounts } from './components/Financial/BankAccounts/ListBankAccounts';
+import { ListCashBook } from './components/Financial/CashBook/ListCashBook';
+import { CashFlowView } from './components/Financial/CashFlow/CashFlowView';
 import { PayableList } from './components/Financial/Payables/PayableList';
 import { ListPlanAccounts } from './components/Financial/PlanAccounts/ListPlanAccounts';
 import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
+import { FinancialSettingsForm } from './components/Financial/Settings/FinancialSettingsForm';
 import { Navbar } from './components/Navbar';
 import { ListPersons } from './components/Persons/ListPersons';
 import { authStorage } from './utils/auth';
@@ -32,11 +36,17 @@ function rotaInicial() {
   if (hash === '#receivables') return '/receivables';
   if (hash === '#payables') return '/payables';
   if (hash === '#plan-accounts') return '/plan-accounts';
+  if (hash === '#cash-book') return '/cash-book';
+  if (hash === '#bank-accounts') return '/bank-accounts';
+  if (hash === '#cash-flow') return '/cash-flow';
   if (hash === '#settings') return '/settings';
   if (path === '/persons') return '/persons';
   if (path === '/receivables') return '/receivables';
   if (path === '/payables') return '/payables';
   if (path === '/plan-accounts') return '/plan-accounts';
+  if (path === '/cash-book') return '/cash-book';
+  if (path === '/bank-accounts') return '/bank-accounts';
+  if (path === '/cash-flow') return '/cash-flow';
   if (path === '/settings') return '/settings';
   return '/dashboard';
 }
@@ -102,6 +112,22 @@ function App() {
         ) : path === '/plan-accounts' ? (
           <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 md:p-6">
             <ListPlanAccounts />
+          </main>
+        ) : path === '/cash-book' ? (
+          <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 md:p-6">
+            <ListCashBook />
+          </main>
+        ) : path === '/bank-accounts' ? (
+          <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 md:p-6">
+            <ListBankAccounts />
+          </main>
+        ) : path === '/cash-flow' ? (
+          <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 md:p-6">
+            <CashFlowView />
+          </main>
+        ) : path === '/settings' ? (
+          <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 md:p-6">
+            <FinancialSettingsForm />
           </main>
         ) : (
           <Dashboard />

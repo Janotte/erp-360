@@ -3,10 +3,12 @@ import {
   BookOpen,
   ChevronRight,
   CreditCard,
+  Landmark,
   LayoutDashboard,
   type LucideIcon,
   Settings,
   Users,
+  Wallet,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -48,6 +50,9 @@ const itensMenu: ItemMenu[] = [
     filhos: [
       { title: 'Pagar', icon: CreditCard, url: '/payables' },
       { title: 'Receber', icon: ArrowUpRight, url: '/receivables' },
+      { title: 'Livro caixa', icon: Wallet, url: '/cash-book' },
+      { title: 'Contas bancárias', icon: Landmark, url: '/bank-accounts' },
+      { title: 'Fluxo de caixa', icon: BookOpen, url: '/cash-flow' },
       { title: 'Plano de Contas', icon: BookOpen, url: '/plan-accounts' },
     ],
   },
@@ -64,7 +69,10 @@ export function AppSidebar({ pathAtivo, onNavigate }: AppSidebarProps) {
   const rotaFinanceira =
     pathAtivo === '/payables' ||
     pathAtivo === '/receivables' ||
-    pathAtivo === '/plan-accounts';
+    pathAtivo === '/plan-accounts' ||
+    pathAtivo === '/cash-book' ||
+    pathAtivo === '/bank-accounts' ||
+    pathAtivo === '/cash-flow';
   const [financeiroAberto, setFinanceiroAberto] = useState(rotaFinanceira);
 
   useEffect(() => {

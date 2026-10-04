@@ -176,8 +176,9 @@ export interface FinancialPaginationResponse {
 }
 
 export const financialService = {
-  listPlanAccounts: async (): Promise<CatalogOption[]> => {
-    const res = await fetch(`${API_URL}/financial/plan-accounts`, {
+  listPlanAccounts: async (type?: 'revenue' | 'expense' | 'bank' | 'withdrawal'): Promise<CatalogOption[]> => {
+    const params = type ? `?type=${type}` : '';
+    const res = await fetch(`${API_URL}/financial/plan-accounts${params}`, {
       headers: authHeaders(),
     });
     const body = await parseJson(res);
@@ -311,23 +312,63 @@ export const financialService = {
   pay: async (
     tipo: FinancialTipo,
     id: string,
-    dados: { settledOn: string; settledAmount: number },
+    dados: {
+      settledOn: string;
+      settledAmount: number;
+      treasury: 'cash' | 'bank';
+      bankAccountId?: string | null;
+      waiveCharges?: boolean;
+      remainderMode?: 'none' | 'new_title' | 'plan_account';
+      differencePlanAccountId?: string | null;
+      remainderDueOn?: string | null;
+      includeChargesOnNewTitle?: boolean;
+    },
   ): Promise<FinancialAccount> => {
     const endpoint = tipo === 'payable' ? 'pay' : 'receive';
-    const payload =
-      tipo === 'payable'
-        ? { paidOn: dados.settledOn, paidAmount: dados.settledAmount }
-        : { receivedOn: dados.settledOn, receivedAmount: dados.settledAmount };
-
     const res = await fetch(`${API_URL}/${collection(tipo)}/${id}/${endpoint}`, {
       method: 'POST',
       headers: jsonHeaders(),
-      body: JSON.stringify(payload),
+      body: JSON.stringify(dados),
     });
     const body = await parseJson(res);
     if (!res.ok) {
       throw new Error(body.message || body.error || 'Falha ao liquidar título.');
     }
     return normalizeAccount(body as Record<string, unknown>, tipo);
+  },
+  settlementPreview: async (
+    tipo: FinancialTipo,
+    id: string,
+    settledOn: string,
+    waiveCharges = false,
+  ) => {
+    const params = new URLSearchParams({ settledOn });
+    if (tipo === 'receivable' && waiveCharges) params.set('waiveCharges', 'true');
+    const res = await fetch(
+      `${API_URL}/${collection(tipo)}/${id}/settlement-preview?${params.toString()}`,
+      { headers: authHeaders() },
+    );
+    const body = await parseJson(res);
+    if (!res.ok) {
+      throw new Error(body.message || body.error || 'Falha ao calcular a baixa.');
+    }
+    return body as {
+      originalAmount: number;
+      dueOn: string;
+      daysLate: number;
+      chargeableDays: number;
+      fineAmount: number;
+      interestAmount: number;
+      dueAmount: number;
+      settings: {
+        lateFeeBps: number;
+        dailyInterestBps: number;
+        graceDays: number;
+        discountObtainedPlanAccountId: string | null;
+        discountGrantedPlanAccountId: string | null;
+        lateFeePaidPlanAccountId: string | null;
+        lateFeeReceivedPlanAccountId: string | null;
+      };
+    };
   },
 };

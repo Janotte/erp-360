@@ -134,6 +134,13 @@
       "when": 1791050339281,
       "tag": "0018_polite_falcon",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791060160134,
+      "tag": "0019_lush_karma",
+      "breakpoints": true
     }
   ]
 }

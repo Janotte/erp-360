@@ -434,7 +434,7 @@ export function PayableList() {
           if (!open) setSelectedAccount(null);
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Liquidar Conta a Pagar</DialogTitle>
           </DialogHeader>
