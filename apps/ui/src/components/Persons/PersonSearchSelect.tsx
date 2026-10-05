@@ -16,6 +16,7 @@ interface PersonSearchSelectProps {
   placeholder?: string;
   allowClear?: boolean;
   required?: boolean;
+  disabled?: boolean;
 }
 
 export function PersonSearchSelect({
@@ -25,6 +26,7 @@ export function PersonSearchSelect({
   placeholder = 'Buscar por nome ou documento...',
   allowClear = false,
   required = false,
+  disabled = false,
 }: PersonSearchSelectProps) {
   const types = Array.isArray(type) ? type : [type];
   const listId = useId();
@@ -70,7 +72,7 @@ export function PersonSearchSelect({
 
   const { data: response, isFetching } = useQuery({
     queryKey: ['personSearchSelect', types, search],
-    enabled: open,
+    enabled: open && !disabled,
     queryFn: () =>
       personsService.list({
         page: 1,
@@ -98,6 +100,14 @@ export function PersonSearchSelect({
     setSearchText('');
     setSearch('');
   };
+
+  if (disabled) {
+    return (
+      <div className="flex h-9 items-center rounded-md border border-input bg-zinc-50 px-3 text-sm text-zinc-700">
+        <span className="truncate">{selectedLabel || placeholder}</span>
+      </div>
+    );
+  }
 
   return (
     <div ref={rootRef} className="relative">

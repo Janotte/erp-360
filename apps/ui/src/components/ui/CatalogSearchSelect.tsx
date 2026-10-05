@@ -15,6 +15,7 @@ interface CatalogSearchSelectProps {
   allowClear?: boolean;
   required?: boolean;
   isLoading?: boolean;
+  disabled?: boolean;
 }
 
 export function CatalogSearchSelect({
@@ -26,6 +27,7 @@ export function CatalogSearchSelect({
   allowClear = false,
   required = false,
   isLoading = false,
+  disabled = false,
 }: CatalogSearchSelectProps) {
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -70,6 +72,14 @@ export function CatalogSearchSelect({
     setSelectedLabel('');
     setSearchText('');
   };
+
+  if (disabled) {
+    return (
+      <div className="flex h-9 items-center rounded-md border border-input bg-zinc-50 px-3 text-sm text-zinc-700">
+        <span className="truncate">{selectedLabel || placeholder}</span>
+      </div>
+    );
+  }
 
   return (
     <div ref={rootRef} className="relative">

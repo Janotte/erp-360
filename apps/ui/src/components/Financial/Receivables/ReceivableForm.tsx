@@ -1,4 +1,10 @@
-import { formatCurrencyInput, maskCurrencyInput, parseCurrencyToCents } from '@erp-360/shared';
+import {
+  formatCurrency,
+  formatCurrencyInput,
+  formatRawDate,
+  maskCurrencyInput,
+  parseCurrencyToCents,
+} from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -16,10 +22,15 @@ import {
 
 interface ReceivableFormProps {
   accountToUpdate?: FinancialAccount | null;
+  readOnly?: boolean;
   onSuccess: () => void;
 }
 
-export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormProps) {
+export function ReceivableForm({
+  accountToUpdate,
+  readOnly = false,
+  onSuccess,
+}: ReceivableFormProps) {
   const queryClient = useQueryClient();
   const [personId, setPersonId] = useState('');
   const [documentNumber, setDocumentNumber] = useState('');
@@ -92,6 +103,7 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (readOnly) return;
     const installmentAmount = parseCurrencyToCents(amountStr);
     if (!personId || !description || !dueOn || installmentAmount <= 0) return;
 
@@ -114,11 +126,33 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
     });
   };
 
+  const showSettlement =
+    readOnly &&
+    accountToUpdate &&
+    (accountToUpdate.status === 'recebido' || accountToUpdate.settledOn);
+
   return (
     <form
       onSubmit={handleSubmit}
       className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pt-2"
     >
+      {showSettlement && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm space-y-1">
+          <p className="font-medium text-emerald-800">Liquidação</p>
+          <p className="text-emerald-700">
+            Data:{' '}
+            <strong>{formatRawDate(accountToUpdate.settledOn) || '-'}</strong>
+          </p>
+          <p className="text-emerald-700">
+            Valor recebido:{' '}
+            <strong>{formatCurrency(accountToUpdate.settledAmount)}</strong>
+          </p>
+          <p className="text-emerald-700">
+            Status: <strong>{accountToUpdate.status}</strong>
+          </p>
+        </div>
+      )}
+
       <div className="space-y-1">
         <Label>Cliente</Label>
         <PersonSearchSelect
@@ -126,7 +160,8 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
           onChange={setPersonId}
           type="cliente"
           placeholder="Buscar cliente por nome ou documento..."
-          required
+          required={!readOnly}
+          disabled={readOnly}
         />
       </div>
 
@@ -138,6 +173,7 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
             value={documentNumber}
             maxLength={44}
             onChange={(e) => setDocumentNumber(e.target.value)}
+            disabled={readOnly}
           />
         </div>
         <div className="space-y-1">
@@ -147,6 +183,7 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
             value={invoiceNumber}
             maxLength={44}
             onChange={(e) => setInvoiceNumber(e.target.value)}
+            disabled={readOnly}
           />
         </div>
       </div>
@@ -158,7 +195,8 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
           value={description}
           maxLength={255}
           onChange={(e) => setDescription(e.target.value)}
-          required
+          required={!readOnly}
+          disabled={readOnly}
         />
       </div>
 
@@ -170,7 +208,8 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
             type="date"
             value={issueOn}
             onChange={(e) => setIssueOn(e.target.value)}
-            required
+            required={!readOnly}
+            disabled={readOnly}
           />
         </div>
         <div className="space-y-1">
@@ -180,7 +219,8 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
             type="date"
             value={dueOn}
             onChange={(e) => setDueOn(e.target.value)}
-            required
+            required={!readOnly}
+            disabled={readOnly}
           />
         </div>
       </div>
@@ -195,7 +235,8 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
           placeholder="0,00"
           value={amountStr}
           onChange={(e) => setAmountStr(maskCurrencyInput(e.target.value))}
-          required
+          required={!readOnly}
+          disabled={readOnly}
         />
       </div>
 
@@ -207,7 +248,8 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
           options={planAccounts}
           placeholder="Buscar plano de contas..."
           emptyMessage="Nenhum plano de contas cadastrado."
-          allowClear
+          allowClear={!readOnly}
+          disabled={readOnly}
         />
       </div>
 
@@ -218,7 +260,8 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
           onChange={setFinancialInstitutionId}
           type="instituicao"
           placeholder="Buscar instituição (opcional)..."
-          allowClear
+          allowClear={!readOnly}
+          disabled={readOnly}
         />
       </div>
 
@@ -231,7 +274,8 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
             options={paymentMethods}
             placeholder="Buscar forma de pagamento..."
             emptyMessage="Nenhuma forma de pagamento cadastrada."
-            allowClear
+            allowClear={!readOnly}
+            disabled={readOnly}
           />
         </div>
         <div className="space-y-1">
@@ -242,7 +286,8 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
             options={cardBrands}
             placeholder="Buscar bandeira..."
             emptyMessage="Nenhuma bandeira cadastrada."
-            allowClear
+            allowClear={!readOnly}
+            disabled={readOnly}
           />
         </div>
       </div>
@@ -254,6 +299,7 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
           value={bearerName}
           maxLength={60}
           onChange={(e) => setBearerName(e.target.value)}
+          disabled={readOnly}
         />
       </div>
 
@@ -265,6 +311,7 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
             value={bankSlipOurNumber}
             maxLength={20}
             onChange={(e) => setBankSlipOurNumber(e.target.value)}
+            disabled={readOnly}
           />
         </div>
         <div className="space-y-1">
@@ -274,6 +321,7 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
             value={barcode}
             maxLength={50}
             onChange={(e) => setBarcode(e.target.value)}
+            disabled={readOnly}
           />
         </div>
       </div>
@@ -285,20 +333,27 @@ export function ReceivableForm({ accountToUpdate, onSuccess }: ReceivableFormPro
           value={transactionAuthorization}
           maxLength={128}
           onChange={(e) => setTransactionAuthorization(e.target.value)}
+          disabled={readOnly}
         />
       </div>
 
-      <Button
-        type="submit"
-        className="mt-2 w-full bg-zinc-900 text-white hover:bg-zinc-800"
-        disabled={mutation.isPending}
-      >
-        {mutation.isPending
-          ? 'Salvando...'
-          : accountToUpdate
-            ? 'Atualizar'
-            : 'Confirmar Lançamento'}
-      </Button>
+      {readOnly ? (
+        <Button type="button" variant="outline" className="mt-2 w-full" onClick={onSuccess}>
+          Fechar
+        </Button>
+      ) : (
+        <Button
+          type="submit"
+          className="mt-2 w-full bg-zinc-900 text-white hover:bg-zinc-800"
+          disabled={mutation.isPending}
+        >
+          {mutation.isPending
+            ? 'Salvando...'
+            : accountToUpdate
+              ? 'Atualizar'
+              : 'Confirmar Lançamento'}
+        </Button>
+      )}
     </form>
   );
 }

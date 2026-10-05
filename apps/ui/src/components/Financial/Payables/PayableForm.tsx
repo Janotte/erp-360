@@ -1,4 +1,10 @@
-import { formatCurrencyInput, maskCurrencyInput, parseCurrencyToCents } from '@erp-360/shared';
+import {
+  formatCurrency,
+  formatCurrencyInput,
+  formatRawDate,
+  maskCurrencyInput,
+  parseCurrencyToCents,
+} from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -16,10 +22,15 @@ import {
 
 interface PayableFormProps {
   accountToUpdate?: FinancialAccount | null;
+  readOnly?: boolean;
   onSuccess: () => void;
 }
 
-export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
+export function PayableForm({
+  accountToUpdate,
+  readOnly = false,
+  onSuccess,
+}: PayableFormProps) {
   const queryClient = useQueryClient();
   const [personId, setPersonId] = useState('');
   const [documentNumber, setDocumentNumber] = useState('');
@@ -64,6 +75,7 @@ export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (readOnly) return;
     const installmentAmount = parseCurrencyToCents(amountStr);
     if (!personId || !description || !dueOn || installmentAmount <= 0) return;
 
@@ -78,11 +90,33 @@ export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
     });
   };
 
+  const showSettlement =
+    readOnly &&
+    accountToUpdate &&
+    (accountToUpdate.status === 'pago' || accountToUpdate.settledOn);
+
   return (
     <form
       onSubmit={handleSubmit}
       className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pt-2"
     >
+      {showSettlement && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm space-y-1">
+          <p className="font-medium text-emerald-800">Liquidação</p>
+          <p className="text-emerald-700">
+            Data:{' '}
+            <strong>{formatRawDate(accountToUpdate.settledOn) || '-'}</strong>
+          </p>
+          <p className="text-emerald-700">
+            Valor pago:{' '}
+            <strong>{formatCurrency(accountToUpdate.settledAmount)}</strong>
+          </p>
+          <p className="text-emerald-700">
+            Status: <strong>{accountToUpdate.status}</strong>
+          </p>
+        </div>
+      )}
+
       <div className="space-y-1">
         <Label>Credor</Label>
         <PersonSearchSelect
@@ -90,7 +124,8 @@ export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
           onChange={setPersonId}
           type={['fornecedor', 'colaborador', 'instituicao']}
           placeholder="Buscar fornecedor, colaborador ou instituição..."
-          required
+          required={!readOnly}
+          disabled={readOnly}
         />
       </div>
 
@@ -101,6 +136,7 @@ export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
           value={documentNumber}
           maxLength={44}
           onChange={(e) => setDocumentNumber(e.target.value)}
+          disabled={readOnly}
         />
       </div>
 
@@ -111,7 +147,8 @@ export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
           value={description}
           maxLength={255}
           onChange={(e) => setDescription(e.target.value)}
-          required
+          required={!readOnly}
+          disabled={readOnly}
         />
       </div>
 
@@ -123,7 +160,8 @@ export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
             type="date"
             value={issueOn}
             onChange={(e) => setIssueOn(e.target.value)}
-            required
+            required={!readOnly}
+            disabled={readOnly}
           />
         </div>
         <div className="space-y-1">
@@ -133,7 +171,8 @@ export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
             type="date"
             value={dueOn}
             onChange={(e) => setDueOn(e.target.value)}
-            required
+            required={!readOnly}
+            disabled={readOnly}
           />
         </div>
       </div>
@@ -148,7 +187,8 @@ export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
           placeholder="0,00"
           value={amountStr}
           onChange={(e) => setAmountStr(maskCurrencyInput(e.target.value))}
-          required
+          required={!readOnly}
+          disabled={readOnly}
         />
       </div>
 
@@ -160,17 +200,24 @@ export function PayableForm({ accountToUpdate, onSuccess }: PayableFormProps) {
           options={planAccounts}
           placeholder="Buscar plano de contas..."
           emptyMessage="Nenhum plano de contas cadastrado."
-          allowClear
+          allowClear={!readOnly}
+          disabled={readOnly}
         />
       </div>
 
-      <Button type="submit" className="mt-2 w-full" disabled={mutation.isPending}>
-        {mutation.isPending
-          ? 'Salvando...'
-          : accountToUpdate
-            ? 'Atualizar'
-            : 'Confirmar Lançamento'}
-      </Button>
+      {readOnly ? (
+        <Button type="button" variant="outline" className="mt-2 w-full" onClick={onSuccess}>
+          Fechar
+        </Button>
+      ) : (
+        <Button type="submit" className="mt-2 w-full" disabled={mutation.isPending}>
+          {mutation.isPending
+            ? 'Salvando...'
+            : accountToUpdate
+              ? 'Atualizar'
+              : 'Confirmar Lançamento'}
+        </Button>
+      )}
     </form>
   );
 }

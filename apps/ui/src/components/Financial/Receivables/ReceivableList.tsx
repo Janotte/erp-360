@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Search,
   Trash2,
+  Eye,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -76,6 +77,7 @@ export function ReceivableList() {
   const queryClient = useQueryClient();
   const [openReceive, setOpenReceive] = useState(false);
   const [openForm, setOpenForm] = useState(false);
+  const [formReadOnly, setFormReadOnly] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<FinancialAccount | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -166,11 +168,19 @@ export function ReceivableList() {
 
   const openCreate = () => {
     setSelectedAccount(null);
+    setFormReadOnly(false);
     setOpenForm(true);
   };
 
   const openEdit = (account: FinancialAccount) => {
     setSelectedAccount(account);
+    setFormReadOnly(false);
+    setOpenForm(true);
+  };
+
+  const openView = (account: FinancialAccount) => {
+    setSelectedAccount(account);
+    setFormReadOnly(true);
     setOpenForm(true);
   };
 
@@ -352,10 +362,19 @@ export function ReceivableList() {
                             </DropdownMenuItem>
                           </>
                         )}
-                        {acc.status === 'recebido' && (
-                          <DropdownMenuItem onClick={() => openConfirm(acc, 'reverse')}>
-                            <RotateCcw className="h-4 w-4" /> Estornar
-                          </DropdownMenuItem>
+                        {(acc.status === 'recebido' || acc.status === 'cancelado') && (
+                          <>
+                            <DropdownMenuItem onClick={() => openView(acc)}>
+                              <Eye className="h-4 w-4" /> Visualizar
+                            </DropdownMenuItem>
+                            {acc.status === 'recebido' && (
+                              <DropdownMenuItem
+                                onClick={() => openConfirm(acc, 'reverse')}
+                              >
+                                <RotateCcw className="h-4 w-4" /> Estornar
+                              </DropdownMenuItem>
+                            )}
+                          </>
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -407,21 +426,30 @@ export function ReceivableList() {
         open={openForm}
         onOpenChange={(open) => {
           setOpenForm(open);
-          if (!open) setSelectedAccount(null);
+          if (!open) {
+            setSelectedAccount(null);
+            setFormReadOnly(false);
+          }
         }}
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {selectedAccount ? 'Editar Conta a Receber' : 'Lançar Conta a Receber'}
+              {formReadOnly
+                ? 'Visualizar Conta a Receber'
+                : selectedAccount
+                  ? 'Editar Conta a Receber'
+                  : 'Lançar Conta a Receber'}
             </DialogTitle>
           </DialogHeader>
           <ReceivableForm
-            key={selectedAccount?.id ?? 'new'}
+            key={`${selectedAccount?.id ?? 'new'}-${formReadOnly ? 'view' : 'edit'}`}
             accountToUpdate={selectedAccount}
+            readOnly={formReadOnly}
             onSuccess={() => {
               setOpenForm(false);
               setSelectedAccount(null);
+              setFormReadOnly(false);
             }}
           />
         </DialogContent>
