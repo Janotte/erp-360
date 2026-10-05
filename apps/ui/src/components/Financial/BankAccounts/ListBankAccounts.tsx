@@ -1,4 +1,10 @@
-import { formatCurrency, formatRawDate } from '@erp-360/shared';
+import {
+  formatCurrency,
+  formatCurrencyInput,
+  formatRawDate,
+  maskCurrencyInput,
+  parseCurrencyToCents,
+} from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -23,10 +29,50 @@ export function ListBankAccounts() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [openForm, setOpenForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [branchNumber, setBranchNumber] = useState('');
   const [accountCode, setAccountCode] = useState('');
   const [planAccountId, setPlanAccountId] = useState('');
+  const [openingOn, setOpeningOn] = useState('');
+  const [openingAmountStr, setOpeningAmountStr] = useState('');
+
+  const resetForm = () => {
+    setEditingId(null);
+    setName('');
+    setBranchNumber('');
+    setAccountCode('');
+    setPlanAccountId('');
+    setOpeningOn('');
+    setOpeningAmountStr('');
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setOpenForm(true);
+  };
+
+  const openEdit = (account: BankAccount) => {
+    setEditingId(account.id);
+    setName(account.name);
+    setBranchNumber(account.branchNumber ?? '');
+    setAccountCode(account.accountCode ?? '');
+    setPlanAccountId(account.planAccountId ?? '');
+    setOpeningOn(account.openingOn ?? '');
+    setOpeningAmountStr(
+      account.openingAmount ? formatCurrencyInput(account.openingAmount) : '',
+    );
+    setOpenForm(true);
+  };
+
+  const accountPayload = () => ({
+    name,
+    branchNumber: branchNumber || undefined,
+    accountCode: accountCode || undefined,
+    planAccountId: planAccountId || undefined,
+    openingOn: openingOn || null,
+    openingAmount: parseCurrencyToCents(openingAmountStr),
+  });
 
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ['treasury', 'bank-accounts'],
@@ -44,22 +90,17 @@ export function ListBankAccounts() {
     enabled: Boolean(selectedId),
   });
 
-  const createMutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: () =>
-      treasuryService.createBankAccount({
-        name,
-        branchNumber: branchNumber || undefined,
-        accountCode: accountCode || undefined,
-        planAccountId: planAccountId || undefined,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['treasury', 'bank-accounts'] });
+      editingId
+        ? treasuryService.updateBankAccount(editingId, accountPayload())
+        : treasuryService.createBankAccount(accountPayload()),
+    onSuccess: (account) => {
+      queryClient.invalidateQueries({ queryKey: ['treasury'] });
       setOpenForm(false);
-      setName('');
-      setBranchNumber('');
-      setAccountCode('');
-      setPlanAccountId('');
-      toast.success('Conta bancária cadastrada.');
+      resetForm();
+      setSelectedId(account.id);
+      toast.success(editingId ? 'Conta bancária atualizada.' : 'Conta bancária cadastrada.');
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -85,7 +126,7 @@ export function ListBankAccounts() {
             Extrato, saldo e conciliação por conta.
           </p>
         </div>
-        <Button size="sm" onClick={() => setOpenForm(true)}>
+        <Button size="sm" onClick={openCreate}>
           Nova conta
         </Button>
       </div>
@@ -125,6 +166,9 @@ export function ListBankAccounts() {
                     Saldo {formatCurrency(statement.account.balance ?? 0)}
                   </p>
                 </div>
+                <Button variant="outline" size="sm" onClick={() => openEdit(selected)}>
+                  Editar
+                </Button>
               </div>
               <Table>
                 <TableHeader>
@@ -184,16 +228,26 @@ export function ListBankAccounts() {
         </div>
       </div>
 
-      <Dialog open={openForm} onOpenChange={setOpenForm}>
+      <Dialog
+        open={openForm}
+        onOpenChange={(open) => {
+          setOpenForm(open);
+          if (!open) resetForm();
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nova conta bancária</DialogTitle>
+            <DialogTitle>{editingId ? 'Editar conta bancária' : 'Nova conta bancária'}</DialogTitle>
           </DialogHeader>
           <form
             className="space-y-3"
             onSubmit={(event) => {
               event.preventDefault();
-              createMutation.mutate();
+              if (parseCurrencyToCents(openingAmountStr) !== 0 && !openingOn) {
+                toast.error('Informe a data do saldo inicial.');
+                return;
+              }
+              saveMutation.mutate();
             }}
           >
             <div className="space-y-1">
@@ -233,9 +287,32 @@ export function ListBankAccounts() {
                 allowClear
               />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="openingOn">Data do saldo inicial</Label>
+                <Input
+                  id="openingOn"
+                  type="date"
+                  value={openingOn}
+                  onChange={(e) => setOpeningOn(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="openingAmount">Saldo inicial (R$)</Label>
+                <Input
+                  id="openingAmount"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="0,00"
+                  value={openingAmountStr}
+                  onChange={(e) => setOpeningAmountStr(maskCurrencyInput(e.target.value))}
+                />
+              </div>
+            </div>
             <div className="flex justify-end">
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? 'Salvando...' : 'Cadastrar'}
+              <Button type="submit" disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? 'Salvando...' : editingId ? 'Salvar' : 'Cadastrar'}
               </Button>
             </div>
           </form>

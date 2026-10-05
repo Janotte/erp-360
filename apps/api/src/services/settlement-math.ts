@@ -54,3 +54,25 @@ export function computeDueAmount(params: {
     dueAmount: params.originalAmount + fineAmount + interestAmount,
   };
 }
+
+export function computeSettlementGaps(params: {
+  kind: 'payable' | 'receivable';
+  originalAmount: number;
+  dueAmount: number;
+  settledAmount: number;
+  daysLate: number;
+  waiveCharges: boolean;
+}) {
+  const remainder = params.dueAmount - params.settledAmount;
+  const extraVsDue = params.settledAmount - params.dueAmount;
+  const extraVsOriginal = params.settledAmount - params.originalAmount;
+  const extra =
+    params.kind === 'receivable' &&
+    !params.waiveCharges &&
+    params.daysLate > 0 &&
+    extraVsOriginal > 0
+      ? extraVsOriginal
+      : extraVsDue;
+
+  return { remainder, extra };
+}

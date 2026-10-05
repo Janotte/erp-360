@@ -131,7 +131,10 @@ export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
         installmentAmount: receivables.installmentAmount,
       } as const;
       const sortColumn = sortColumns[sortField];
-      const orderBy = sortOrder === 'asc' ? [asc(sortColumn)] : [desc(sortColumn)];
+      const orderBy =
+        sortOrder === 'asc'
+          ? [asc(sortColumn), asc(receivables.id)]
+          : [desc(sortColumn), asc(receivables.id)];
 
       const data = await db
         .select()

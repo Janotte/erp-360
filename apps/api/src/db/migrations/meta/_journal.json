@@ -141,6 +141,13 @@
       "when": 1791060160134,
       "tag": "0019_lush_karma",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791160297380,
+      "tag": "0020_steady_doomsday",
+      "breakpoints": true
     }
   ]
 }

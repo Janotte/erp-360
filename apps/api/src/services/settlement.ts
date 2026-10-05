@@ -6,10 +6,10 @@ import {
   receivables,
   settlements,
 } from '@erp-360/mod-financial';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../db/index.ts';
 import { getOrCreateFinancialSettings } from './financial-settings.ts';
-import { addDays, computeDueAmount } from './settlement-math.ts';
+import { addDays, computeDueAmount, computeSettlementGaps } from './settlement-math.ts';
 
 export class SettlementError extends Error {
   status: number;
@@ -101,8 +101,14 @@ export async function settleTitle(input: SettleInput) {
       waiveCharges: Boolean(input.waiveCharges),
     });
 
-    const remainder = due.dueAmount - input.settledAmount;
-    const extra = input.settledAmount - due.dueAmount;
+    const { remainder, extra } = computeSettlementGaps({
+      kind: input.kind,
+      originalAmount: title.installmentAmount,
+      dueAmount: due.dueAmount,
+      settledAmount: input.settledAmount,
+      daysLate: due.daysLate,
+      waiveCharges: Boolean(input.waiveCharges),
+    });
     let remainderMode: RemainderMode = input.remainderMode ?? 'none';
 
     if (remainder > 0) {
@@ -112,19 +118,20 @@ export async function settleTitle(input: SettleInput) {
           'O valor é menor que o devido. Gere um novo título ou lance a diferença no plano de contas.',
         );
       }
-      if (remainderMode === 'plan_account' && !input.differencePlanAccountId) {
+      if (remainderMode === 'plan_account' && extra <= 0 && !input.differencePlanAccountId) {
         throw new SettlementError(400, 'Selecione a conta do plano para a diferença.');
-      }
-    } else if (extra > 0) {
-      remainderMode = 'none';
-      if (!input.differencePlanAccountId) {
-        throw new SettlementError(
-          400,
-          'O valor é maior que o devido. Selecione a conta do plano para a diferença.',
-        );
       }
     } else {
       remainderMode = 'none';
+    }
+
+    if (extra > 0 && !input.differencePlanAccountId) {
+      throw new SettlementError(
+        400,
+        input.kind === 'receivable' && due.daysLate > 0 && !input.waiveCharges
+          ? 'Lance a diferença em relação ao valor original em uma conta de receita.'
+          : 'O valor é maior que o devido. Selecione a conta do plano para a diferença.',
+      );
     }
 
     if (input.treasury === 'bank' && input.bankAccountId) {
@@ -454,7 +461,7 @@ async function insertRemainderTitle(
   return created.id;
 }
 
-async function recalcCashBalances(tx: Queryable, tenantId: string) {
+export async function recalcCashBalances(tx: Queryable, tenantId: string) {
   const rows = await tx
     .select({
       id: cashEntries.id,
@@ -463,7 +470,11 @@ async function recalcCashBalances(tx: Queryable, tenantId: string) {
     })
     .from(cashEntries)
     .where(eq(cashEntries.tenantId, tenantId))
-    .orderBy(asc(cashEntries.occurredOn), asc(cashEntries.createdAt));
+    .orderBy(
+      asc(cashEntries.occurredOn),
+      desc(cashEntries.openingBalance),
+      asc(cashEntries.createdAt),
+    );
 
   let balance = 0;
   for (const row of rows) {
@@ -472,7 +483,7 @@ async function recalcCashBalances(tx: Queryable, tenantId: string) {
   }
 }
 
-async function recalcBankBalances(tx: Queryable, tenantId: string, bankAccountId: string) {
+export async function recalcBankBalances(tx: Queryable, tenantId: string, bankAccountId: string) {
   const rows = await tx
     .select({
       id: bankEntries.id,
@@ -483,7 +494,11 @@ async function recalcBankBalances(tx: Queryable, tenantId: string, bankAccountId
     .where(
       and(eq(bankEntries.tenantId, tenantId), eq(bankEntries.bankAccountId, bankAccountId)),
     )
-    .orderBy(asc(bankEntries.occurredOn), asc(bankEntries.createdAt));
+    .orderBy(
+      asc(bankEntries.occurredOn),
+      desc(bankEntries.openingBalance),
+      asc(bankEntries.createdAt),
+    );
 
   let balance = 0;
   for (const row of rows) {
@@ -503,11 +518,15 @@ export async function listCashFlow(tenantId: string, days = 60) {
   const endIso = addDays(todayIso, days - 1);
 
   const [cash] = await db
-    .select({
-      balance: sql<number>`coalesce(max(${cashEntries.balance}), 0)`,
-    })
+    .select({ balance: cashEntries.balance })
     .from(cashEntries)
-    .where(eq(cashEntries.tenantId, tenantId));
+    .where(eq(cashEntries.tenantId, tenantId))
+    .orderBy(
+      desc(cashEntries.occurredOn),
+      asc(cashEntries.openingBalance),
+      desc(cashEntries.createdAt),
+    )
+    .limit(1);
 
   const [banks] = await db
     .select({

@@ -1,6 +1,6 @@
 import { tenantColumns } from '@erp-360/mod-core';
 import { persons } from '@erp-360/mod-persons';
-import { foreignKey, integer, pgTable, unique, uuid, varchar } from 'drizzle-orm/pg-core';
+import { date, foreignKey, integer, pgTable, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 import { planAccounts } from './plan_accounts.ts';
 
 export const bankAccounts = pgTable(
@@ -12,6 +12,10 @@ export const bankAccounts = pgTable(
     branchNumber: varchar('branch_number', { length: 10 }),
     accountCode: varchar('account_code', { length: 16 }),
     planAccountId: uuid('plan_account_id'),
+    /** Data do saldo inicial da conta */
+    openingOn: date('opening_on'),
+    /** Saldo inicial da conta em centavos */
+    openingAmount: integer('opening_amount').default(0).notNull(),
     balance: integer('balance').default(0).notNull(),
     financialInstitutionId: uuid('financial_institution_id'),
     staticPixFlag: varchar('static_pix_flag', { length: 1 }),

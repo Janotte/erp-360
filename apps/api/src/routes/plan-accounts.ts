@@ -105,7 +105,10 @@ export const planAccountsRoutes: FastifyPluginAsync = async (fastify) => {
         name: planAccounts.name,
       } as const;
       const sortColumn = sortColumns[sortField];
-      const orderBy = sortOrder === 'asc' ? [asc(sortColumn)] : [desc(sortColumn)];
+      const orderBy =
+        sortOrder === 'asc'
+          ? [asc(sortColumn), asc(planAccounts.id)]
+          : [desc(sortColumn), asc(planAccounts.id)];
 
       const data = await db
         .select()

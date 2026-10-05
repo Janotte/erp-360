@@ -33,6 +33,7 @@ export const bankEntries = pgTable(
       onDelete: 'cascade',
     }),
     reconciled: boolean('reconciled').default(false).notNull(),
+    openingBalance: boolean('opening_balance').default(false).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => [

@@ -21,6 +21,8 @@ export interface BankAccount {
   branchNumber?: string | null;
   accountCode?: string | null;
   planAccountId?: string | null;
+  openingOn?: string | null;
+  openingAmount?: number;
   balance: number;
   financialInstitutionId?: string | null;
 }
@@ -45,6 +47,8 @@ export interface FinancialSettings {
   discountGrantedPlanAccountId?: string | null;
   lateFeePaidPlanAccountId?: string | null;
   lateFeeReceivedPlanAccountId?: string | null;
+  cashOpeningOn?: string | null;
+  cashOpeningAmount?: number;
 }
 
 export interface CashFlowDay {
@@ -96,6 +100,8 @@ export const treasuryService = {
     branchNumber?: string;
     accountCode?: string;
     planAccountId?: string;
+    openingOn?: string | null;
+    openingAmount?: number;
   }): Promise<BankAccount> => {
     const res = await fetch(`${API_URL}/financial/bank-accounts`, {
       method: 'POST',
@@ -105,6 +111,39 @@ export const treasuryService = {
     const body = await parseJson(res);
     if (!res.ok) throw new Error(body.message || 'Falha ao cadastrar conta bancária.');
     return body as BankAccount;
+  },
+  updateBankAccount: async (
+    id: string,
+    dados: {
+      name: string;
+      branchNumber?: string;
+      accountCode?: string;
+      planAccountId?: string;
+      openingOn?: string | null;
+      openingAmount?: number;
+    },
+  ): Promise<BankAccount> => {
+    const res = await fetch(`${API_URL}/financial/bank-accounts/${id}`, {
+      method: 'PUT',
+      headers: jsonHeaders(),
+      body: JSON.stringify(dados),
+    });
+    const body = await parseJson(res);
+    if (!res.ok) throw new Error(body.message || 'Falha ao atualizar conta bancária.');
+    return body as BankAccount;
+  },
+  saveCashOpening: async (dados: {
+    cashOpeningOn?: string | null;
+    cashOpeningAmount: number;
+  }): Promise<FinancialSettings> => {
+    const res = await fetch(`${API_URL}/financial/cash-opening`, {
+      method: 'PUT',
+      headers: jsonHeaders(),
+      body: JSON.stringify(dados),
+    });
+    const body = await parseJson(res);
+    if (!res.ok) throw new Error(body.message || 'Falha ao salvar o saldo inicial do caixa.');
+    return body as FinancialSettings;
   },
   bankEntries: async (
     id: string,

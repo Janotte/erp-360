@@ -9,8 +9,13 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.ts';
 import { getOrCreateFinancialSettings } from '../services/financial-settings.ts';
+import { loadBankAccount, syncBankOpening, syncCashOpening } from '../services/opening-balance.ts';
 import { listCashFlow } from '../services/settlement.ts';
 import '../types/fastify.ts';
+
+const dateString = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de data deve ser YYYY-MM-DD');
 
 const settingsBody = z.object({
   lateFeeBps: z.number().int().min(0).max(10000),
@@ -21,6 +26,8 @@ const settingsBody = z.object({
   discountGrantedPlanAccountId: z.string().uuid().optional().nullable(),
   lateFeePaidPlanAccountId: z.string().uuid().optional().nullable(),
   lateFeeReceivedPlanAccountId: z.string().uuid().optional().nullable(),
+  cashOpeningOn: dateString.optional().nullable(),
+  cashOpeningAmount: z.number().int().optional().default(0),
 });
 
 const bankAccountBody = z.object({
@@ -29,6 +36,8 @@ const bankAccountBody = z.object({
   accountCode: z.string().max(16).optional().nullable(),
   planAccountId: z.string().uuid().optional().nullable(),
   financialInstitutionId: z.string().uuid().optional().nullable(),
+  openingOn: dateString.optional().nullable(),
+  openingAmount: z.number().int().optional().default(0),
 });
 
 export const treasuryRoutes: FastifyPluginAsync = async (fastify) => {
@@ -41,10 +50,15 @@ export const treasuryRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.put(
     '/settings',
     { schema: { body: settingsBody } },
-    async (request) => {
+    async (request, reply) => {
       const tenantId = request.user.tenantId;
       await getOrCreateFinancialSettings(tenantId);
       const data = request.body as z.infer<typeof settingsBody>;
+      const cashOpeningOn = data.cashOpeningOn || null;
+      const cashOpeningAmount = data.cashOpeningAmount ?? 0;
+      if (cashOpeningAmount !== 0 && !cashOpeningOn) {
+        return reply.status(400).send({ message: 'Informe a data do saldo inicial do caixa.' });
+      }
       const [updated] = await db
         .update(financialSettings)
         .set({
@@ -56,9 +70,43 @@ export const treasuryRoutes: FastifyPluginAsync = async (fastify) => {
           discountGrantedPlanAccountId: data.discountGrantedPlanAccountId || null,
           lateFeePaidPlanAccountId: data.lateFeePaidPlanAccountId || null,
           lateFeeReceivedPlanAccountId: data.lateFeeReceivedPlanAccountId || null,
+          cashOpeningOn,
+          cashOpeningAmount,
         })
         .where(eq(financialSettings.tenantId, tenantId))
         .returning();
+      await syncCashOpening(tenantId, cashOpeningOn, cashOpeningAmount);
+      return updated;
+    },
+  );
+
+  fastify.put(
+    '/cash-opening',
+    {
+      schema: {
+        body: z.object({
+          cashOpeningOn: dateString.optional().nullable(),
+          cashOpeningAmount: z.number().int(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const tenantId = request.user.tenantId;
+      await getOrCreateFinancialSettings(tenantId);
+      const data = request.body as { cashOpeningOn?: string | null; cashOpeningAmount: number };
+      const cashOpeningOn = data.cashOpeningOn || null;
+      if (data.cashOpeningAmount !== 0 && !cashOpeningOn) {
+        return reply.status(400).send({ message: 'Informe a data do saldo inicial do caixa.' });
+      }
+      const [updated] = await db
+        .update(financialSettings)
+        .set({
+          cashOpeningOn,
+          cashOpeningAmount: data.cashOpeningAmount,
+        })
+        .where(eq(financialSettings.tenantId, tenantId))
+        .returning();
+      await syncCashOpening(tenantId, cashOpeningOn, data.cashOpeningAmount);
       return updated;
     },
   );
@@ -74,7 +122,11 @@ export const treasuryRoutes: FastifyPluginAsync = async (fastify) => {
       .select()
       .from(cashEntries)
       .where(and(...conditions))
-      .orderBy(desc(cashEntries.occurredOn), desc(cashEntries.createdAt));
+      .orderBy(
+        desc(cashEntries.occurredOn),
+        asc(cashEntries.openingBalance),
+        desc(cashEntries.createdAt),
+      );
   });
 
   fastify.get('/cash-flow', async (request) => {
@@ -95,6 +147,11 @@ export const treasuryRoutes: FastifyPluginAsync = async (fastify) => {
     { schema: { body: bankAccountBody } },
     async (request, reply) => {
       const data = request.body as z.infer<typeof bankAccountBody>;
+      const openingOn = data.openingOn || null;
+      const openingAmount = data.openingAmount ?? 0;
+      if (openingAmount !== 0 && !openingOn) {
+        return reply.status(400).send({ message: 'Informe a data do saldo inicial.' });
+      }
       const [created] = await db
         .insert(bankAccounts)
         .values({
@@ -104,10 +161,53 @@ export const treasuryRoutes: FastifyPluginAsync = async (fastify) => {
           accountCode: data.accountCode || null,
           planAccountId: data.planAccountId || null,
           financialInstitutionId: data.financialInstitutionId || null,
+          openingOn,
+          openingAmount,
           balance: 0,
         })
         .returning();
-      return reply.status(201).send(created);
+      await syncBankOpening(request.user.tenantId, created.id, openingOn, openingAmount);
+      const account = await loadBankAccount(request.user.tenantId, created.id);
+      return reply.status(201).send(account ?? created);
+    },
+  );
+
+  fastify.put(
+    '/bank-accounts/:id',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: bankAccountBody,
+      },
+    },
+    async (request, reply) => {
+      const { tenantId } = request.user;
+      const { id } = request.params as { id: string };
+      const data = request.body as z.infer<typeof bankAccountBody>;
+      const existing = await loadBankAccount(tenantId, id);
+      if (!existing) {
+        return reply.status(404).send({ message: 'Conta bancária não encontrada.' });
+      }
+      const openingOn = data.openingOn || null;
+      const openingAmount = data.openingAmount ?? 0;
+      if (openingAmount !== 0 && !openingOn) {
+        return reply.status(400).send({ message: 'Informe a data do saldo inicial.' });
+      }
+      await db
+        .update(bankAccounts)
+        .set({
+          name: data.name.trim(),
+          branchNumber: data.branchNumber || null,
+          accountCode: data.accountCode || null,
+          planAccountId: data.planAccountId || null,
+          financialInstitutionId: data.financialInstitutionId || null,
+          openingOn,
+          openingAmount,
+        })
+        .where(and(eq(bankAccounts.id, id), eq(bankAccounts.tenantId, tenantId)));
+      await syncBankOpening(tenantId, id, openingOn, openingAmount);
+      const account = await loadBankAccount(tenantId, id);
+      return account;
     },
   );
 
@@ -129,7 +229,11 @@ export const treasuryRoutes: FastifyPluginAsync = async (fastify) => {
         .select()
         .from(bankEntries)
         .where(and(eq(bankEntries.tenantId, tenantId), eq(bankEntries.bankAccountId, id)))
-        .orderBy(desc(bankEntries.occurredOn), desc(bankEntries.createdAt));
+        .orderBy(
+          desc(bankEntries.occurredOn),
+          asc(bankEntries.openingBalance),
+          desc(bankEntries.createdAt),
+        );
       return { account, entries };
     },
   );

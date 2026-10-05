@@ -56,10 +56,19 @@ export function PayModal({ tipo, account, onSuccess }: PayModalProps) {
     queryFn: treasuryService.bankAccounts,
   });
 
+  const originalAmount = preview?.originalAmount ?? account.installmentAmount;
   const dueAmount = preview?.dueAmount ?? account.installmentAmount;
   const settledAmount = parseCurrencyToCents(valorPagoStr);
   const remainder = dueAmount - settledAmount;
-  const extra = settledAmount - dueAmount;
+  const extraVsDue = settledAmount - dueAmount;
+  const extraVsOriginal = settledAmount - originalAmount;
+  const extra =
+    tipo === 'receivable' &&
+    !waiveCharges &&
+    (preview?.daysLate ?? 0) > 0 &&
+    extraVsOriginal > 0
+      ? extraVsOriginal
+      : extraVsDue;
   const differenceType = extra > 0
     ? tipo === 'payable' ? 'expense' : 'revenue'
     : tipo === 'payable' ? 'revenue' : 'expense';
@@ -104,9 +113,9 @@ export function PayModal({ tipo, account, onSuccess }: PayModalProps) {
         waiveCharges,
         remainderMode: remainder > 0 ? remainderMode : 'none',
         differencePlanAccountId:
-          remainder > 0 && remainderMode === 'plan_account'
+          extra > 0
             ? differencePlanAccountId
-            : extra > 0
+            : remainder > 0 && remainderMode === 'plan_account'
               ? differencePlanAccountId
               : null,
         remainderDueOn: remainder > 0 && remainderMode === 'new_title' ? remainderDueOn : null,
@@ -126,6 +135,14 @@ export function PayModal({ tipo, account, onSuccess }: PayModalProps) {
     if (settledAmount <= 0) return;
     if (treasury === 'bank' && !bankAccountId) {
       toast.error('Selecione a conta bancária.');
+      return;
+    }
+    if (extra > 0 && !differencePlanAccountId) {
+      toast.error(
+        tipo === 'receivable' && !waiveCharges && (preview?.daysLate ?? 0) > 0
+          ? 'Selecione a conta de receita para a diferença em relação ao valor original.'
+          : 'Selecione a conta do plano para a diferença.',
+      );
       return;
     }
     mutation.mutate();
@@ -295,10 +312,16 @@ export function PayModal({ tipo, account, onSuccess }: PayModalProps) {
       {extra > 0 ? (
         <div className="space-y-3 rounded-md border p-3">
           <p className="text-sm text-zinc-600">
-            Diferença a maior: {formatCurrency(extra)}
+            {tipo === 'receivable' && !waiveCharges && (preview?.daysLate ?? 0) > 0
+              ? `Diferença em relação ao valor original: ${formatCurrency(extra)}`
+              : `Diferença a maior: ${formatCurrency(extra)}`}
           </p>
           <div className="space-y-1">
-            <Label>Conta do plano para a diferença</Label>
+            <Label>
+              {tipo === 'receivable' && !waiveCharges && (preview?.daysLate ?? 0) > 0
+                ? 'Conta de receita para multa, juros e diferença'
+                : 'Conta do plano para a diferença'}
+            </Label>
             <CatalogSearchSelect
               value={differencePlanAccountId}
               onChange={setDifferencePlanAccountId}

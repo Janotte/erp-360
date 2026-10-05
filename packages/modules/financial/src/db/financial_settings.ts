@@ -1,5 +1,5 @@
 import { tenants } from '@erp-360/mod-core';
-import { integer, pgTable, uuid } from 'drizzle-orm/pg-core';
+import { date, integer, pgTable, uuid } from 'drizzle-orm/pg-core';
 import { planAccounts } from './plan_accounts.ts';
 
 export const financialSettings = pgTable('financial_settings', {
@@ -31,4 +31,8 @@ export const financialSettings = pgTable('financial_settings', {
     () => planAccounts.id,
     { onDelete: 'restrict' },
   ),
+  /** Data do saldo inicial do caixa */
+  cashOpeningOn: date('cash_opening_on'),
+  /** Saldo inicial do caixa em centavos */
+  cashOpeningAmount: integer('cash_opening_amount').default(0).notNull(),
 });

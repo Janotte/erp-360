@@ -1,5 +1,5 @@
 import { tenantColumns } from '@erp-360/mod-core';
-import { date, foreignKey, integer, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, date, foreignKey, integer, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { payables } from './payables.ts';
 import { planAccounts } from './plan_accounts.ts';
 import { receivables } from './receivables.ts';
@@ -21,6 +21,7 @@ export const cashEntries = pgTable(
     settlementId: uuid('settlement_id').references(() => settlements.id, {
       onDelete: 'cascade',
     }),
+    openingBalance: boolean('opening_balance').default(false).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => [

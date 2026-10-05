@@ -177,7 +177,10 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
         createdAt: persons.createdAt,
       } as const;
       const sortColumn = sortColumns[sortField];
-      const orderBy = sortOrder === 'asc' ? [asc(sortColumn)] : [desc(sortColumn)];
+      const orderBy =
+        sortOrder === 'asc'
+          ? [asc(sortColumn), asc(persons.id)]
+          : [desc(sortColumn), asc(persons.id)];
 
       // 4. Executa a Query trazendo os dados paginados
       const data = await db
