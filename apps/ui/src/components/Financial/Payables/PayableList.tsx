@@ -70,6 +70,7 @@ import {
 
 import { PayableForm } from './PayableForm';
 import { PayModal } from './PayModal';
+import { ReplicatePayableDialog } from './ReplicatePayableDialog';
 
 type ConfirmAction = 'delete' | 'reverse' | null;
 
@@ -77,6 +78,7 @@ export function PayableList() {
   const queryClient = useQueryClient();
   const [openPay, setOpenPay] = useState(false);
   const [openForm, setOpenForm] = useState(false);
+  const [openReplicate, setOpenReplicate] = useState(false);
   const [formReadOnly, setFormReadOnly] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<FinancialAccount | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
@@ -446,12 +448,48 @@ export function PayableList() {
             key={`${selectedAccount?.id ?? 'new'}-${formReadOnly ? 'view' : 'edit'}`}
             accountToUpdate={selectedAccount}
             readOnly={formReadOnly}
+            onReplicate={
+              selectedAccount
+                ? () => {
+                    setOpenForm(false);
+                    setOpenReplicate(true);
+                  }
+                : undefined
+            }
             onSuccess={() => {
               setOpenForm(false);
               setSelectedAccount(null);
               setFormReadOnly(false);
             }}
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={openReplicate}
+        onOpenChange={(open) => {
+          setOpenReplicate(open);
+          if (!open) setSelectedAccount(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Replicar Conta a Pagar</DialogTitle>
+          </DialogHeader>
+          {selectedAccount && (
+            <ReplicatePayableDialog
+              source={selectedAccount}
+              onCancel={() => {
+                setOpenReplicate(false);
+                setSelectedAccount(null);
+              }}
+              onSuccess={() => {
+                setOpenReplicate(false);
+                setSelectedAccount(null);
+                setFormReadOnly(false);
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

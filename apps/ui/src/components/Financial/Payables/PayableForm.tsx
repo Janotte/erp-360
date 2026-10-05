@@ -24,12 +24,14 @@ interface PayableFormProps {
   accountToUpdate?: FinancialAccount | null;
   readOnly?: boolean;
   onSuccess: () => void;
+  onReplicate?: () => void;
 }
 
 export function PayableForm({
   accountToUpdate,
   readOnly = false,
   onSuccess,
+  onReplicate,
 }: PayableFormProps) {
   const queryClient = useQueryClient();
   const [personId, setPersonId] = useState('');
@@ -206,17 +208,36 @@ export function PayableForm({
       </div>
 
       {readOnly ? (
-        <Button type="button" variant="outline" className="mt-2 w-full" onClick={onSuccess}>
-          Fechar
-        </Button>
+        <div className="mt-2 flex gap-2">
+          {onReplicate && accountToUpdate && (
+            <Button type="button" className="flex-1" onClick={onReplicate}>
+              Replicar
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1"
+            onClick={onSuccess}
+          >
+            Fechar
+          </Button>
+        </div>
       ) : (
-        <Button type="submit" className="mt-2 w-full" disabled={mutation.isPending}>
-          {mutation.isPending
-            ? 'Salvando...'
-            : accountToUpdate
-              ? 'Atualizar'
-              : 'Confirmar Lançamento'}
-        </Button>
+        <div className="mt-2 flex gap-2">
+          {onReplicate && accountToUpdate && (
+            <Button type="button" variant="outline" className="flex-1" onClick={onReplicate}>
+              Replicar
+            </Button>
+          )}
+          <Button type="submit" className="flex-1" disabled={mutation.isPending}>
+            {mutation.isPending
+              ? 'Salvando...'
+              : accountToUpdate
+                ? 'Atualizar'
+                : 'Confirmar Lançamento'}
+          </Button>
+        </div>
       )}
     </form>
   );
