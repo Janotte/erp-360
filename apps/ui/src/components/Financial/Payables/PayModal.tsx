@@ -99,7 +99,10 @@ export function PayModal({ tipo, account, onSuccess }: PayModalProps) {
   }, [preview, extra, remainder, tipo, differencePlanAccountId]);
 
   const bankOptions = useMemo(
-    () => bankAccounts.map((item) => ({ id: item.id, label: item.name })),
+    () =>
+      bankAccounts
+        .filter((item) => (item.kind ?? 'operating') === 'operating')
+        .map((item) => ({ id: item.id, label: item.name })),
     [bankAccounts],
   );
 

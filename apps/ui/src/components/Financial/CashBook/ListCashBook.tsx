@@ -9,6 +9,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -28,6 +38,7 @@ export function ListCashBook() {
   const [openOpening, setOpenOpening] = useState(false);
   const [openingOn, setOpeningOn] = useState('');
   const [openingAmountStr, setOpeningAmountStr] = useState('');
+  const [reverseTransferId, setReverseTransferId] = useState<string | null>(null);
 
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['treasury', 'cash-entries'],
@@ -61,6 +72,16 @@ export function ListCashBook() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const reverseMutation = useMutation({
+    mutationFn: (id: string) => treasuryService.reverseTransfer(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['treasury'] });
+      setReverseTransferId(null);
+      toast.success('Transferência estornada.');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const currentBalance = entries[0]?.balance ?? settings?.cashOpeningAmount ?? 0;
 
   return (
@@ -90,12 +111,13 @@ export function ListCashBook() {
               <TableHead className="text-right">Entrada</TableHead>
               <TableHead className="text-right">Saída</TableHead>
               <TableHead className="text-right">Saldo</TableHead>
+              <TableHead className="w-[100px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-4">
+                <TableCell colSpan={6} className="text-center py-4">
                   Carregando livro caixa...
                 </TableCell>
               </TableRow>
@@ -113,11 +135,22 @@ export function ListCashBook() {
                   <TableCell className="text-right tabular-nums">
                     {formatCurrency(entry.balance)}
                   </TableCell>
+                  <TableCell className="text-right">
+                    {entry.transferId ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReverseTransferId(entry.transferId!)}
+                      >
+                        Estornar
+                      </Button>
+                    ) : null}
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-4 text-zinc-500">
+                <TableCell colSpan={6} className="text-center py-4 text-zinc-500">
                   Nenhum lançamento em caixa.
                 </TableCell>
               </TableRow>
@@ -125,6 +158,36 @@ export function ListCashBook() {
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog
+        open={Boolean(reverseTransferId)}
+        onOpenChange={(open) => {
+          if (!open) setReverseTransferId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Estornar transferência</AlertDialogTitle>
+            <AlertDialogDescription>
+              Os dois lançamentos desta transferência serão excluídos e os saldos recalculados.
+              Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700"
+              disabled={reverseMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                if (reverseTransferId) reverseMutation.mutate(reverseTransferId);
+              }}
+            >
+              {reverseMutation.isPending ? 'Estornando...' : 'Estornar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={openOpening} onOpenChange={setOpenOpening}>
         <DialogContent>

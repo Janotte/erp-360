@@ -11,6 +11,11 @@ import { db } from '../db/index.ts';
 import { getOrCreateFinancialSettings } from '../services/financial-settings.ts';
 import { loadBankAccount, syncBankOpening, syncCashOpening } from '../services/opening-balance.ts';
 import { listCashFlow } from '../services/settlement.ts';
+import {
+  createTreasuryTransfer,
+  reverseTreasuryTransfer,
+  TransferError,
+} from '../services/treasury-transfer.ts';
 import '../types/fastify.ts';
 
 const dateString = z
@@ -32,12 +37,23 @@ const settingsBody = z.object({
 
 const bankAccountBody = z.object({
   name: z.string().min(1).max(60),
+  kind: z.enum(['operating', 'investment']).optional().default('operating'),
   branchNumber: z.string().max(10).optional().nullable(),
   accountCode: z.string().max(16).optional().nullable(),
   planAccountId: z.string().uuid().optional().nullable(),
   financialInstitutionId: z.string().uuid().optional().nullable(),
   openingOn: dateString.optional().nullable(),
   openingAmount: z.number().int().optional().default(0),
+});
+
+const transferBody = z.object({
+  occurredOn: dateString,
+  amount: z.number().int().positive(),
+  fromTreasury: z.enum(['cash', 'bank']),
+  fromBankAccountId: z.string().uuid().optional().nullable(),
+  toTreasury: z.enum(['cash', 'bank']),
+  toBankAccountId: z.string().uuid().optional().nullable(),
+  description: z.string().max(255).optional().nullable(),
 });
 
 export const treasuryRoutes: FastifyPluginAsync = async (fastify) => {
@@ -157,6 +173,7 @@ export const treasuryRoutes: FastifyPluginAsync = async (fastify) => {
         .values({
           tenantId: request.user.tenantId,
           name: data.name.trim(),
+          kind: data.kind,
           branchNumber: data.branchNumber || null,
           accountCode: data.accountCode || null,
           planAccountId: data.planAccountId || null,
@@ -197,6 +214,7 @@ export const treasuryRoutes: FastifyPluginAsync = async (fastify) => {
         .update(bankAccounts)
         .set({
           name: data.name.trim(),
+          kind: data.kind,
           branchNumber: data.branchNumber || null,
           accountCode: data.accountCode || null,
           planAccountId: data.planAccountId || null,
@@ -259,6 +277,52 @@ export const treasuryRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ message: 'Lançamento bancário não encontrado.' });
       }
       return updated;
+    },
+  );
+
+  fastify.post(
+    '/transfers',
+    { schema: { body: transferBody } },
+    async (request, reply) => {
+      const data = request.body as z.infer<typeof transferBody>;
+      try {
+        const transfer = await createTreasuryTransfer({
+          tenantId: request.user.tenantId,
+          occurredOn: data.occurredOn,
+          amount: data.amount,
+          fromTreasury: data.fromTreasury,
+          fromBankAccountId: data.fromBankAccountId,
+          toTreasury: data.toTreasury,
+          toBankAccountId: data.toBankAccountId,
+          description: data.description,
+        });
+        return reply.status(201).send(transfer);
+      } catch (error) {
+        if (error instanceof TransferError) {
+          return reply.status(error.status).send({ message: error.message });
+        }
+        throw error;
+      }
+    },
+  );
+
+  fastify.delete(
+    '/transfers/:id',
+    { schema: { params: z.object({ id: z.string().uuid() }) } },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      try {
+        const reversed = await reverseTreasuryTransfer({
+          tenantId: request.user.tenantId,
+          transferId: id,
+        });
+        return reversed;
+      } catch (error) {
+        if (error instanceof TransferError) {
+          return reply.status(error.status).send({ message: error.message });
+        }
+        throw error;
+      }
     },
   );
 };

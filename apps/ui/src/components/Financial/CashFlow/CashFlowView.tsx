@@ -23,11 +23,12 @@ export function CashFlowView() {
         <div>
           <h3 className="text-lg font-bold text-zinc-900">Fluxo de caixa</h3>
           <p className="text-sm text-zinc-500">
-            Projeção de 60 dias com títulos pendentes e saldo de tesouraria.
+            Projeção de 60 dias com títulos pendentes e saldo de tesouraria (caixa +
+            contas operacionais).
           </p>
         </div>
         <div className="rounded-md border bg-white px-4 py-2 text-right">
-          <p className="text-xs text-zinc-500">Saldo inicial</p>
+          <p className="text-xs text-zinc-500">Saldo de tesouraria</p>
           <p className="text-lg font-semibold tabular-nums">
             {formatCurrency(data?.openingBalance ?? 0)}
           </p>

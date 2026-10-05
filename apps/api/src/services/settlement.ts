@@ -136,7 +136,7 @@ export async function settleTitle(input: SettleInput) {
 
     if (input.treasury === 'bank' && input.bankAccountId) {
       const [account] = await tx
-        .select({ id: bankAccounts.id })
+        .select({ id: bankAccounts.id, kind: bankAccounts.kind })
         .from(bankAccounts)
         .where(
           and(
@@ -147,6 +147,12 @@ export async function settleTitle(input: SettleInput) {
         .limit(1);
       if (!account) {
         throw new SettlementError(400, 'Conta bancária não encontrada.');
+      }
+      if (account.kind === 'investment') {
+        throw new SettlementError(
+          400,
+          'Não é possível liquidar título em conta de investimento. Use caixa ou conta operacional.',
+        );
       }
     }
 
@@ -533,7 +539,9 @@ export async function listCashFlow(tenantId: string, days = 60) {
       balance: sql<number>`coalesce(sum(${bankAccounts.balance}), 0)`,
     })
     .from(bankAccounts)
-    .where(eq(bankAccounts.tenantId, tenantId));
+    .where(
+      and(eq(bankAccounts.tenantId, tenantId), eq(bankAccounts.kind, 'operating')),
+    );
 
   const openingBalance = Number(cash?.balance ?? 0) + Number(banks?.balance ?? 0);
 

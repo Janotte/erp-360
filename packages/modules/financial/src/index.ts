@@ -8,3 +8,4 @@ export * from './db/financial_settings.ts';
 export * from './db/settlements.ts';
 export * from './db/cash_entries.ts';
 export * from './db/bank_entries.ts';
+export * from './db/treasury_transfers.ts';

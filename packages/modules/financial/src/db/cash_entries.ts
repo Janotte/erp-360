@@ -4,6 +4,7 @@ import { payables } from './payables.ts';
 import { planAccounts } from './plan_accounts.ts';
 import { receivables } from './receivables.ts';
 import { settlements } from './settlements.ts';
+import { treasuryTransfers } from './treasury_transfers.ts';
 
 export const cashEntries = pgTable(
   'cash_entries',
@@ -22,6 +23,9 @@ export const cashEntries = pgTable(
       onDelete: 'cascade',
     }),
     openingBalance: boolean('opening_balance').default(false).notNull(),
+    transferId: uuid('transfer_id').references(() => treasuryTransfers.id, {
+      onDelete: 'cascade',
+    }),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => [

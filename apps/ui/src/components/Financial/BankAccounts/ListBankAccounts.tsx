@@ -9,6 +9,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -23,7 +33,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { financialService } from '@/services/financials';
-import { type BankAccount, treasuryService } from '@/services/treasury';
+import { type BankAccount, type BankAccountKind, treasuryService } from '@/services/treasury';
+
+import { TransferModal, type TransferMode } from './TransferModal';
 
 export function ListBankAccounts() {
   const queryClient = useQueryClient();
@@ -34,8 +46,11 @@ export function ListBankAccounts() {
   const [branchNumber, setBranchNumber] = useState('');
   const [accountCode, setAccountCode] = useState('');
   const [planAccountId, setPlanAccountId] = useState('');
+  const [kind, setKind] = useState<BankAccountKind>('operating');
   const [openingOn, setOpeningOn] = useState('');
   const [openingAmountStr, setOpeningAmountStr] = useState('');
+  const [transferMode, setTransferMode] = useState<TransferMode | null>(null);
+  const [reverseTransferId, setReverseTransferId] = useState<string | null>(null);
 
   const resetForm = () => {
     setEditingId(null);
@@ -43,6 +58,7 @@ export function ListBankAccounts() {
     setBranchNumber('');
     setAccountCode('');
     setPlanAccountId('');
+    setKind('operating');
     setOpeningOn('');
     setOpeningAmountStr('');
   };
@@ -58,6 +74,7 @@ export function ListBankAccounts() {
     setBranchNumber(account.branchNumber ?? '');
     setAccountCode(account.accountCode ?? '');
     setPlanAccountId(account.planAccountId ?? '');
+    setKind(account.kind ?? 'operating');
     setOpeningOn(account.openingOn ?? '');
     setOpeningAmountStr(
       account.openingAmount ? formatCurrencyInput(account.openingAmount) : '',
@@ -70,6 +87,7 @@ export function ListBankAccounts() {
     branchNumber: branchNumber || undefined,
     accountCode: accountCode || undefined,
     planAccountId: planAccountId || undefined,
+    kind,
     openingOn: openingOn || null,
     openingAmount: parseCurrencyToCents(openingAmountStr),
   });
@@ -115,7 +133,23 @@ export function ListBankAccounts() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const reverseMutation = useMutation({
+    mutationFn: (id: string) => treasuryService.reverseTransfer(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['treasury'] });
+      setReverseTransferId(null);
+      toast.success('Transferência estornada.');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const selected: BankAccount | undefined = accounts.find((item) => item.id === selectedId);
+  const operatingBalance = accounts
+    .filter((item) => (item.kind ?? 'operating') === 'operating')
+    .reduce((sum, item) => sum + (item.balance ?? 0), 0);
+  const investmentBalance = accounts
+    .filter((item) => item.kind === 'investment')
+    .reduce((sum, item) => sum + (item.balance ?? 0), 0);
 
   return (
     <div className="space-y-4">
@@ -123,12 +157,27 @@ export function ListBankAccounts() {
         <div>
           <h3 className="text-lg font-bold text-zinc-900">Contas bancárias</h3>
           <p className="text-sm text-zinc-500">
-            Extrato, saldo e conciliação por conta.
+            Extrato, saldo e conciliação. Investimento não entra no fluxo de caixa.
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Operacional {formatCurrency(operatingBalance)} · Investimento{' '}
+            {formatCurrency(investmentBalance)}
           </p>
         </div>
-        <Button size="sm" onClick={openCreate}>
-          Nova conta
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => setTransferMode('transfer')}>
+            Transferir
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setTransferMode('apply')}>
+            Aplicar
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setTransferMode('redeem')}>
+            Resgatar
+          </Button>
+          <Button size="sm" onClick={openCreate}>
+            Nova conta
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
@@ -146,6 +195,9 @@ export function ListBankAccounts() {
                 onClick={() => setSelectedId(account.id)}
               >
                 <span className="font-medium">{account.name}</span>
+                <span className="text-xs text-zinc-400">
+                  {account.kind === 'investment' ? 'Investimento' : 'Operacional'}
+                </span>
                 <span className="text-sm tabular-nums text-zinc-500">
                   {formatCurrency(account.balance ?? 0)}
                 </span>
@@ -163,6 +215,7 @@ export function ListBankAccounts() {
                 <div>
                   <p className="font-medium">{statement.account.name}</p>
                   <p className="text-sm text-zinc-500">
+                    {statement.account.kind === 'investment' ? 'Investimento' : 'Operacional'} ·
                     Saldo {formatCurrency(statement.account.balance ?? 0)}
                   </p>
                 </div>
@@ -179,6 +232,7 @@ export function ListBankAccounts() {
                     <TableHead className="text-right">Saída</TableHead>
                     <TableHead className="text-right">Saldo</TableHead>
                     <TableHead>Conciliação</TableHead>
+                    <TableHead className="w-[100px]" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -210,11 +264,22 @@ export function ListBankAccounts() {
                             {entry.reconciled ? 'Conciliado' : 'Conciliar'}
                           </Button>
                         </TableCell>
+                        <TableCell className="text-right">
+                          {entry.transferId ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setReverseTransferId(entry.transferId!)}
+                            >
+                              Estornar
+                            </Button>
+                          ) : null}
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-4 text-zinc-500">
+                        <TableCell colSpan={7} className="text-center py-4 text-zinc-500">
                         Nenhum lançamento nesta conta.
                       </TableCell>
                     </TableRow>
@@ -227,6 +292,36 @@ export function ListBankAccounts() {
           )}
         </div>
       </div>
+
+      <AlertDialog
+        open={Boolean(reverseTransferId)}
+        onOpenChange={(open) => {
+          if (!open) setReverseTransferId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Estornar transferência</AlertDialogTitle>
+            <AlertDialogDescription>
+              Os dois lançamentos desta transferência serão excluídos e os saldos recalculados.
+              Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700"
+              disabled={reverseMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                if (reverseTransferId) reverseMutation.mutate(reverseTransferId);
+              }}
+            >
+              {reverseMutation.isPending ? 'Estornando...' : 'Estornar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={openForm}
@@ -278,6 +373,18 @@ export function ListBankAccounts() {
               </div>
             </div>
             <div className="space-y-1">
+              <Label htmlFor="bankKind">Tipo</Label>
+              <select
+                id="bankKind"
+                value={kind}
+                onChange={(e) => setKind(e.target.value as BankAccountKind)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              >
+                <option value="operating">Operacional (entra no fluxo de caixa)</option>
+                <option value="investment">Investimento (fora do fluxo de caixa)</option>
+              </select>
+            </div>
+            <div className="space-y-1">
               <Label>Plano de contas</Label>
               <CatalogSearchSelect
                 value={planAccountId}
@@ -316,6 +423,33 @@ export function ListBankAccounts() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(transferMode)}
+        onOpenChange={(open) => {
+          if (!open) setTransferMode(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {transferMode === 'apply'
+                ? 'Aplicar'
+                : transferMode === 'redeem'
+                  ? 'Resgatar'
+                  : 'Transferir'}
+            </DialogTitle>
+          </DialogHeader>
+          {transferMode ? (
+            <TransferModal
+              key={transferMode}
+              mode={transferMode}
+              accounts={accounts}
+              onSuccess={() => setTransferMode(null)}
+            />
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

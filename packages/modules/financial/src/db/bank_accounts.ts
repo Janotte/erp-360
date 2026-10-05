@@ -1,7 +1,9 @@
 import { tenantColumns } from '@erp-360/mod-core';
 import { persons } from '@erp-360/mod-persons';
-import { date, foreignKey, integer, pgTable, unique, uuid, varchar } from 'drizzle-orm/pg-core';
+import { date, foreignKey, integer, pgEnum, pgTable, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 import { planAccounts } from './plan_accounts.ts';
+
+export const bankAccountKindEnum = pgEnum('bank_account_kind', ['operating', 'investment']);
 
 export const bankAccounts = pgTable(
   'bank_accounts',
@@ -9,6 +11,8 @@ export const bankAccounts = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     ...tenantColumns,
     name: varchar('name', { length: 60 }).notNull(),
+    /** Operacional entra no fluxo; investimento fica de fora */
+    kind: bankAccountKindEnum('kind').default('operating').notNull(),
     branchNumber: varchar('branch_number', { length: 10 }),
     accountCode: varchar('account_code', { length: 16 }),
     planAccountId: uuid('plan_account_id'),

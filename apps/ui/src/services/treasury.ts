@@ -15,9 +15,12 @@ async function parseJson(res: Response) {
   return res.json().catch(() => ({}));
 }
 
+export type BankAccountKind = 'operating' | 'investment';
+
 export interface BankAccount {
   id: string;
   name: string;
+  kind?: BankAccountKind;
   branchNumber?: string | null;
   accountCode?: string | null;
   planAccountId?: string | null;
@@ -35,6 +38,7 @@ export interface TreasuryEntry {
   outflowAmount: number;
   balance: number;
   reconciled?: boolean;
+  transferId?: string | null;
 }
 
 export interface FinancialSettings {
@@ -97,6 +101,7 @@ export const treasuryService = {
   },
   createBankAccount: async (dados: {
     name: string;
+    kind?: BankAccountKind;
     branchNumber?: string;
     accountCode?: string;
     planAccountId?: string;
@@ -116,6 +121,7 @@ export const treasuryService = {
     id: string,
     dados: {
       name: string;
+      kind?: BankAccountKind;
       branchNumber?: string;
       accountCode?: string;
       planAccountId?: string;
@@ -154,6 +160,33 @@ export const treasuryService = {
     const body = await parseJson(res);
     if (!res.ok) throw new Error(body.message || 'Falha ao carregar extrato.');
     return body as { account: BankAccount; entries: TreasuryEntry[] };
+  },
+  transfer: async (dados: {
+    occurredOn: string;
+    amount: number;
+    fromTreasury: 'cash' | 'bank';
+    fromBankAccountId?: string | null;
+    toTreasury: 'cash' | 'bank';
+    toBankAccountId?: string | null;
+    description?: string | null;
+  }) => {
+    const res = await fetch(`${API_URL}/financial/transfers`, {
+      method: 'POST',
+      headers: jsonHeaders(),
+      body: JSON.stringify(dados),
+    });
+    const body = await parseJson(res);
+    if (!res.ok) throw new Error(body.message || 'Falha ao transferir.');
+    return body;
+  },
+  reverseTransfer: async (id: string) => {
+    const res = await fetch(`${API_URL}/financial/transfers/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    const body = await parseJson(res);
+    if (!res.ok) throw new Error(body.message || 'Falha ao estornar a transferência.');
+    return body as { id: string };
   },
   reconcile: async (id: string, reconciled: boolean): Promise<TreasuryEntry> => {
     const res = await fetch(`${API_URL}/financial/bank-entries/${id}/reconcile`, {
