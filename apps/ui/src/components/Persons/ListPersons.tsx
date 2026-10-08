@@ -1,4 +1,11 @@
-import { parseTaxpayerType, personKindLabels, personKinds, taxpayerTypeLabels } from '@erp-360/shared';
+import {
+  formatTaxId,
+  parsePersonKind,
+  parseTaxpayerType,
+  personKindLabels,
+  personKinds,
+  taxpayerTypeLabels,
+} from '@erp-360/shared';
 import {
   keepPreviousData,
   useMutation,
@@ -259,7 +266,11 @@ export function ListPersons() {
               persons.map((person) => (
                 <TableRow key={person.id}>
                   <TableCell className="font-medium">{person.name}</TableCell>
-                  <TableCell>{person.taxId || '-'}</TableCell>
+                  <TableCell>
+                    {person.taxId
+                      ? formatTaxId(parsePersonKind(person.type), person.taxId)
+                      : '-'}
+                  </TableCell>
                   <TableCell>{formatTaxpayerType(person.taxpayerType)}</TableCell>
                   <TableCell>{person.nfeEmail || '-'}</TableCell>
                   <TableCell>

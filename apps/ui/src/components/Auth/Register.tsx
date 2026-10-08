@@ -13,6 +13,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+import { formatCnpj, toTitleCasePtBr } from '@erp-360/shared';
+
 import { sendRegisterAPI } from '../../services/auth';
 
 interface RegisterProps {
@@ -60,6 +62,7 @@ export function Register({ onRegisterSuccess }: RegisterProps) {
                 placeholder="Minha Empresa LTDA"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
+                onBlur={() => setCompanyName(toTitleCasePtBr(companyName))}
                 required
               />
             </div>
@@ -69,7 +72,10 @@ export function Register({ onRegisterSuccess }: RegisterProps) {
                 id="cnpj"
                 placeholder="12.345.678/0001-00"
                 value={cnpj}
-                onChange={(e) => setCnpj(e.target.value)}
+                maxLength={18}
+                inputMode="numeric"
+                autoComplete="off"
+                onChange={(e) => setCnpj(formatCnpj(e.target.value))}
                 required
               />
             </div>
@@ -80,6 +86,7 @@ export function Register({ onRegisterSuccess }: RegisterProps) {
                 placeholder="João Silva"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onBlur={() => setName(toTitleCasePtBr(name))}
                 required
               />
             </div>
@@ -90,7 +97,7 @@ export function Register({ onRegisterSuccess }: RegisterProps) {
                 type="email"
                 placeholder="adm@empresa.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value.toLowerCase())}
                 required
               />
             </div>

@@ -23,6 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { formatPostalCode, toTitleCasePtBr } from '@erp-360/shared';
+
 import { locationsService } from '@/services/locations';
 import { type AddressType, type PersonAddress, personsService } from '@/services/persons';
 
@@ -58,7 +60,13 @@ function formatAddress(address: PersonAddress) {
     .filter(Boolean)
     .join('/');
   const place = [address.neighborhood, cityLine].filter(Boolean).join(' - ');
-  return [streetLine, place, address.postalCode].filter(Boolean).join(' · ');
+  return [
+    streetLine,
+    place,
+    address.postalCode ? formatPostalCode(address.postalCode) : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 interface PersonAddressesProps {
@@ -152,7 +160,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
     setEditingId(address.id);
     setForm({
       type: address.type,
-      postalCode: address.postalCode ?? '',
+      postalCode: address.postalCode ? formatPostalCode(address.postalCode) : '',
       street: address.street ?? '',
       number: address.number ?? '',
       complement: address.complement ?? '',
@@ -272,7 +280,11 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
                 id="postalCode"
                 value={form.postalCode}
                 maxLength={9}
-                onChange={(event) => updateForm({ postalCode: event.target.value })}
+                inputMode="numeric"
+                autoComplete="off"
+                onChange={(event) =>
+                  updateForm({ postalCode: formatPostalCode(event.target.value) })
+                }
               />
             </div>
             <div className="space-y-1">
@@ -292,7 +304,8 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
               id="street"
               value={form.street}
               maxLength={60}
-              onChange={(event) => updateForm({ street: event.target.value })}
+                onChange={(event) => updateForm({ street: event.target.value })}
+                onBlur={() => updateForm({ street: toTitleCasePtBr(form.street) })}
             />
           </div>
 
@@ -304,6 +317,9 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
                 value={form.complement}
                 maxLength={60}
                 onChange={(event) => updateForm({ complement: event.target.value })}
+                onBlur={() =>
+                  updateForm({ complement: toTitleCasePtBr(form.complement) })
+                }
               />
             </div>
             <div className="space-y-1">
@@ -313,6 +329,9 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
                 value={form.neighborhood}
                 maxLength={60}
                 onChange={(event) => updateForm({ neighborhood: event.target.value })}
+                onBlur={() =>
+                  updateForm({ neighborhood: toTitleCasePtBr(form.neighborhood) })
+                }
               />
             </div>
           </div>

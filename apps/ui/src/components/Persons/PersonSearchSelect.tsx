@@ -5,6 +5,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { formatTaxId, parsePersonKind } from '@erp-360/shared';
+
 import { type Person, personsService } from '@/services/persons';
 
 type PersonType = 'cliente' | 'fornecedor' | 'instituicao' | 'colaborador';
@@ -186,7 +188,7 @@ export function PersonSearchSelect({
                   <span className="block truncate font-medium">{person.name}</span>
                   {person.taxId ? (
                     <span className="block truncate text-xs text-zinc-500">
-                      {person.taxId}
+                      {formatTaxId(parsePersonKind(person.type), person.taxId)}
                     </span>
                   ) : null}
                 </span>

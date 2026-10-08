@@ -1,4 +1,5 @@
 import { users } from '@erp-360/mod-core';
+import { isValidCnpj, normalizeEmail, onlyDigits, toTitleCasePtBr } from '@erp-360/shared';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
@@ -32,12 +33,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { email, password } = request.body as z.infer<typeof loginBody>;
+      const normalizedEmail = normalizeEmail(email);
 
       try {
         const [user] = await db
           .select()
           .from(users)
-          .where(eq(users.email, email))
+          .where(eq(users.email, normalizedEmail))
           .limit(1);
 
         if (!user) {
@@ -82,12 +84,18 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       const { companyName, cnpj, name, email, password } = request.body as z.infer<
         typeof registerBody
       >;
+      const normalizedEmail = normalizeEmail(email);
+      const normalizedCnpj = onlyDigits(cnpj).slice(0, 14);
+
+      if (!isValidCnpj(normalizedCnpj)) {
+        return reply.status(400).send({ message: 'CNPJ inválido.' });
+      }
 
       try {
         const [usuarioExistente] = await db
           .select()
           .from(users)
-          .where(eq(users.email, email))
+          .where(eq(users.email, normalizedEmail))
           .limit(1);
 
         if (usuarioExistente) {
@@ -96,7 +104,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
         const [novoTenant] = await db
           .insert(tenants)
-          .values({ name: companyName, cnpj })
+          .values({ name: toTitleCasePtBr(companyName), cnpj: normalizedCnpj })
           .returning();
 
         const hash = await bcrypt.hash(password, 10);
@@ -105,8 +113,8 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           .insert(users)
           .values({
             tenantId: novoTenant.id,
-            name: name,
-            email,
+            name: toTitleCasePtBr(name),
+            email: normalizedEmail,
             passwordHash: hash,
           })
           .returning();

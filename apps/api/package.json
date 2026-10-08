@@ -13,6 +13,7 @@
     "db:studio": "drizzle-kit studio",
     "db:setup": "wait-on tcp:localhost:5432 && pnpm db:migrate",
     "db:seed": "tsx scripts/seed-complete.ts",
+    "db:normalize-text": "tsx scripts/normalize-text.ts",
     "db:backup": "tsx scripts/backup-db.ts",
     "db:restore": "tsx scripts/restore-db.ts"
   },

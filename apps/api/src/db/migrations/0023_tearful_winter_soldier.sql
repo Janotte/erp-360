@@ -1,0 +1,1 @@
+ALTER TABLE "persons" ADD COLUMN "preserve_name_casing" boolean DEFAULT false NOT NULL;

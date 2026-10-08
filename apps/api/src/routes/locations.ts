@@ -1,5 +1,6 @@
 import { cities, states } from '@erp-360/mod-persons';
-import { and, asc, eq, ilike } from 'drizzle-orm';
+import { escapeIlike } from '@erp-360/shared';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
@@ -31,7 +32,8 @@ export const locationsRoutes: FastifyPluginAsync = async (fastify) => {
     const conditions = [eq(cities.stateId, stateId)];
 
     if (busca?.trim()) {
-      conditions.push(ilike(cities.name, `%${busca.trim()}%`));
+      const like = `%${escapeIlike(busca.trim())}%`;
+      conditions.push(sql`unaccent(${cities.name}) ilike unaccent(${like})`);
     }
 
     return db

@@ -9,6 +9,7 @@ export interface Person {
   id: string;
   type: PersonKind;
   name: string;
+  preserveNameCasing?: boolean;
   taxId?: string | null;
   taxpayerType?: TaxpayerType | null;
   stateRegistration?: string | null;

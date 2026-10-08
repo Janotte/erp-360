@@ -1,6 +1,5 @@
 import {
-  formatCnpj,
-  formatCpf,
+  formatTaxId,
   isValidCnpj,
   isValidCpf,
   parsePersonKind,
@@ -9,6 +8,7 @@ import {
   personKinds,
   taxpayerTypeLabels,
   taxpayerTypes,
+  toTitleCasePtBr,
   type PersonKind,
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -57,14 +57,8 @@ function toDateInput(value?: string | null) {
 function parseEmails(raw: string) {
   return raw
     .split(/[,;\n]/)
-    .map((email) => email.trim())
+    .map((email) => email.trim().toLowerCase())
     .filter(Boolean);
-}
-
-function formatTaxId(kind: PersonKind, value: string) {
-  if (kind === 'individual') return formatCpf(value);
-  if (kind === 'company') return formatCnpj(value);
-  return value.slice(0, 19);
 }
 
 function taxIdMaxLength(kind: PersonKind) {
@@ -83,6 +77,7 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
   const [personId, setPersonId] = useState(personToUpdate?.id);
   const [personKind, setPersonKind] = useState<PersonKind>('individual');
   const [name, setName] = useState('');
+  const [preserveNameCasing, setPreserveNameCasing] = useState(false);
   const [taxId, setTaxId] = useState('');
   const [taxIdError, setTaxIdError] = useState('');
   const [taxpayerType, setTaxpayerType] = useState('9');
@@ -120,6 +115,7 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
 
     setPersonKind(kind);
     setName(person.name ?? '');
+    setPreserveNameCasing(Boolean(person.preserveNameCasing));
     setTaxId(formatTaxId(kind, person.taxId || ''));
     setTaxIdError('');
     setTaxpayerType(taxpayer != null ? String(taxpayer) : '');
@@ -148,6 +144,8 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
       setPersonId(saved.id);
       const savedKind = parsePersonKind(saved.type);
       setPersonKind(savedKind);
+      setName(saved.name);
+      setPreserveNameCasing(Boolean(saved.preserveNameCasing));
       setTaxId(formatTaxId(savedKind, saved.taxId || ''));
       const savedType =
         savedKind === 'individual'
@@ -196,6 +194,7 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
     mutation.mutate({
       type: personKind,
       name,
+      preserveNameCasing,
       taxId: taxId || null,
       taxpayerType: personKind === 'individual' ? 9 : parseTaxpayerType(taxpayerType),
       stateRegistration: stateRegistration || null,
@@ -243,8 +242,25 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
             value={name}
             maxLength={120}
             onChange={(e) => setName(e.target.value)}
+            onBlur={() => {
+              if (!preserveNameCasing) setName(toTitleCasePtBr(name));
+            }}
             required
           />
+          <div className="flex items-center space-x-2 pt-1">
+            <Checkbox
+              id="preserveNameCasing"
+              checked={preserveNameCasing}
+              onCheckedChange={(checked) => {
+                const next = Boolean(checked);
+                setPreserveNameCasing(next);
+                if (!next) setName(toTitleCasePtBr(name));
+              }}
+            />
+            <label htmlFor="preserveNameCasing" className="text-sm text-zinc-600">
+              Manter grafia
+            </label>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -320,7 +336,7 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
             type="email"
             value={nfeEmail}
             maxLength={60}
-            onChange={(e) => setNfeEmail(e.target.value)}
+            onChange={(e) => setNfeEmail(e.target.value.toLowerCase())}
           />
         </div>
 

@@ -1,5 +1,11 @@
 import { cities, personAddresses, persons, states } from '@erp-360/mod-persons';
-import { PersonAddressSchema, type PersonAddressInput } from '@erp-360/shared';
+import {
+  emptyToNull,
+  normalizePostalCode,
+  PersonAddressSchema,
+  toTitleCasePtBr,
+  type PersonAddressInput,
+} from '@erp-360/shared';
 import { and, asc, eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
@@ -29,18 +35,14 @@ const addressColumns = {
   stateAbbreviation: states.abbreviation,
 };
 
-function emptyToNull(value?: string | null) {
-  return value ? value : null;
-}
-
 function toAddressValues(data: PersonAddressInput) {
   return {
     type: data.type,
-    postalCode: emptyToNull(data.postalCode),
-    street: emptyToNull(data.street),
+    postalCode: emptyToNull(normalizePostalCode(data.postalCode)),
+    street: emptyToNull(toTitleCasePtBr(data.street ?? '')),
     number: emptyToNull(data.number),
-    complement: emptyToNull(data.complement),
-    neighborhood: emptyToNull(data.neighborhood),
+    complement: emptyToNull(toTitleCasePtBr(data.complement ?? '')),
+    neighborhood: emptyToNull(toTitleCasePtBr(data.neighborhood ?? '')),
     cityId: data.cityId,
   };
 }

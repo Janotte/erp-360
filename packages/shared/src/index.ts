@@ -3,10 +3,24 @@ import { z } from 'zod';
 import {
   formatCnpj,
   formatCpf,
+  formatPhone,
+  formatPostalCode,
+  formatTaxId,
   isValidCnpj,
   isValidCpf,
+  normalizePhone,
+  normalizePostalCode,
+  normalizeTaxId,
   onlyDigits,
 } from './utils/brazilianDocuments.ts';
+import {
+  compactSpaces,
+  emptyToNull,
+  escapeIlike,
+  normalizeEmail,
+  normalizePersonName,
+  toTitleCasePtBr,
+} from './utils/text.ts';
 
 export const UserSchema = z.object({
   id: z.string().uuid({ message: 'ID precisa ser um UUID válido' }),
@@ -53,6 +67,7 @@ const optionalText = (max: number) =>
 export const PersonSchema = z.object({
   type: z.enum(personKinds).default('individual'),
   name: z.string().min(2, 'O nome deve ter pelo menos 2 caracteres').max(120),
+  preserveNameCasing: z.boolean().default(false),
   taxId: optionalText(19),
   taxpayerType: z.union([z.number(), z.string(), z.null()]).optional(),
   stateRegistration: optionalText(20),
@@ -120,6 +135,24 @@ const nodeEnv = (globalThis as { process?: { env?: Record<string, string | undef
 
 export const API_URL = nodeEnv?.APP_BASE_URL ?? 'http://localhost:3000';
 
-export { formatCnpj, formatCpf, isValidCnpj, isValidCpf, onlyDigits };
+export {
+  compactSpaces,
+  emptyToNull,
+  escapeIlike,
+  formatCnpj,
+  formatCpf,
+  formatPhone,
+  formatPostalCode,
+  formatTaxId,
+  isValidCnpj,
+  isValidCpf,
+  normalizeEmail,
+  normalizePersonName,
+  normalizePhone,
+  normalizePostalCode,
+  normalizeTaxId,
+  onlyDigits,
+  toTitleCasePtBr,
+};
 export * from './utils/FormatCurrency';
 export * from './utils/FormatRawDate';

@@ -1,13 +1,19 @@
 import { persons } from '@erp-360/mod-persons';
 import {
+  emptyToNull,
+  escapeIlike,
   isValidCnpj,
   isValidCpf,
+  normalizeEmail,
+  normalizePersonName,
+  normalizeTaxId,
+  onlyDigits,
   parsePersonKind,
   parseTaxpayerType,
   PersonSchema,
   type Person,
 } from '@erp-360/shared';
-import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.js';
@@ -15,10 +21,6 @@ import '../types/fastify.js';
 import { payables, receivables } from '@erp-360/mod-financial';
 import { personAddressRoutes } from './person-addresses.js';
 import { personContactRoutes } from './person-contacts.js';
-
-function emptyToNull(value?: string | null) {
-  return value ? value : null;
-}
 
 function personDocumentError(data: Person) {
   const taxId = data.taxId?.trim();
@@ -44,16 +46,20 @@ function serializePerson(person: typeof persons.$inferSelect) {
 
 function toPersonValues(data: Person) {
   const type = parsePersonKind(data.type);
+  const documentEmails = (data.documentEmails ?? [])
+    .map((email) => normalizeEmail(email))
+    .filter(Boolean);
   return {
     type,
-    name: data.name,
-    taxId: emptyToNull(data.taxId),
+    name: normalizePersonName(data.name, Boolean(data.preserveNameCasing)),
+    preserveNameCasing: Boolean(data.preserveNameCasing),
+    taxId: emptyToNull(normalizeTaxId(type, data.taxId)),
     taxpayerType: type === 'individual' ? 9 : parseTaxpayerType(data.taxpayerType),
     stateRegistration: emptyToNull(data.stateRegistration),
     isRuralProducer: data.isRuralProducer,
     birthDate: emptyToNull(data.birthDate),
-    nfeEmail: emptyToNull(data.nfeEmail),
-    documentEmails: data.documentEmails?.length ? data.documentEmails : null,
+    nfeEmail: emptyToNull(normalizeEmail(data.nfeEmail)),
+    documentEmails: documentEmails.length ? documentEmails : null,
     notes: emptyToNull(data.notes),
     isActive: data.isActive,
     isVisible: data.isVisible,
@@ -161,12 +167,15 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
       if (kind) conditions.push(eq(persons.type, kind));
 
       // 2. Filtro por Busca Textual (Nome, CPF/CNPJ ou e-mail da NF-e)
-      if (search) {
+      if (search?.trim()) {
+        const term = search.trim();
+        const like = `%${escapeIlike(term)}%`;
+        const digits = onlyDigits(term);
         conditions.push(
           or(
-            ilike(persons.name, `%${search}%`),
-            ilike(persons.taxId, `%${search}%`),
-            ilike(persons.nfeEmail, `%${search}%`),
+            sql`unaccent(${persons.name}) ilike unaccent(${like})`,
+            sql`unaccent(coalesce(${persons.nfeEmail}, '')) ilike unaccent(${like})`,
+            digits ? sql`coalesce(${persons.taxId}, '') like ${`%${digits}%`}` : sql`false`,
           )!,
         );
       }

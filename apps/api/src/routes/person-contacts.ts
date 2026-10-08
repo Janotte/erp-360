@@ -1,5 +1,12 @@
 import { personContacts, persons } from '@erp-360/mod-persons';
-import { PersonContactSchema, type PersonContactInput } from '@erp-360/shared';
+import {
+  emptyToNull,
+  normalizeEmail,
+  normalizePhone,
+  PersonContactSchema,
+  toTitleCasePtBr,
+  type PersonContactInput,
+} from '@erp-360/shared';
 import { and, asc, eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
@@ -26,19 +33,15 @@ const contactColumns = {
   email: personContacts.email,
 };
 
-function emptyToNull(value?: string | null) {
-  return value ? value : null;
-}
-
 function toContactValues(data: PersonContactInput) {
   return {
     type: data.type,
-    relationship: emptyToNull(data.relationship),
-    name: data.name,
-    phone: emptyToNull(data.phone),
-    mobilePhone: emptyToNull(data.mobilePhone),
-    whatsapp: emptyToNull(data.whatsapp),
-    email: emptyToNull(data.email),
+    relationship: emptyToNull(toTitleCasePtBr(data.relationship ?? '')),
+    name: toTitleCasePtBr(data.name),
+    phone: emptyToNull(normalizePhone(data.phone)),
+    mobilePhone: emptyToNull(normalizePhone(data.mobilePhone)),
+    whatsapp: emptyToNull(normalizePhone(data.whatsapp)),
+    email: emptyToNull(normalizeEmail(data.email)),
   };
 }
 

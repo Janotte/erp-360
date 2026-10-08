@@ -23,6 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { formatPhone, toTitleCasePtBr } from '@erp-360/shared';
+
 import { type ContactType, type PersonContact, personsService } from '@/services/persons';
 
 const contactTypes: ContactType[] = ['Principal', 'Outro'];
@@ -48,7 +50,12 @@ const emptyForm = (): ContactFormState => ({
 });
 
 function formatContact(contact: PersonContact) {
-  return [contact.phone, contact.mobilePhone, contact.whatsapp, contact.email]
+  return [
+    contact.phone ? formatPhone(contact.phone) : '',
+    contact.mobilePhone ? formatPhone(contact.mobilePhone) : '',
+    contact.whatsapp ? formatPhone(contact.whatsapp) : '',
+    contact.email ?? '',
+  ]
     .filter(Boolean)
     .join(' · ');
 }
@@ -122,9 +129,9 @@ export function PersonContacts({ personId }: PersonContactsProps) {
       type: contact.type,
       relationship: contact.relationship ?? '',
       name: contact.name,
-      phone: contact.phone ?? '',
-      mobilePhone: contact.mobilePhone ?? '',
-      whatsapp: contact.whatsapp ?? '',
+      phone: contact.phone ? formatPhone(contact.phone) : '',
+      mobilePhone: contact.mobilePhone ? formatPhone(contact.mobilePhone) : '',
+      whatsapp: contact.whatsapp ? formatPhone(contact.whatsapp) : '',
       email: contact.email ?? '',
     });
   };
@@ -236,6 +243,7 @@ export function PersonContacts({ personId }: PersonContactsProps) {
                 maxLength={60}
                 required
                 onChange={(event) => updateForm({ name: event.target.value })}
+                onBlur={() => updateForm({ name: toTitleCasePtBr(form.name) })}
               />
             </div>
             <div className="space-y-1">
@@ -245,6 +253,9 @@ export function PersonContacts({ personId }: PersonContactsProps) {
                 value={form.relationship}
                 maxLength={40}
                 onChange={(event) => updateForm({ relationship: event.target.value })}
+                onBlur={() =>
+                  updateForm({ relationship: toTitleCasePtBr(form.relationship) })
+                }
               />
             </div>
           </div>
@@ -255,8 +266,10 @@ export function PersonContacts({ personId }: PersonContactsProps) {
               <Input
                 id="contactPhone"
                 value={form.phone}
-                maxLength={20}
-                onChange={(event) => updateForm({ phone: event.target.value })}
+                maxLength={15}
+                inputMode="numeric"
+                autoComplete="off"
+                onChange={(event) => updateForm({ phone: formatPhone(event.target.value) })}
               />
             </div>
             <div className="space-y-1">
@@ -264,8 +277,12 @@ export function PersonContacts({ personId }: PersonContactsProps) {
               <Input
                 id="mobilePhone"
                 value={form.mobilePhone}
-                maxLength={20}
-                onChange={(event) => updateForm({ mobilePhone: event.target.value })}
+                maxLength={15}
+                inputMode="numeric"
+                autoComplete="off"
+                onChange={(event) =>
+                  updateForm({ mobilePhone: formatPhone(event.target.value) })
+                }
               />
             </div>
           </div>
@@ -276,8 +293,12 @@ export function PersonContacts({ personId }: PersonContactsProps) {
               <Input
                 id="whatsapp"
                 value={form.whatsapp}
-                maxLength={20}
-                onChange={(event) => updateForm({ whatsapp: event.target.value })}
+                maxLength={15}
+                inputMode="numeric"
+                autoComplete="off"
+                onChange={(event) =>
+                  updateForm({ whatsapp: formatPhone(event.target.value) })
+                }
               />
             </div>
             <div className="space-y-1">
@@ -287,7 +308,9 @@ export function PersonContacts({ personId }: PersonContactsProps) {
                 type="email"
                 value={form.email}
                 maxLength={80}
-                onChange={(event) => updateForm({ email: event.target.value })}
+                onChange={(event) =>
+                  updateForm({ email: event.target.value.toLowerCase() })
+                }
               />
             </div>
           </div>

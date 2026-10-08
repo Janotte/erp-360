@@ -28,6 +28,8 @@ export const persons = pgTable(
     ...tenantColumns,
     type: typePersonEnum('type').default('individual').notNull(),
     name: varchar('name', { length: 120 }).notNull(),
+    /** Quando true, o nome é gravado como digitado (marcas, siglas). */
+    preserveNameCasing: boolean('preserve_name_casing').default(false).notNull(),
     // CPF, CPNJ ou documento de estrangeiro
     taxId: varchar('tax_id', { length: 19 }),
     /* `taxpayerType` explícito na NF-e: 1 contribuinte, 2 isento, 9 não contribuinte.  */
