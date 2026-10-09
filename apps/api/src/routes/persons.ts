@@ -18,6 +18,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { uniqueConflictMessage } from '../lib/postgres-errors.ts';
+import { CepLookupError, lookupCep } from '../services/cep-lookup.ts';
 import { CnpjLookupError, lookupCnpj } from '../services/cnpj-lookup.ts';
 import '../types/fastify.js';
 import { payables, receivables } from '@erp-360/mod-financial';
@@ -127,6 +128,22 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
         return await lookupCnpj({ tenantId: request.user.tenantId, cnpj });
       } catch (error) {
         if (error instanceof CnpjLookupError) {
+          return reply.status(error.status).send({ message: error.message });
+        }
+        throw error;
+      }
+    },
+  );
+
+  fastify.get(
+    '/lookup/cep/:cep',
+    { schema: { params: z.object({ cep: z.string().min(8).max(9) }) } },
+    async (request, reply) => {
+      const { cep } = request.params as { cep: string };
+      try {
+        return await lookupCep(cep);
+      } catch (error) {
+        if (error instanceof CepLookupError) {
           return reply.status(error.status).send({ message: error.message });
         }
         throw error;
