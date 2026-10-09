@@ -17,6 +17,7 @@ import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.js';
+import { CnpjLookupError, lookupCnpj } from '../services/cnpj-lookup.ts';
 import '../types/fastify.js';
 import { payables, receivables } from '@erp-360/mod-financial';
 import { personAddressRoutes } from './person-addresses.js';
@@ -109,6 +110,22 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
   await fastify.register(personAddressRoutes);
   await fastify.register(personContactRoutes);
 
+  fastify.get(
+    '/lookup/cnpj/:cnpj',
+    { schema: { params: z.object({ cnpj: z.string().min(14).max(18) }) } },
+    async (request, reply) => {
+      const { cnpj } = request.params as { cnpj: string };
+      try {
+        return await lookupCnpj({ tenantId: request.user.tenantId, cnpj });
+      } catch (error) {
+        if (error instanceof CnpjLookupError) {
+          return reply.status(error.status).send({ message: error.message });
+        }
+        throw error;
+      }
+    },
+  );
+
   // 1. Rota para Cadastrar uma Pessoa (Protegida por Tenant)
   fastify.post(
     '/',
@@ -123,15 +140,24 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ message: documentError });
       }
 
-      const [newPerson] = await db
-        .insert(persons)
-        .values({
-          ...toPersonValues(data),
-          tenantId,
-        })
-        .returning();
+      try {
+        const [newPerson] = await db
+          .insert(persons)
+          .values({
+            ...toPersonValues(data),
+            tenantId,
+          })
+          .returning();
 
-      return reply.status(201).send(serializePerson(newPerson));
+        return reply.status(201).send(serializePerson(newPerson));
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          return reply
+            .status(409)
+            .send({ message: 'Já existe uma pessoa com este documento.' });
+        }
+        throw error;
+      }
     },
   );
 
@@ -333,3 +359,14 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 };
+
+function isUniqueViolation(error: unknown) {
+  const candidates = [error, (error as { cause?: unknown } | null)?.cause];
+  return candidates.some(
+    (candidate) =>
+      typeof candidate === 'object' &&
+      candidate !== null &&
+      'code' in candidate &&
+      candidate.code === '23505',
+  );
+}

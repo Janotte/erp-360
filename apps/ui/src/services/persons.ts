@@ -1,4 +1,4 @@
-import { API_URL, parsePersonKind, parseTaxpayerType } from '@erp-360/shared';
+import { API_URL, onlyDigits, parsePersonKind, parseTaxpayerType } from '@erp-360/shared';
 
 import { authStorage } from '../utils/auth';
 
@@ -53,6 +53,26 @@ export interface PersonAddressInput {
   complement?: string;
   neighborhood?: string;
   cityId: string;
+}
+
+export interface CnpjLookupAddress {
+  postalCode: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  neighborhood: string | null;
+  cityId: string | null;
+  cityName: string | null;
+  stateAbbreviation: string | null;
+}
+
+export interface CnpjLookupResult {
+  taxId: string;
+  name: string;
+  birthDate: string | null;
+  nfeEmail: string | null;
+  address: CnpjLookupAddress | null;
+  existingPersonId: string | null;
 }
 
 export type ContactType = 'Principal' | 'Outro';
@@ -175,6 +195,17 @@ export const personsService = {
       ...body,
       data: Array.isArray(body.data) ? body.data.map(normalizePerson) : [],
     };
+  },
+  lookupCnpj: async (cnpj: string): Promise<CnpjLookupResult> => {
+    const digits = onlyDigits(cnpj);
+    const res = await fetch(`${API_URL}/persons/lookup/cnpj/${digits}`, {
+      headers: authHeaders(),
+    });
+    const body = await readBody(res);
+    if (!res.ok) {
+      throw new Error(body.message || body.error || 'Falha ao consultar o CNPJ.');
+    }
+    return body as CnpjLookupResult;
   },
   get: async (id: string): Promise<Person> => {
     const res = await fetch(`${API_URL}/persons/${id}`, {

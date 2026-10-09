@@ -78,6 +78,13 @@ function formatTitleWord(word: string, isFirst: boolean): string {
     return lower.toLocaleUpperCase('pt-BR');
   }
   if (!isFirst && LOWER_PARTICLES.has(lower)) return lower;
+  if (/^\d+[a-zà-ü]/i.test(lower)) {
+    return lower.replace(
+      /^(\d+)([a-zà-ü])(.*)$/i,
+      (_match, digits: string, letter: string, rest: string) =>
+        `${digits}${letter.toLocaleUpperCase('pt-BR')}${rest}`,
+    );
+  }
 
   return capitalizeWord(lower);
 }

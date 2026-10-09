@@ -12,7 +12,7 @@ import {
   type PersonKind,
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-import { type Person, type PersonInput, personsService } from '../../services/persons';
+import {
+  type CnpjLookupAddress,
+  type Person,
+  type PersonInput,
+  personsService,
+} from '../../services/persons';
 import { Separator } from '../ui/separator';
 import { PersonAddresses } from './PersonAddresses';
 import { PersonContacts } from './PersonContacts';
@@ -93,6 +98,9 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
   const [isSupplier, setIsSupplier] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false);
   const [isFinancialInstitution, setIsFinancialInstitution] = useState(false);
+  const [pendingAddress, setPendingAddress] = useState<CnpjLookupAddress | null>(null);
+  const pendingAddressRef = useRef<CnpjLookupAddress | null>(null);
+  pendingAddressRef.current = pendingAddress;
 
   const { data: personLoaded } = useQuery({
     queryKey: ['person', personId],
@@ -139,7 +147,7 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
         ? personsService.update(personId, dados)
         : personsService.create(dados);
     },
-    onSuccess: (saved) => {
+    onSuccess: async (saved) => {
       const created = !personId;
       setPersonId(saved.id);
       const savedKind = parsePersonKind(saved.type);
@@ -155,6 +163,30 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
       queryClient.setQueryData(['person', saved.id], saved);
       queryClient.invalidateQueries({ queryKey: ['person', saved.id] });
       queryClient.invalidateQueries({ queryKey: ['listaPessoas'] });
+
+      const draft = pendingAddressRef.current;
+      if (created && draft?.cityId) {
+        try {
+          await personsService.createAddress(saved.id, {
+            type: 'Principal',
+            postalCode: draft.postalCode || undefined,
+            street: draft.street || undefined,
+            number: draft.number || undefined,
+            complement: draft.complement || undefined,
+            neighborhood: draft.neighborhood || undefined,
+            cityId: draft.cityId,
+          });
+          setPendingAddress(null);
+          queryClient.invalidateQueries({ queryKey: ['personAddresses', saved.id] });
+        } catch (error) {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : 'Pessoa salva, mas o endereço principal não foi gravado.',
+          );
+        }
+      }
+
       onPersisted?.(saved);
       toast.success(
         created ? 'Pessoa cadastrada com sucesso!' : 'Pessoa atualizada com sucesso!',
@@ -172,12 +204,39 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
     setPersonKind(next);
     setTaxId((current) => formatTaxId(next, current));
     setTaxIdError('');
+    if (next !== 'company') setPendingAddress(null);
     if (next === 'individual') setTaxpayerType('9');
   };
 
   const handleTaxIdChange = (value: string) => {
     setTaxId(formatTaxId(personKind, value));
     setTaxIdError('');
+  };
+
+  const lookupMutation = useMutation({
+    mutationFn: () => personsService.lookupCnpj(taxId),
+    onSuccess: (data) => {
+      setName(data.name);
+      setBirthDate(data.birthDate ?? '');
+      setNfeEmail(data.nfeEmail ?? '');
+      setPendingAddress(data.address);
+      if (data.existingPersonId && data.existingPersonId !== personId) {
+        toast.error('Este CNPJ já está cadastrado neste ambiente.');
+      } else if (data.address && !data.address.cityId) {
+        toast.error('Dados preenchidos, mas a cidade não foi encontrada. Complete o endereço após salvar.');
+      } else {
+        toast.success('Dados do CNPJ preenchidos. Confira e salve.');
+      }
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const lookupCnpj = () => {
+    if (!isValidCnpj(taxId)) {
+      setTaxIdError('CNPJ inválido');
+      return;
+    }
+    lookupMutation.mutate();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -235,6 +294,33 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
           </select>
         </div>
 
+        {personKind === 'company' ? (
+          <div className="space-y-1">
+            <Label htmlFor="taxId">{labels.taxId}</Label>
+            <Input
+              id="taxId"
+              value={taxId}
+              maxLength={taxIdMaxLength(personKind)}
+              inputMode="numeric"
+              autoComplete="off"
+              onChange={(e) => handleTaxIdChange(e.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                lookupCnpj();
+              }}
+            />
+            <p className="text-xs text-zinc-500">
+              {lookupMutation.isPending
+                ? 'Consultando CNPJ...'
+                : 'Digite o CNPJ e pressione Enter para preencher os dados.'}
+            </p>
+            {taxIdError ? (
+              <p className="text-sm text-destructive">{taxIdError}</p>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="space-y-1">
           <Label htmlFor="nome">{labels.name}</Label>
           <Input
@@ -264,20 +350,22 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <Label htmlFor="taxId">{labels.taxId}</Label>
-            <Input
-              id="taxId"
-              value={taxId}
-              maxLength={taxIdMaxLength(personKind)}
-              inputMode={personKind === 'foreigner' ? 'text' : 'numeric'}
-              autoComplete="off"
-              onChange={(e) => handleTaxIdChange(e.target.value)}
-            />
-            {taxIdError ? (
-              <p className="text-sm text-destructive">{taxIdError}</p>
-            ) : null}
-          </div>
+          {personKind !== 'company' ? (
+            <div className="space-y-1">
+              <Label htmlFor="taxId">{labels.taxId}</Label>
+              <Input
+                id="taxId"
+                value={taxId}
+                maxLength={taxIdMaxLength(personKind)}
+                inputMode={personKind === 'foreigner' ? 'text' : 'numeric'}
+                autoComplete="off"
+                onChange={(e) => handleTaxIdChange(e.target.value)}
+              />
+              {taxIdError ? (
+                <p className="text-sm text-destructive">{taxIdError}</p>
+              ) : null}
+            </div>
+          ) : null}
           <div className="space-y-1">
             <Label htmlFor="birthDate">{labels.birthDate}</Label>
             <Input
@@ -444,6 +532,22 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
             {mutation.error.message}
           </p>
         )}
+
+        {pendingAddress && !personId ? (
+          <p className="text-sm text-zinc-600">
+            Endereço Principal a gravar:{' '}
+            {[
+              pendingAddress.street,
+              pendingAddress.number,
+              pendingAddress.neighborhood,
+              pendingAddress.cityName,
+              pendingAddress.stateAbbreviation,
+            ]
+              .filter(Boolean)
+              .join(', ')}
+            {pendingAddress.cityId ? '' : ' (cidade pendente)'}
+          </p>
+        ) : null}
 
         <Button type="submit" className="w-full mt-4" disabled={mutation.isPending}>
           {mutation.isPending ? 'Salvando...' : 'Salvar'}
