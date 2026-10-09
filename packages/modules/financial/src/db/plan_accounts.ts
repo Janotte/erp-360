@@ -52,5 +52,6 @@ export const planAccounts = pgTable(
       table.tenantId,
       table.accountCode,
     ),
+    unique('plan_accounts_tenant_name_unique').on(table.tenantId, table.name),
   ],
 );

@@ -59,6 +59,7 @@ export const persons = pgTable(
   (table) => [
     unique('persons_id_tenant_id_unique').on(table.id, table.tenantId),
     unique('persons_tenant_tax_id_unique').on(table.tenantId, table.taxId),
+    unique('persons_tenant_name_unique').on(table.tenantId, table.name),
     check('persons_taxpayer_type_check', sql`${table.taxpayerType} in (1, 2, 9)`),
     check(
       'persons_tax_id_not_blank',

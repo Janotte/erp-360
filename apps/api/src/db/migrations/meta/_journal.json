@@ -169,6 +169,13 @@
       "when": 1791503105719,
       "tag": "0023_tearful_winter_soldier",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791506933788,
+      "tag": "0024_omniscient_hobgoblin",
+      "breakpoints": true
     }
   ]
 }

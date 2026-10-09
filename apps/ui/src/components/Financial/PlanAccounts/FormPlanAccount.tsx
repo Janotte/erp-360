@@ -201,6 +201,12 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
         </label>
       </div>
 
+      {mutation.isError && (
+        <p className="text-sm font-medium text-destructive bg-destructive/10 p-3 rounded-md">
+          {mutation.error.message}
+        </p>
+      )}
+
       <div className="flex justify-end pt-2">
         <Button type="submit" disabled={mutation.isPending}>
           {mutation.isPending ? 'Salvando...' : accountId ? 'Atualizar' : 'Cadastrar'}

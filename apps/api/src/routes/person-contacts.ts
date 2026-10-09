@@ -12,7 +12,12 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
 import { db } from '../db/index.js';
+import { uniqueConflictMessage } from '../lib/postgres-errors.ts';
 import '../types/fastify.js';
+
+const contactUniqueMessages = {
+  person_contacts_one_principal: 'Esta pessoa já possui um contato Principal.',
+};
 
 const personParams = z.object({
   id: z.string().uuid({ message: 'ID precisa ser um UUID válido' }),
@@ -104,17 +109,27 @@ export const personContactRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ message: 'Pessoa não encontrada' });
       }
 
-      const [created] = await db
-        .insert(personContacts)
-        .values({
-          ...toContactValues(data),
-          personId: id,
-          tenantId,
-        })
-        .returning({ id: personContacts.id });
+      try {
+        const [created] = await db
+          .insert(personContacts)
+          .values({
+            ...toContactValues(data),
+            personId: id,
+            tenantId,
+          })
+          .returning({ id: personContacts.id });
 
-      const [contact] = await selectContact(id, tenantId, created.id);
-      return reply.status(201).send(contact);
+        const [contact] = await selectContact(id, tenantId, created.id);
+        return reply.status(201).send(contact);
+      } catch (error) {
+        const message = uniqueConflictMessage(
+          error,
+          contactUniqueMessages,
+          'Esta pessoa já possui um contato Principal.',
+        );
+        if (message) return reply.status(409).send({ message });
+        throw error;
+      }
     },
   );
 
@@ -126,24 +141,34 @@ export const personContactRoutes: FastifyPluginAsync = async (fastify) => {
       const { id, contactId } = request.params as z.infer<typeof contactParams>;
       const data = request.body as PersonContactInput;
 
-      const [updated] = await db
-        .update(personContacts)
-        .set(toContactValues(data))
-        .where(
-          and(
-            eq(personContacts.id, contactId),
-            eq(personContacts.personId, id),
-            eq(personContacts.tenantId, tenantId),
-          ),
-        )
-        .returning({ id: personContacts.id });
+      try {
+        const [updated] = await db
+          .update(personContacts)
+          .set(toContactValues(data))
+          .where(
+            and(
+              eq(personContacts.id, contactId),
+              eq(personContacts.personId, id),
+              eq(personContacts.tenantId, tenantId),
+            ),
+          )
+          .returning({ id: personContacts.id });
 
-      if (!updated) {
-        return reply.status(404).send({ message: 'Contato não encontrado' });
+        if (!updated) {
+          return reply.status(404).send({ message: 'Contato não encontrado' });
+        }
+
+        const [contact] = await selectContact(id, tenantId, updated.id);
+        return contact;
+      } catch (error) {
+        const message = uniqueConflictMessage(
+          error,
+          contactUniqueMessages,
+          'Esta pessoa já possui um contato Principal.',
+        );
+        if (message) return reply.status(409).send({ message });
+        throw error;
       }
-
-      const [contact] = await selectContact(id, tenantId, updated.id);
-      return contact;
     },
   );
 

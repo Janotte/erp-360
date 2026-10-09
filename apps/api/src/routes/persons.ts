@@ -17,11 +17,19 @@ import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.js';
+import { uniqueConflictMessage } from '../lib/postgres-errors.ts';
 import { CnpjLookupError, lookupCnpj } from '../services/cnpj-lookup.ts';
 import '../types/fastify.js';
 import { payables, receivables } from '@erp-360/mod-financial';
 import { personAddressRoutes } from './person-addresses.js';
 import { personContactRoutes } from './person-contacts.js';
+
+const personUniqueMessages = {
+  persons_tenant_tax_id_unique: 'Já existe uma pessoa com este documento.',
+  tax_id: 'Já existe uma pessoa com este documento.',
+  persons_tenant_name_unique: 'Já existe uma pessoa com este nome.',
+  '(name)': 'Já existe uma pessoa com este nome.',
+};
 
 function personDocumentError(data: Person) {
   const taxId = data.taxId?.trim();
@@ -151,11 +159,12 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
 
         return reply.status(201).send(serializePerson(newPerson));
       } catch (error) {
-        if (isUniqueViolation(error)) {
-          return reply
-            .status(409)
-            .send({ message: 'Já existe uma pessoa com este documento.' });
-        }
+        const message = uniqueConflictMessage(
+          error,
+          personUniqueMessages,
+          'Já existe uma pessoa com estes dados.',
+        );
+        if (message) return reply.status(409).send({ message });
         throw error;
       }
     },
@@ -290,17 +299,27 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ message: documentError });
       }
 
-      const [person] = await db
-        .update(persons)
-        .set(toPersonValues(data))
-        .where(and(eq(persons.id, id), eq(persons.tenantId, tenantId)))
-        .returning();
+      try {
+        const [person] = await db
+          .update(persons)
+          .set(toPersonValues(data))
+          .where(and(eq(persons.id, id), eq(persons.tenantId, tenantId)))
+          .returning();
 
-      if (!person) {
-        return reply.status(404).send({ message: 'Pessoa não encontrada' });
+        if (!person) {
+          return reply.status(404).send({ message: 'Pessoa não encontrada' });
+        }
+
+        return serializePerson(person);
+      } catch (error) {
+        const message = uniqueConflictMessage(
+          error,
+          personUniqueMessages,
+          'Já existe uma pessoa com estes dados.',
+        );
+        if (message) return reply.status(409).send({ message });
+        throw error;
       }
-
-      return serializePerson(person);
     },
   );
 
@@ -359,14 +378,3 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 };
-
-function isUniqueViolation(error: unknown) {
-  const candidates = [error, (error as { cause?: unknown } | null)?.cause];
-  return candidates.some(
-    (candidate) =>
-      typeof candidate === 'object' &&
-      candidate !== null &&
-      'code' in candidate &&
-      candidate.code === '23505',
-  );
-}

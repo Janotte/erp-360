@@ -1,0 +1,2 @@
+ALTER TABLE "persons" ADD CONSTRAINT "persons_tenant_name_unique" UNIQUE("tenant_id","name");--> statement-breakpoint
+ALTER TABLE "plan_accounts" ADD CONSTRAINT "plan_accounts_tenant_name_unique" UNIQUE("tenant_id","name");

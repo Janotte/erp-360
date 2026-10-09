@@ -3,7 +3,16 @@ import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/index.ts';
+import { uniqueConflictMessage } from '../lib/postgres-errors.ts';
 import '../types/fastify.ts';
+
+const planAccountUniqueMessages = {
+  plan_accounts_tenant_account_code_unique:
+    'Já existe um plano de contas com este código.',
+  account_code: 'Já existe um plano de contas com este código.',
+  plan_accounts_tenant_name_unique: 'Já existe um plano de contas com este nome.',
+  '(name)': 'Já existe um plano de contas com este nome.',
+};
 
 const planAccountTypes = ['revenue', 'expense', 'bank', 'withdrawal'] as const;
 
@@ -64,12 +73,12 @@ export const planAccountsRoutes: FastifyPluginAsync = async (fastify) => {
 
         return reply.status(201).send(created);
       } catch (error) {
-        const code = (error as { code?: string }).code;
-        if (code === '23505') {
-          return reply.status(400).send({
-            message: 'Já existe um plano de contas com este código.',
-          });
-        }
+        const message = uniqueConflictMessage(
+          error,
+          planAccountUniqueMessages,
+          'Já existe um plano de contas com estes dados.',
+        );
+        if (message) return reply.status(409).send({ message });
         throw error;
       }
     },
@@ -189,12 +198,12 @@ export const planAccountsRoutes: FastifyPluginAsync = async (fastify) => {
 
         return updated;
       } catch (error) {
-        const code = (error as { code?: string }).code;
-        if (code === '23505') {
-          return reply.status(400).send({
-            message: 'Já existe um plano de contas com este código.',
-          });
-        }
+        const message = uniqueConflictMessage(
+          error,
+          planAccountUniqueMessages,
+          'Já existe um plano de contas com estes dados.',
+        );
+        if (message) return reply.status(409).send({ message });
         throw error;
       }
     },

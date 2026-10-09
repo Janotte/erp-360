@@ -11,7 +11,13 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
 import { db } from '../db/index.js';
+import { uniqueConflictMessage } from '../lib/postgres-errors.ts';
 import '../types/fastify.js';
+
+const addressUniqueMessages = {
+  person_addresses_role_per_person:
+    'Esta pessoa já possui um endereço deste tipo.',
+};
 
 const personParams = z.object({
   id: z.string().uuid({ message: 'ID precisa ser um UUID válido' }),
@@ -123,6 +129,12 @@ export const personAddressRoutes: FastifyPluginAsync = async (fastify) => {
         const [address] = await selectAddress(id, tenantId, created.id);
         return reply.status(201).send(address);
       } catch (error) {
+        const message = uniqueConflictMessage(
+          error,
+          addressUniqueMessages,
+          'Esta pessoa já possui um endereço deste tipo.',
+        );
+        if (message) return reply.status(409).send({ message });
         if (isForeignKeyError(error)) {
           return reply.status(400).send({ message: 'Cidade informada não existe.' });
         }
@@ -159,6 +171,12 @@ export const personAddressRoutes: FastifyPluginAsync = async (fastify) => {
         const [address] = await selectAddress(id, tenantId, updated.id);
         return address;
       } catch (error) {
+        const message = uniqueConflictMessage(
+          error,
+          addressUniqueMessages,
+          'Esta pessoa já possui um endereço deste tipo.',
+        );
+        if (message) return reply.status(409).send({ message });
         if (isForeignKeyError(error)) {
           return reply.status(400).send({ message: 'Cidade informada não existe.' });
         }
