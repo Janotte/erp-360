@@ -219,6 +219,7 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
       setName(data.name);
       setBirthDate(data.birthDate ?? '');
       setNfeEmail(data.nfeEmail ?? '');
+      if (data.stateRegistration) setStateRegistration(data.stateRegistration);
       setPendingAddress(data.address);
       if (data.existingPersonId && data.existingPersonId !== personId) {
         toast.error('Este CNPJ já está cadastrado neste ambiente.');

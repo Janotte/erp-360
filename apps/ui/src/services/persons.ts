@@ -81,6 +81,7 @@ export interface CnpjLookupResult {
   name: string;
   birthDate: string | null;
   nfeEmail: string | null;
+  stateRegistration: string | null;
   address: CnpjLookupAddress | null;
   existingPersonId: string | null;
 }
