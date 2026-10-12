@@ -30,6 +30,13 @@ export const UserSchema = z.object({
 
 export type User = z.infer<typeof UserSchema>;
 
+export const RegisterResponseSchema = z.object({
+  userId: z.string().uuid({ message: 'ID precisa ser um UUID válido' }),
+  tenantId: z.string().uuid({ message: 'ID precisa ser um UUID válido' }),
+});
+
+export type RegisterResponse = z.infer<typeof RegisterResponseSchema>;
+
 export const taxpayerTypes = [1, 2, 9] as const;
 export type TaxpayerType = (typeof taxpayerTypes)[number];
 

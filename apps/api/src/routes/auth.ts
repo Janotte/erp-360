@@ -1,5 +1,11 @@
 import { tenants, users } from '@erp-360/mod-core';
-import { isValidCnpj, normalizeEmail, onlyDigits, toTitleCasePtBr } from '@erp-360/shared';
+import {
+  isValidCnpj,
+  normalizeEmail,
+  onlyDigits,
+  RegisterResponseSchema,
+  toTitleCasePtBr,
+} from '@erp-360/shared';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
@@ -82,6 +88,9 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     {
       schema: {
         body: registerBody,
+        response: {
+          201: RegisterResponseSchema,
+        },
       },
     },
     async (request, reply) => {
@@ -114,14 +123,10 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
             })
             .returning();
 
-          return { usuarioId: novoUsuario.id, tenantId: novoTenant.id };
+          return { userId: novoUsuario.id, tenantId: novoTenant.id };
         });
 
-        return reply.status(201).send({
-          sucesso: true,
-          usuarioId: created.usuarioId,
-          tenantId: created.tenantId,
-        });
+        return reply.status(201).send(created);
       } catch (error) {
         const message = uniqueConflictMessage(
           error,

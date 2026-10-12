@@ -1,4 +1,8 @@
-import { API_URL } from '@erp-360/shared';
+import {
+  API_URL,
+  RegisterResponseSchema,
+  type RegisterResponse,
+} from '@erp-360/shared';
 
 export interface LoginResponse {
   token: string;
@@ -36,9 +40,7 @@ export const sendLoginAPI = async (data: {
   return response.json();
 };
 
-export const sendRegisterAPI = async (
-  data: RegisterInput,
-): Promise<{ success: boolean }> => {
+export const sendRegisterAPI = async (data: RegisterInput): Promise<RegisterResponse> => {
   const response = await fetch(`${API_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -50,5 +52,10 @@ export const sendRegisterAPI = async (
     throw new Error(erro.message || 'Falha ao registrar empresa.');
   }
 
-  return response.json();
+  const parsed = RegisterResponseSchema.safeParse(await response.json());
+  if (!parsed.success) {
+    throw new Error('Resposta de cadastro inválida.');
+  }
+
+  return parsed.data;
 };
