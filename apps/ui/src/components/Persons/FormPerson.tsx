@@ -4,12 +4,12 @@ import {
   isValidCpf,
   parsePersonKind,
   parseTaxpayerType,
+  type PersonKind,
   personKindLabels,
   personKinds,
   taxpayerTypeLabels,
   taxpayerTypes,
   toTitleCasePtBr,
-  type PersonKind,
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useRef, useState } from 'react';

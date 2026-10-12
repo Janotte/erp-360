@@ -1,5 +1,6 @@
 import { tenantColumns } from '@erp-360/mod-core';
 import { date, foreignKey, integer, pgTable, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
+
 import { bankAccounts } from './bank_accounts.ts';
 import { treasuryKindEnum } from './settlements.ts';
 

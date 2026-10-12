@@ -1,5 +1,6 @@
-import fp from 'fastify-plugin';
 import type { FastifyInstance } from 'fastify';
+import fp from 'fastify-plugin';
+
 import { env } from './env.js';
 
 async function configPlugin(app: FastifyInstance): Promise<void> {

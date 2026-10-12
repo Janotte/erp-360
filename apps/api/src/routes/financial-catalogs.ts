@@ -1,9 +1,11 @@
+import '../types/fastify.ts';
+
 import { cardBrands, paymentMethods, planAccounts } from '@erp-360/mod-financial';
 import { and, asc, eq } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+
 import { db } from '../db/index.ts';
-import '../types/fastify.ts';
 
 export const financialCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);

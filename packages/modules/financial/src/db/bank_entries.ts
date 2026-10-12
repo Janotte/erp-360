@@ -9,6 +9,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+
 import { bankAccounts } from './bank_accounts.ts';
 import { payables } from './payables.ts';
 import { planAccounts } from './plan_accounts.ts';

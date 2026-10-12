@@ -1,6 +1,7 @@
 import { tenantColumns } from '@erp-360/mod-core';
 import { persons } from '@erp-360/mod-persons';
 import { date, foreignKey, integer, pgEnum, pgTable, unique, uuid, varchar } from 'drizzle-orm/pg-core';
+
 import { planAccounts } from './plan_accounts.ts';
 
 export const bankAccountKindEnum = pgEnum('bank_account_kind', ['operating', 'investment']);

@@ -11,6 +11,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+
 import { planAccounts } from './plan_accounts.ts';
 
 export const statusPayableEnum = pgEnum('status_payable', [

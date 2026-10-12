@@ -1,10 +1,12 @@
+import '../types/fastify.js';
+
 import { cities, personAddresses, persons, states } from '@erp-360/mod-persons';
 import {
   emptyToNull,
   normalizePostalCode,
+  type PersonAddressInput,
   PersonAddressSchema,
   toTitleCasePtBr,
-  type PersonAddressInput,
 } from '@erp-360/shared';
 import { and, asc, eq } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -12,7 +14,6 @@ import { z } from 'zod';
 
 import { db } from '../db/index.js';
 import { uniqueConflictMessage } from '../lib/postgres-errors.ts';
-import '../types/fastify.js';
 
 const addressUniqueMessages = {
   person_addresses_role_per_person: 'Esta pessoa já possui um endereço deste tipo.',

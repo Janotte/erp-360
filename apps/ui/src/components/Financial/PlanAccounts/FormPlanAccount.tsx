@@ -10,10 +10,10 @@ import { Label } from '@/components/ui/label';
 import {
   type PlanAccount,
   type PlanAccountInput,
+  planAccountsService,
   type PlanAccountType,
   planAccountTypeLabels,
   planAccountTypes,
-  planAccountsService,
 } from '@/services/planAccounts';
 
 function parsePlanAccountType(value: unknown): PlanAccountType | '' {

@@ -3,6 +3,7 @@ import {
   planAccounts,
 } from '@erp-360/mod-financial';
 import { and, eq, ilike, or } from 'drizzle-orm';
+
 import { db } from '../db/index.ts';
 
 export type FinancialSettingsRow = typeof financialSettings.$inferSelect;

@@ -8,6 +8,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+
 import { persons } from './persons.ts';
 
 // Enum de controle do tipo de contato da pessoa

@@ -1,15 +1,17 @@
+import '../types/fastify.ts';
+
 import { receivables } from '@erp-360/mod-financial';
 import { and, asc, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+
 import { db } from '../db/index.ts';
 import {
-  SettlementError,
   previewSettlement,
   reverseSettlement,
+  SettlementError,
   settleTitle,
 } from '../services/settlement.ts';
-import '../types/fastify.ts';
 
 const dateString = z
   .string()

@@ -1,11 +1,13 @@
+import '../types/fastify.js';
+
 import { personContacts, persons } from '@erp-360/mod-persons';
 import {
   emptyToNull,
   normalizeEmail,
   normalizePhone,
+  type PersonContactInput,
   PersonContactSchema,
   toTitleCasePtBr,
-  type PersonContactInput,
 } from '@erp-360/shared';
 import { and, asc, eq } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -13,7 +15,6 @@ import { z } from 'zod';
 
 import { db } from '../db/index.js';
 import { uniqueConflictMessage } from '../lib/postgres-errors.ts';
-import '../types/fastify.js';
 
 const contactUniqueMessages = {
   person_contacts_one_principal: 'Esta pessoa já possui um contato Principal.',

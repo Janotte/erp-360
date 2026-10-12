@@ -1,3 +1,5 @@
+import '../types/fastify.js';
+
 import { tenants, users } from '@erp-360/mod-core';
 import {
   isValidCnpj,
@@ -13,7 +15,6 @@ import { z } from 'zod';
 
 import { db } from '../db/index.js';
 import { uniqueConflictMessage } from '../lib/postgres-errors.js';
-import '../types/fastify.js';
 
 const loginBody = z.object({
   email: z.string().email(),

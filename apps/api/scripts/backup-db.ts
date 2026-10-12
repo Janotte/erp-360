@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
+
 import { env } from '../src/config/index.ts';
 
 function pad(value: number): string {

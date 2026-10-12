@@ -1,3 +1,4 @@
+import { formatCnpj, toTitleCasePtBr } from '@erp-360/shared';
 import { useMutation } from '@tanstack/react-query';
 import React, { useState } from 'react';
 
@@ -12,8 +13,6 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
-import { formatCnpj, toTitleCasePtBr } from '@erp-360/shared';
 
 import { sendRegisterAPI } from '../../services/auth';
 

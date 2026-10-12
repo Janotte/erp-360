@@ -8,6 +8,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+
 import { cities } from './cities.ts';
 import { persons } from './persons.ts';
 

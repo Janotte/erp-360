@@ -1,3 +1,5 @@
+import '../types/fastify.js';
+
 import { cities, states } from '@erp-360/mod-persons';
 import { escapeIlike } from '@erp-360/shared';
 import { and, asc, eq, sql } from 'drizzle-orm';
@@ -5,7 +7,6 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../db/index.js';
-import '../types/fastify.js';
 
 const citiesQuery = z.object({
   stateId: z.string().uuid(),

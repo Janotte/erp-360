@@ -11,6 +11,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+
 import { cardBrands } from './card_brands.ts';
 import { paymentMethods } from './payment_methods.ts';
 import { planAccounts } from './plan_accounts.ts';

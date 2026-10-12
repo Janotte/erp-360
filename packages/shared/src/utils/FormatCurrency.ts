@@ -10,7 +10,7 @@ const brlInputFormatter = new Intl.NumberFormat('pt-BR', {
  */
 export function formatCurrency(valueInCents: number | null | undefined): string {
   if (valueInCents === null || valueInCents === undefined) {
-    return 'R\$ 0,00';
+    return 'R$ 0,00';
   }
 
   const valueInReais = valueInCents / 100;

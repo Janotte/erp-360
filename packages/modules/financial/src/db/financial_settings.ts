@@ -1,5 +1,6 @@
 import { tenants } from '@erp-360/mod-core';
 import { date, integer, pgTable, uuid } from 'drizzle-orm/pg-core';
+
 import { planAccounts } from './plan_accounts.ts';
 
 export const financialSettings = pgTable('financial_settings', {

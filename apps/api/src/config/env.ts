@@ -1,7 +1,9 @@
-import { config as loadDotenv } from 'dotenv';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { config as loadDotenv } from 'dotenv';
 import { ZodError } from 'zod';
+
 import { AppEnv, appEnvSchema } from './schemas/app-env.schema.ts';
 
 loadDotenv({

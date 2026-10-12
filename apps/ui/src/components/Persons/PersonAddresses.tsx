@@ -1,3 +1,4 @@
+import { formatPostalCode, toTitleCasePtBr } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -23,8 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { formatPostalCode, toTitleCasePtBr } from '@erp-360/shared';
-
 import { locationsService } from '@/services/locations';
 import { type AddressType, type PersonAddress, personsService } from '@/services/persons';
 

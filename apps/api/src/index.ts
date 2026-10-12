@@ -1,3 +1,5 @@
+import './types/fastify.js';
+
 import cors from '@fastify/cors';
 import fastifyJwt from '@fastify/jwt';
 import Fastify from 'fastify';
@@ -16,7 +18,6 @@ import { personsRoutes } from './routes/persons.ts';
 import { planAccountsRoutes } from './routes/plan-accounts.ts';
 import { receivablesRoutes } from './routes/receivables.ts';
 import { treasuryRoutes } from './routes/treasury.ts';
-import './types/fastify.js';
 
 const fastify = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
 

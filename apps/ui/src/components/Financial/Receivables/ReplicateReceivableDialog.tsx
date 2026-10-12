@@ -24,10 +24,10 @@ import {
   financialService,
 } from '@/services/financials';
 import {
-  type DueMode,
-  type IssueMode,
   advanceDocumentNumber,
   buildReplicateStep,
+  type DueMode,
+  type IssueMode,
   parseIsoDate,
 } from '@/utils/replicatePayable';
 

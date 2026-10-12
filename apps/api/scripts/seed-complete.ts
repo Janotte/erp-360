@@ -5,11 +5,12 @@
  * Uso: pnpm --filter @erp-360/api db:seed
  */
 
-import { config } from 'dotenv';
-import { eq } from 'drizzle-orm';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { config } from 'dotenv';
+import { eq } from 'drizzle-orm';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 config({ path: join(scriptDir, '..', '.env') });
@@ -56,11 +57,6 @@ function readJson<T>(fileName: string): T {
   }
 
   return JSON.parse(fileContent) as T;
-}
-
-function toCoordinate(value: number | null): string | null {
-  if (value == null) return null;
-  return value.toFixed(8);
 }
 
 async function seedComplete() {

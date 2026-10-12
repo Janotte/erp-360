@@ -236,6 +236,9 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
     devDependencies:
+      '@erp-360/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/eslint-config
       '@types/node':
         specifier: ^22.20.3
         version: 22.20.3
@@ -248,9 +251,15 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
+      eslint:
+        specifier: ^10.10.0
+        version: 10.10.0(jiti@2.7.0)(supports-color@5.5.0)
       tsx:
         specifier: ^4.20.5
         version: 4.23.13
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
 
   apps/ui:
     dependencies:
@@ -324,6 +333,9 @@ importers:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@4.3.3)
     devDependencies:
+      '@erp-360/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/eslint-config
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.10.0(jiti@2.7.0)(supports-color@5.5.0))
@@ -393,6 +405,16 @@ importers:
       zod:
         specifier: ^4.6.5
         version: 4.6.5
+    devDependencies:
+      '@erp-360/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      eslint:
+        specifier: ^10.10.0
+        version: 10.10.0(jiti@2.7.0)(supports-color@5.5.0)
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
 
   packages/modules/financial:
     dependencies:
@@ -405,6 +427,16 @@ importers:
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)(postgres@3.4.9)
+    devDependencies:
+      '@erp-360/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      eslint:
+        specifier: ^10.10.0
+        version: 10.10.0(jiti@2.7.0)(supports-color@5.5.0)
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
 
   packages/modules/persons:
     dependencies:
@@ -414,12 +446,32 @@ importers:
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)(postgres@3.4.9)
+    devDependencies:
+      '@erp-360/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      eslint:
+        specifier: ^10.10.0
+        version: 10.10.0(jiti@2.7.0)(supports-color@5.5.0)
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
 
   packages/shared:
     dependencies:
       zod:
         specifier: ^4.6.5
         version: 4.6.5
+    devDependencies:
+      '@erp-360/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      eslint:
+        specifier: ^10.10.0
+        version: 10.10.0(jiti@2.7.0)(supports-color@5.5.0)
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
 
 packages:
 

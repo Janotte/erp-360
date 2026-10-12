@@ -1,10 +1,12 @@
+import '../types/fastify.ts';
+
 import { payables, planAccounts, receivables } from '@erp-360/mod-financial';
 import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+
 import { db } from '../db/index.ts';
 import { uniqueConflictMessage } from '../lib/postgres-errors.ts';
-import '../types/fastify.ts';
 
 const planAccountUniqueMessages = {
   plan_accounts_tenant_account_code_unique:

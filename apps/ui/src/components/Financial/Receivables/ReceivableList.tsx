@@ -12,13 +12,13 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
+  Eye,
   MoreHorizontal,
   Pencil,
   Plus,
   RotateCcw,
   Search,
   Trash2,
-  Eye,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';

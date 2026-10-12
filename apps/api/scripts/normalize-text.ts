@@ -3,12 +3,12 @@
  * Uso: pnpm --filter @erp-360/api exec tsx scripts/normalize-text.ts
  */
 
-import { config } from 'dotenv';
-import { eq } from 'drizzle-orm';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { toTitleCasePtBr } from '@erp-360/shared';
+import { config } from 'dotenv';
+import { eq } from 'drizzle-orm';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 config({ path: join(scriptDir, '..', '.env') });

@@ -1,4 +1,5 @@
 import { pgTable, unique, uuid, varchar } from 'drizzle-orm/pg-core';
+
 import { countries } from './countries.ts';
 
 export const states = pgTable(

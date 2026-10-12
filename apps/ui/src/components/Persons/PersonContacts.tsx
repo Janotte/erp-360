@@ -1,3 +1,4 @@
+import { formatPhone, toTitleCasePtBr } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -23,8 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { formatPhone, toTitleCasePtBr } from '@erp-360/shared';
-
 import { type ContactType, type PersonContact, personsService } from '@/services/persons';
 
 const contactTypes: ContactType[] = ['Principal', 'Outro'];

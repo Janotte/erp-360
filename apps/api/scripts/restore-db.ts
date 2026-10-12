@@ -3,6 +3,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+
 import { env } from '../src/config/index.ts';
 
 const USAGE = 'Uso: pnpm --filter @erp-360/api db:restore -- --confirm [arquivo.dump]';
