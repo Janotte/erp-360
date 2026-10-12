@@ -1,4 +1,4 @@
-import { users } from '@erp-360/mod-core';
+import { tenants, users } from '@erp-360/mod-core';
 import { isValidCnpj, normalizeEmail, onlyDigits, toTitleCasePtBr } from '@erp-360/shared';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
@@ -6,9 +6,8 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
 import { db } from '../db/index.js';
+import { uniqueConflictMessage } from '../lib/postgres-errors.js';
 import '../types/fastify.js';
-
-import { tenants } from '@erp-360/mod-core';
 
 const loginBody = z.object({
   email: z.string().email(),
@@ -22,6 +21,11 @@ const registerBody = z.object({
   email: z.string().email(),
   password: z.string().min(6),
 });
+
+const registerUniqueMessages = {
+  tenants_cnpj_unique: 'CNPJ já cadastrado.',
+  users_email_unique: 'E-mail já cadastrado.',
+};
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
@@ -91,40 +95,41 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ message: 'CNPJ inválido.' });
       }
 
+      const passwordHash = await bcrypt.hash(password, 10);
+
       try {
-        const [usuarioExistente] = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, normalizedEmail))
-          .limit(1);
+        const created = await db.transaction(async (tx) => {
+          const [novoTenant] = await tx
+            .insert(tenants)
+            .values({ name: toTitleCasePtBr(companyName), cnpj: normalizedCnpj })
+            .returning();
 
-        if (usuarioExistente) {
-          return reply.status(409).send({ message: 'E-mail já cadastrado.' });
-        }
+          const [novoUsuario] = await tx
+            .insert(users)
+            .values({
+              tenantId: novoTenant.id,
+              name: toTitleCasePtBr(name),
+              email: normalizedEmail,
+              passwordHash,
+            })
+            .returning();
 
-        const [novoTenant] = await db
-          .insert(tenants)
-          .values({ name: toTitleCasePtBr(companyName), cnpj: normalizedCnpj })
-          .returning();
+          return { usuarioId: novoUsuario.id, tenantId: novoTenant.id };
+        });
 
-        const hash = await bcrypt.hash(password, 10);
-
-        const [novoUsuario] = await db
-          .insert(users)
-          .values({
-            tenantId: novoTenant.id,
-            name: toTitleCasePtBr(name),
-            email: normalizedEmail,
-            passwordHash: hash,
-          })
-          .returning();
-
-        return reply.send({
+        return reply.status(201).send({
           sucesso: true,
-          usuarioId: novoUsuario.id,
-          tenantId: novoTenant.id,
+          usuarioId: created.usuarioId,
+          tenantId: created.tenantId,
         });
       } catch (error) {
+        const message = uniqueConflictMessage(
+          error,
+          registerUniqueMessages,
+          'Já existe um cadastro com estes dados.',
+        );
+        if (message) return reply.status(409).send({ message });
+
         fastify.log.error(error);
         return reply.status(500).send({ message: 'Erro interno no servidor.' });
       }

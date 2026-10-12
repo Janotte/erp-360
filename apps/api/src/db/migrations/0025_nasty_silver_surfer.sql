@@ -1,0 +1,1 @@
+ALTER TABLE "tenants" ADD CONSTRAINT "tenants_cnpj_unique" UNIQUE("cnpj");

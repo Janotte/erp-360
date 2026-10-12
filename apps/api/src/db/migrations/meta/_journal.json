@@ -176,6 +176,13 @@
       "when": 1791506933788,
       "tag": "0024_omniscient_hobgoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791847694842,
+      "tag": "0025_nasty_silver_surfer",
+      "breakpoints": true
     }
   ]
 }
