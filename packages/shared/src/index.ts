@@ -137,11 +137,6 @@ export const PersonContactSchema = z.object({
 
 export type PersonContactInput = z.infer<typeof PersonContactSchema>;
 
-const nodeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } })
-  .process?.env;
-
-export const API_URL = nodeEnv?.APP_BASE_URL ?? 'http://localhost:3000';
-
 export {
   compactSpaces,
   emptyToNull,

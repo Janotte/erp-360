@@ -1,6 +1,5 @@
-import { API_URL } from '@erp-360/shared';
-
 import { authStorage } from '../utils/auth';
+import { API_URL } from './apiClient';
 
 export interface FinancialAccount {
   id: string;
@@ -57,8 +56,7 @@ function normalizeAccount(
     issueOn: String(item.issueOn ?? ''),
     installmentAmount: Number(item.installmentAmount ?? 0),
     dueOn: String(item.dueOn ?? ''),
-    settledOn:
-      optionalString(item.paidOn) || optionalString(item.receivedOn),
+    settledOn: optionalString(item.paidOn) || optionalString(item.receivedOn),
     settledAmount:
       (item.paidAmount as number | undefined) ??
       (item.receivedAmount as number | undefined),
@@ -105,17 +103,14 @@ function toCreatePayload(
     planAccountId: dados.planAccountId,
     bearerName: 'bearerName' in dados ? dados.bearerName : undefined,
     barcode: 'barcode' in dados ? dados.barcode : undefined,
-    bankSlipOurNumber:
-      'bankSlipOurNumber' in dados ? dados.bankSlipOurNumber : undefined,
+    bankSlipOurNumber: 'bankSlipOurNumber' in dados ? dados.bankSlipOurNumber : undefined,
     invoiceNumber: 'invoiceNumber' in dados ? dados.invoiceNumber : undefined,
     financialInstitutionId:
       'financialInstitutionId' in dados ? dados.financialInstitutionId : undefined,
     paymentMethodId: 'paymentMethodId' in dados ? dados.paymentMethodId : undefined,
     cardBrandId: 'cardBrandId' in dados ? dados.cardBrandId : undefined,
     transactionAuthorization:
-      'transactionAuthorization' in dados
-        ? dados.transactionAuthorization
-        : undefined,
+      'transactionAuthorization' in dados ? dados.transactionAuthorization : undefined,
   };
 }
 
@@ -176,7 +171,9 @@ export interface FinancialPaginationResponse {
 }
 
 export const financialService = {
-  listPlanAccounts: async (type?: 'revenue' | 'expense' | 'bank' | 'withdrawal'): Promise<CatalogOption[]> => {
+  listPlanAccounts: async (
+    type?: 'revenue' | 'expense' | 'bank' | 'withdrawal',
+  ): Promise<CatalogOption[]> => {
     const params = type ? `?type=${type}` : '';
     const res = await fetch(`${API_URL}/financial/plan-accounts${params}`, {
       headers: authHeaders(),

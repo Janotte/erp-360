@@ -1,8 +1,6 @@
-import {
-  API_URL,
-  RegisterResponseSchema,
-  type RegisterResponse,
-} from '@erp-360/shared';
+import { type RegisterResponse, RegisterResponseSchema } from '@erp-360/shared';
+
+import { API_URL } from './apiClient';
 
 export interface LoginResponse {
   token: string;

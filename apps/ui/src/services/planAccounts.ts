@@ -1,6 +1,5 @@
-import { API_URL } from '@erp-360/shared';
-
 import { authStorage } from '../utils/auth';
+import { API_URL } from './apiClient';
 
 export const planAccountTypes = ['revenue', 'expense', 'bank', 'withdrawal'] as const;
 export type PlanAccountType = (typeof planAccountTypes)[number];

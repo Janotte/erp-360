@@ -1,6 +1,5 @@
-import { API_URL } from '@erp-360/shared';
-
 import { authStorage } from '../utils/auth';
+import { API_URL } from './apiClient';
 
 export interface StateOption {
   id: string;

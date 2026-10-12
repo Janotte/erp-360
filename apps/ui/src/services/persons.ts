@@ -1,6 +1,7 @@
-import { API_URL, onlyDigits, parsePersonKind, parseTaxpayerType } from '@erp-360/shared';
+import { onlyDigits, parsePersonKind, parseTaxpayerType } from '@erp-360/shared';
 
 import { authStorage } from '../utils/auth';
+import { API_URL } from './apiClient';
 
 export type PersonKind = 'individual' | 'company' | 'foreigner';
 export type TaxpayerType = 1 | 2 | 9;

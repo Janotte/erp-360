@@ -7,7 +7,6 @@ import {
   ZodTypeProvider,
 } from 'fastify-type-provider-zod';
 
-import { API_URL } from '@erp-360/shared';
 import { env } from './config/index.ts';
 import { authRoutes } from './routes/auth.js';
 import { financialCatalogRoutes } from './routes/financial-catalogs.ts';
@@ -54,7 +53,8 @@ fastify.register(planAccountsRoutes, { prefix: '/plan-accounts' });
 const start = async () => {
   try {
     await fastify.listen({ port: env.app.port, host: env.app.host });
-    console.log(`🚀 Servidor Fastify pronto em ${API_URL}`);
+    const publicUrl = env.app.baseUrl ?? `http://localhost:${env.app.port}`;
+    console.log(`🚀 Servidor Fastify pronto em ${publicUrl}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

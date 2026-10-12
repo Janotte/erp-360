@@ -1,6 +1,5 @@
-import { API_URL } from '@erp-360/shared';
-
 import { authStorage } from '../utils/auth';
+import { API_URL } from './apiClient';
 
 const authHeaders = () => ({
   Authorization: `Bearer ${authStorage.getToken()}`,
@@ -69,7 +68,9 @@ export const treasuryService = {
     if (!res.ok) throw new Error(body.message || 'Falha ao carregar configurações.');
     return body as FinancialSettings;
   },
-  saveSettings: async (dados: Omit<FinancialSettings, 'tenantId'>): Promise<FinancialSettings> => {
+  saveSettings: async (
+    dados: Omit<FinancialSettings, 'tenantId'>,
+  ): Promise<FinancialSettings> => {
     const res = await fetch(`${API_URL}/financial/settings`, {
       method: 'PUT',
       headers: jsonHeaders(),
@@ -80,7 +81,9 @@ export const treasuryService = {
     return body as FinancialSettings;
   },
   cashEntries: async (): Promise<TreasuryEntry[]> => {
-    const res = await fetch(`${API_URL}/financial/cash-entries`, { headers: authHeaders() });
+    const res = await fetch(`${API_URL}/financial/cash-entries`, {
+      headers: authHeaders(),
+    });
     const body = await parseJson(res);
     if (!res.ok) throw new Error(body.message || 'Falha ao carregar o livro caixa.');
     return Array.isArray(body) ? body : [];
@@ -94,7 +97,9 @@ export const treasuryService = {
     return body as { openingBalance: number; days: CashFlowDay[] };
   },
   bankAccounts: async (): Promise<BankAccount[]> => {
-    const res = await fetch(`${API_URL}/financial/bank-accounts`, { headers: authHeaders() });
+    const res = await fetch(`${API_URL}/financial/bank-accounts`, {
+      headers: authHeaders(),
+    });
     const body = await parseJson(res);
     if (!res.ok) throw new Error(body.message || 'Falha ao listar contas bancárias.');
     return Array.isArray(body) ? body : [];
@@ -148,7 +153,8 @@ export const treasuryService = {
       body: JSON.stringify(dados),
     });
     const body = await parseJson(res);
-    if (!res.ok) throw new Error(body.message || 'Falha ao salvar o saldo inicial do caixa.');
+    if (!res.ok)
+      throw new Error(body.message || 'Falha ao salvar o saldo inicial do caixa.');
     return body as FinancialSettings;
   },
   bankEntries: async (
