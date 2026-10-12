@@ -1,9 +1,14 @@
 import { receivables } from '@erp-360/mod-financial';
 import { and, asc, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../db/index.ts';
-import { SettlementError, previewSettlement, reverseSettlement, settleTitle } from '../services/settlement.ts';
+import {
+  SettlementError,
+  previewSettlement,
+  reverseSettlement,
+  settleTitle,
+} from '../services/settlement.ts';
 import '../types/fastify.ts';
 
 const dateString = z
@@ -12,7 +17,13 @@ const dateString = z
 
 /** Query string "false" não pode passar por z.coerce.boolean — Boolean("false") === true. */
 const queryBoolean = z
-  .union([z.boolean(), z.literal('true'), z.literal('false'), z.literal('1'), z.literal('0')])
+  .union([
+    z.boolean(),
+    z.literal('true'),
+    z.literal('false'),
+    z.literal('1'),
+    z.literal('0'),
+  ])
   .optional()
   .transform((value) => value === true || value === 'true' || value === '1');
 
@@ -63,7 +74,7 @@ const listReceivablesQuery = z.object({
   dueTo: dateString.optional(),
 });
 
-export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
+export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
 
   fastify.post(
@@ -71,7 +82,7 @@ export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
     { schema: { body: createReceivableSchema } },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const data = request.body as z.infer<typeof createReceivableSchema>;
+      const data = request.body;
 
       const [newAccount] = await db
         .insert(receivables)
@@ -114,7 +125,7 @@ export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
         busca: search,
         dueFrom,
         dueTo,
-      } = request.query as z.infer<typeof listReceivablesQuery>;
+      } = request.query;
 
       const offset = (page - 1) * limit;
       const conditions = [eq(receivables.tenantId, tenantId)];
@@ -180,11 +191,8 @@ export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
-      const { settledOn, waiveCharges } = request.query as {
-        settledOn: string;
-        waiveCharges?: boolean;
-      };
+      const { id } = request.params;
+      const { settledOn, waiveCharges } = request.query;
       try {
         return await previewSettlement({
           kind: 'receivable',
@@ -212,8 +220,8 @@ export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
-      const data = request.body as z.infer<typeof receiveSchema>;
+      const { id } = request.params;
+      const data = request.body;
 
       try {
         const result = await settleTitle({
@@ -250,8 +258,8 @@ export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
-      const data = request.body as z.infer<typeof createReceivableSchema>;
+      const { id } = request.params;
+      const data = request.body;
 
       const [existing] = await db
         .select({ status: receivables.status })
@@ -303,7 +311,7 @@ export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
+      const { id } = request.params;
 
       const [existing] = await db
         .select({ status: receivables.status })
@@ -337,7 +345,7 @@ export const receivablesRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
+      const { id } = request.params;
 
       try {
         const updated = await reverseSettlement({

@@ -8,7 +8,7 @@ import {
   type PersonContactInput,
 } from '@erp-360/shared';
 import { and, asc, eq } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../db/index.js';
@@ -73,13 +73,13 @@ function selectContact(personId: string, tenantId: string, contactId: string) {
     );
 }
 
-export const personContactRoutes: FastifyPluginAsync = async (fastify) => {
+export const personContactRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.get(
     '/:id/contacts',
     { schema: { params: personParams } },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as z.infer<typeof personParams>;
+      const { id } = request.params;
 
       if (!(await personBelongsToTenant(id, tenantId))) {
         return reply.status(404).send({ message: 'Pessoa não encontrada' });
@@ -102,8 +102,8 @@ export const personContactRoutes: FastifyPluginAsync = async (fastify) => {
     { schema: { params: personParams, body: PersonContactSchema } },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as z.infer<typeof personParams>;
-      const data = request.body as PersonContactInput;
+      const { id } = request.params;
+      const data = request.body;
 
       if (!(await personBelongsToTenant(id, tenantId))) {
         return reply.status(404).send({ message: 'Pessoa não encontrada' });
@@ -138,8 +138,8 @@ export const personContactRoutes: FastifyPluginAsync = async (fastify) => {
     { schema: { params: contactParams, body: PersonContactSchema } },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id, contactId } = request.params as z.infer<typeof contactParams>;
-      const data = request.body as PersonContactInput;
+      const { id, contactId } = request.params;
+      const data = request.body;
 
       try {
         const [updated] = await db
@@ -177,7 +177,7 @@ export const personContactRoutes: FastifyPluginAsync = async (fastify) => {
     { schema: { params: contactParams } },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id, contactId } = request.params as z.infer<typeof contactParams>;
+      const { id, contactId } = request.params;
 
       const [deleted] = await db
         .delete(personContacts)

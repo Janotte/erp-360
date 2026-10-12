@@ -14,7 +14,7 @@ import {
   type Person,
 } from '@erp-360/shared';
 import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { uniqueConflictMessage } from '../lib/postgres-errors.ts';
@@ -48,8 +48,7 @@ function readTaxpayerType(person: object) {
 function serializePerson(person: typeof persons.$inferSelect) {
   return {
     ...person,
-    taxpayerType:
-      person.type === 'individual' ? 9 : readTaxpayerType(person),
+    taxpayerType: person.type === 'individual' ? 9 : readTaxpayerType(person),
   };
 }
 
@@ -79,12 +78,7 @@ function toPersonValues(data: Person) {
   };
 }
 
-const personTypeEnum = z.enum([
-  'cliente',
-  'fornecedor',
-  'colaborador',
-  'instituicao',
-]);
+const personTypeEnum = z.enum(['cliente', 'fornecedor', 'colaborador', 'instituicao']);
 
 function normalizePersonTypes(value: unknown) {
   if (value == null || value === '') return undefined;
@@ -113,7 +107,7 @@ const listPersonsQuery = z.object({
   busca: z.string().optional(),
 });
 
-export const personsRoutes: FastifyPluginAsync = async (fastify) => {
+export const personsRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
   await fastify.register(personAddressRoutes);
   await fastify.register(personContactRoutes);
@@ -122,7 +116,7 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
     '/lookup/cnpj/:cnpj',
     { schema: { params: z.object({ cnpj: z.string().min(14).max(18) }) } },
     async (request, reply) => {
-      const { cnpj } = request.params as { cnpj: string };
+      const { cnpj } = request.params;
       try {
         return await lookupCnpj({ tenantId: request.user.tenantId, cnpj });
       } catch (error) {
@@ -142,7 +136,7 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const data = request.body as Person;
+      const data = request.body;
       const documentError = personDocumentError(data);
       if (documentError) {
         return reply.status(400).send({ message: documentError });
@@ -186,7 +180,7 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
         type,
         kind,
         busca: search,
-      } = request.query as z.infer<typeof listPersonsQuery>;
+      } = request.query;
 
       const offset = (page - 1) * limit;
       const conditions = [eq(persons.tenantId, tenantId)];
@@ -194,9 +188,7 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
       // 1. Filtros por Perfil (OR quando há mais de um tipo)
       if (type?.length) {
         const typeFilters = type.map(personTypeCondition);
-        conditions.push(
-          typeFilters.length === 1 ? typeFilters[0] : or(...typeFilters)!,
-        );
+        conditions.push(typeFilters.length === 1 ? typeFilters[0] : or(...typeFilters)!);
       }
 
       if (kind) conditions.push(eq(persons.type, kind));
@@ -210,7 +202,9 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
           or(
             sql`unaccent(${persons.name}) ilike unaccent(${like})`,
             sql`unaccent(coalesce(${persons.nfeEmail}, '')) ilike unaccent(${like})`,
-            digits ? sql`coalesce(${persons.taxId}, '') like ${`%${digits}%`}` : sql`false`,
+            digits
+              ? sql`coalesce(${persons.taxId}, '') like ${`%${digits}%`}`
+              : sql`false`,
           )!,
         );
       }
@@ -265,7 +259,7 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
+      const { id } = request.params;
 
       const [person] = await db
         .select()
@@ -292,8 +286,8 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
-      const data = request.body as Person;
+      const { id } = request.params;
+      const data = request.body;
       const documentError = personDocumentError(data);
       if (documentError) {
         return reply.status(400).send({ message: documentError });
@@ -334,7 +328,7 @@ export const personsRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
+      const { id } = request.params;
 
       try {
         const [hasPayable] = await db

@@ -7,7 +7,7 @@ import {
   type PersonAddressInput,
 } from '@erp-360/shared';
 import { and, asc, eq } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../db/index.js';
@@ -15,8 +15,7 @@ import { uniqueConflictMessage } from '../lib/postgres-errors.ts';
 import '../types/fastify.js';
 
 const addressUniqueMessages = {
-  person_addresses_role_per_person:
-    'Esta pessoa já possui um endereço deste tipo.',
+  person_addresses_role_per_person: 'Esta pessoa já possui um endereço deste tipo.',
 };
 
 const personParams = z.object({
@@ -78,13 +77,13 @@ function selectAddress(personId: string, tenantId: string, addressId: string) {
     );
 }
 
-export const personAddressRoutes: FastifyPluginAsync = async (fastify) => {
+export const personAddressRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.get(
     '/:id/addresses',
     { schema: { params: personParams } },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as z.infer<typeof personParams>;
+      const { id } = request.params;
 
       if (!(await personBelongsToTenant(id, tenantId))) {
         return reply.status(404).send({ message: 'Pessoa não encontrada' });
@@ -109,8 +108,8 @@ export const personAddressRoutes: FastifyPluginAsync = async (fastify) => {
     { schema: { params: personParams, body: PersonAddressSchema } },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as z.infer<typeof personParams>;
-      const data = request.body as PersonAddressInput;
+      const { id } = request.params;
+      const data = request.body;
 
       if (!(await personBelongsToTenant(id, tenantId))) {
         return reply.status(404).send({ message: 'Pessoa não encontrada' });
@@ -148,8 +147,8 @@ export const personAddressRoutes: FastifyPluginAsync = async (fastify) => {
     { schema: { params: addressParams, body: PersonAddressSchema } },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id, addressId } = request.params as z.infer<typeof addressParams>;
-      const data = request.body as PersonAddressInput;
+      const { id, addressId } = request.params;
+      const data = request.body;
 
       try {
         const [updated] = await db
@@ -190,7 +189,7 @@ export const personAddressRoutes: FastifyPluginAsync = async (fastify) => {
     { schema: { params: addressParams } },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id, addressId } = request.params as z.infer<typeof addressParams>;
+      const { id, addressId } = request.params;
 
       const [deleted] = await db
         .delete(personAddresses)

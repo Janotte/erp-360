@@ -1,6 +1,6 @@
 import { payables, planAccounts, receivables } from '@erp-360/mod-financial';
 import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../db/index.ts';
 import { uniqueConflictMessage } from '../lib/postgres-errors.ts';
@@ -52,7 +52,7 @@ function toPlanAccountValues(data: z.infer<typeof planAccountBodySchema>) {
   };
 }
 
-export const planAccountsRoutes: FastifyPluginAsync = async (fastify) => {
+export const planAccountsRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
 
   fastify.post(
@@ -60,7 +60,7 @@ export const planAccountsRoutes: FastifyPluginAsync = async (fastify) => {
     { schema: { body: planAccountBodySchema } },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const data = request.body as z.infer<typeof planAccountBodySchema>;
+      const data = request.body;
 
       try {
         const [created] = await db
@@ -89,13 +89,7 @@ export const planAccountsRoutes: FastifyPluginAsync = async (fastify) => {
     { schema: { querystring: listPlanAccountsQuery } },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const {
-        page,
-        limit,
-        sortField,
-        sortOrder,
-        busca: search,
-      } = request.query as z.infer<typeof listPlanAccountsQuery>;
+      const { page, limit, sortField, sortOrder, busca: search } = request.query;
 
       const offset = (page - 1) * limit;
       const conditions = [eq(planAccounts.tenantId, tenantId)];
@@ -155,7 +149,7 @@ export const planAccountsRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
+      const { id } = request.params;
 
       const [account] = await db
         .select()
@@ -182,8 +176,8 @@ export const planAccountsRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
-      const data = request.body as z.infer<typeof planAccountBodySchema>;
+      const { id } = request.params;
+      const data = request.body;
 
       try {
         const [updated] = await db
@@ -220,7 +214,7 @@ export const planAccountsRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
+      const { id } = request.params;
 
       try {
         const [hasPayable] = await db

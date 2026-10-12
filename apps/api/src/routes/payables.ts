@@ -1,9 +1,14 @@
 import { payables } from '@erp-360/mod-financial';
 import { and, asc, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../db/index.ts';
-import { SettlementError, previewSettlement, reverseSettlement, settleTitle } from '../services/settlement.ts';
+import {
+  SettlementError,
+  previewSettlement,
+  reverseSettlement,
+  settleTitle,
+} from '../services/settlement.ts';
 import '../types/fastify.ts';
 
 const dateString = z
@@ -47,12 +52,12 @@ const listPayablesQuery = z.object({
   dueTo: dateString.optional(),
 });
 
-export const payablesRoutes: FastifyPluginAsync = async (fastify) => {
+export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
 
   fastify.post('/', { schema: { body: createPayableSchema } }, async (request, reply) => {
     const { tenantId } = request.user;
-    const data = request.body as z.infer<typeof createPayableSchema>;
+    const data = request.body;
 
     const [newAccount] = await db
       .insert(payables)
@@ -86,7 +91,7 @@ export const payablesRoutes: FastifyPluginAsync = async (fastify) => {
         busca: search,
         dueFrom,
         dueTo,
-      } = request.query as z.infer<typeof listPayablesQuery>;
+      } = request.query;
 
       const offset = (page - 1) * limit;
       const conditions = [eq(payables.tenantId, tenantId)];
@@ -151,8 +156,8 @@ export const payablesRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
-      const { settledOn } = request.query as { settledOn: string };
+      const { id } = request.params;
+      const { settledOn } = request.query;
       try {
         return await previewSettlement({
           kind: 'payable',
@@ -179,8 +184,8 @@ export const payablesRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
-      const data = request.body as z.infer<typeof paySchema>;
+      const { id } = request.params;
+      const data = request.body;
 
       try {
         const result = await settleTitle({
@@ -215,8 +220,8 @@ export const payablesRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
-      const data = request.body as z.infer<typeof createPayableSchema>;
+      const { id } = request.params;
+      const data = request.body;
 
       const [existing] = await db
         .select({ status: payables.status })
@@ -260,7 +265,7 @@ export const payablesRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
+      const { id } = request.params;
 
       const [existing] = await db
         .select({ status: payables.status })
@@ -294,7 +299,7 @@ export const payablesRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const { tenantId } = request.user;
-      const { id } = request.params as { id: string };
+      const { id } = request.params;
 
       try {
         const updated = await reverseSettlement({

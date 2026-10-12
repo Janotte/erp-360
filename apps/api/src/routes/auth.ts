@@ -8,7 +8,7 @@ import {
 } from '@erp-360/shared';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../db/index.js';
@@ -28,12 +28,16 @@ const registerBody = z.object({
   password: z.string().min(6),
 });
 
+const messageResponse = z.object({
+  message: z.string(),
+});
+
 const registerUniqueMessages = {
   tenants_cnpj_unique: 'CNPJ já cadastrado.',
   users_email_unique: 'E-mail já cadastrado.',
 };
 
-export const authRoutes: FastifyPluginAsync = async (fastify) => {
+export const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.post(
     '/login',
     {
@@ -42,7 +46,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (request, reply) => {
-      const { email, password } = request.body as z.infer<typeof loginBody>;
+      const { email, password } = request.body;
       const normalizedEmail = normalizeEmail(email);
 
       try {
@@ -90,13 +94,14 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         body: registerBody,
         response: {
           201: RegisterResponseSchema,
+          400: messageResponse,
+          409: messageResponse,
+          500: messageResponse,
         },
       },
     },
     async (request, reply) => {
-      const { companyName, cnpj, name, email, password } = request.body as z.infer<
-        typeof registerBody
-      >;
+      const { companyName, cnpj, name, email, password } = request.body;
       const normalizedEmail = normalizeEmail(email);
       const normalizedCnpj = onlyDigits(cnpj).slice(0, 14);
 

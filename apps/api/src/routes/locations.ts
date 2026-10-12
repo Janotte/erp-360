@@ -1,7 +1,7 @@
 import { cities, states } from '@erp-360/mod-persons';
 import { escapeIlike } from '@erp-360/shared';
 import { and, asc, eq, sql } from 'drizzle-orm';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../db/index.js';
@@ -13,7 +13,7 @@ const citiesQuery = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
-export const locationsRoutes: FastifyPluginAsync = async (fastify) => {
+export const locationsRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
 
   fastify.get('/states', async () => {
@@ -28,7 +28,7 @@ export const locationsRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   fastify.get('/cities', { schema: { querystring: citiesQuery } }, async (request) => {
-    const { stateId, busca, limit } = request.query as z.infer<typeof citiesQuery>;
+    const { stateId, busca, limit } = request.query;
     const conditions = [eq(cities.stateId, stateId)];
 
     if (busca?.trim()) {
