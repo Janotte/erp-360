@@ -156,5 +156,6 @@ export {
   onlyDigits,
   toTitleCasePtBr,
 };
+export * from './financialContracts.ts';
 export * from './utils/FormatCurrency';
 export * from './utils/FormatRawDate';

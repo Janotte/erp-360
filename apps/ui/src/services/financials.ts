@@ -1,3 +1,17 @@
+import {
+  apiErrorMessage,
+  cardBrandCatalogListSchema,
+  type PayableTitle,
+  payableTitleSchema,
+  paymentMethodCatalogListSchema,
+  planAccountCatalogListSchema,
+  type ReceivableTitle,
+  receivableTitleSchema,
+  type SettlementPreview,
+  settlementPreviewSchema,
+  titlePageSchema,
+} from '@erp-360/shared';
+
 import { authStorage } from '../utils/auth';
 import { API_URL } from './apiClient';
 
@@ -37,43 +51,67 @@ const jsonHeaders = () => ({
 const collection = (tipo: FinancialTipo) =>
   tipo === 'payable' ? 'payables' : 'receivables';
 
-function optionalString(value: unknown) {
-  return value ? String(value) : undefined;
+function definedText(value: string | null | undefined) {
+  return value ?? undefined;
 }
 
-function normalizeAccount(
-  item: Record<string, unknown>,
-  tipo: FinancialTipo,
-): FinancialAccount {
-  const personId =
-    tipo === 'payable' ? String(item.creditorId ?? '') : String(item.debtorId ?? '');
+function definedAmount(value: number | null | undefined) {
+  return value ?? undefined;
+}
 
+function fromPayable(row: PayableTitle): FinancialAccount {
   return {
-    id: String(item.id),
-    personId,
-    documentNumber: optionalString(item.documentNumber),
-    description: String(item.description ?? ''),
-    issueOn: String(item.issueOn ?? ''),
-    installmentAmount: Number(item.installmentAmount ?? 0),
-    dueOn: String(item.dueOn ?? ''),
-    settledOn: optionalString(item.paidOn) || optionalString(item.receivedOn),
-    settledAmount:
-      (item.paidAmount as number | undefined) ??
-      (item.receivedAmount as number | undefined),
-    status: (item.status as FinancialAccount['status']) ?? 'pendente',
-    planAccountId: optionalString(item.planAccountId),
-    invoiceNumber: optionalString(item.invoiceNumber),
-    bearerName: optionalString(item.bearerName),
-    barcode: optionalString(item.barcode),
-    bankSlipOurNumber: optionalString(item.bankSlipOurNumber),
-    financialInstitutionId: optionalString(item.financialInstitutionId),
-    paymentMethodId: optionalString(item.paymentMethodId),
-    cardBrandId: optionalString(item.cardBrandId),
-    transactionAuthorization: optionalString(item.transactionAuthorization),
+    id: row.id,
+    personId: row.creditorId,
+    documentNumber: definedText(row.documentNumber),
+    description: row.description,
+    issueOn: row.issueOn,
+    installmentAmount: row.installmentAmount,
+    dueOn: row.dueOn,
+    settledOn: definedText(row.paidOn),
+    settledAmount: definedAmount(row.paidAmount),
+    status: row.status,
+    planAccountId: definedText(row.planAccountId),
   };
 }
 
-async function parseJson(res: Response) {
+function fromReceivable(row: ReceivableTitle): FinancialAccount {
+  return {
+    id: row.id,
+    personId: row.debtorId,
+    documentNumber: definedText(row.documentNumber),
+    description: row.description,
+    issueOn: row.issueOn,
+    installmentAmount: row.installmentAmount,
+    dueOn: row.dueOn,
+    settledOn: definedText(row.receivedOn),
+    settledAmount: definedAmount(row.receivedAmount),
+    status: row.status,
+    planAccountId: definedText(row.planAccountId),
+    invoiceNumber: definedText(row.invoiceNumber),
+    bearerName: definedText(row.bearerName),
+    barcode: definedText(row.barcode),
+    bankSlipOurNumber: definedText(row.bankSlipOurNumber),
+    financialInstitutionId: definedText(row.financialInstitutionId),
+    paymentMethodId: definedText(row.paymentMethodId),
+    cardBrandId: definedText(row.cardBrandId),
+    transactionAuthorization: definedText(row.transactionAuthorization),
+  };
+}
+
+function parseTitle(tipo: FinancialTipo, body: unknown): FinancialAccount {
+  if (tipo === 'payable') {
+    const parsed = payableTitleSchema.safeParse(body);
+    if (!parsed.success) throw new Error('Resposta de título inválida.');
+    return fromPayable(parsed.data);
+  }
+
+  const parsed = receivableTitleSchema.safeParse(body);
+  if (!parsed.success) throw new Error('Resposta de título inválida.');
+  return fromReceivable(parsed.data);
+}
+
+async function readBody(res: Response): Promise<unknown> {
   return res.json().catch(() => ({}));
 }
 
@@ -178,12 +216,13 @@ export const financialService = {
     const res = await fetch(`${API_URL}/financial/plan-accounts${params}`, {
       headers: authHeaders(),
     });
-    const body = await parseJson(res);
+    const body = await readBody(res);
     if (!res.ok) {
-      throw new Error(body.message || body.error || 'Falha ao listar planos de contas.');
+      throw new Error(apiErrorMessage(body, 'Falha ao listar planos de contas.'));
     }
-    if (!Array.isArray(body)) return [];
-    return body.map((item: { id: string; accountCode: string; name: string }) => ({
+    const parsed = planAccountCatalogListSchema.safeParse(body);
+    if (!parsed.success) throw new Error('Resposta de planos de contas inválida.');
+    return parsed.data.map((item) => ({
       id: item.id,
       label: `${item.accountCode} - ${item.name}`,
     }));
@@ -192,30 +231,28 @@ export const financialService = {
     const res = await fetch(`${API_URL}/financial/payment-methods`, {
       headers: authHeaders(),
     });
-    const body = await parseJson(res);
+    const body = await readBody(res);
     if (!res.ok) {
-      throw new Error(
-        body.message || body.error || 'Falha ao listar formas de pagamento.',
-      );
+      throw new Error(apiErrorMessage(body, 'Falha ao listar formas de pagamento.'));
     }
-    if (!Array.isArray(body)) return [];
-    return body.map(
-      (item: { id: string; paymentTypeCode: string; description: string }) => ({
-        id: item.id,
-        label: `${item.paymentTypeCode} - ${item.description}`,
-      }),
-    );
+    const parsed = paymentMethodCatalogListSchema.safeParse(body);
+    if (!parsed.success) throw new Error('Resposta de formas de pagamento inválida.');
+    return parsed.data.map((item) => ({
+      id: item.id,
+      label: `${item.paymentTypeCode} - ${item.description}`,
+    }));
   },
   listCardBrands: async (): Promise<CatalogOption[]> => {
     const res = await fetch(`${API_URL}/financial/card-brands`, {
       headers: authHeaders(),
     });
-    const body = await parseJson(res);
+    const body = await readBody(res);
     if (!res.ok) {
-      throw new Error(body.message || body.error || 'Falha ao listar bandeiras.');
+      throw new Error(apiErrorMessage(body, 'Falha ao listar bandeiras.'));
     }
-    if (!Array.isArray(body)) return [];
-    return body.map((item: { id: string; name: string }) => ({
+    const parsed = cardBrandCatalogListSchema.safeParse(body);
+    if (!parsed.success) throw new Error('Resposta de bandeiras inválida.');
+    return parsed.data.map((item) => ({
       id: item.id,
       label: item.name,
     }));
@@ -238,20 +275,25 @@ export const financialService = {
     const res = await fetch(`${API_URL}/${collection(tipo)}?${params.toString()}`, {
       headers: authHeaders(),
     });
-    const body = await parseJson(res);
+    const body = await readBody(res);
     if (!res.ok) {
-      throw new Error(body.message || body.error || 'Falha ao listar lançamentos.');
+      throw new Error(apiErrorMessage(body, 'Falha ao listar lançamentos.'));
     }
 
-    const rows = Array.isArray(body.data) ? body.data : [];
+    if (tipo === 'payable') {
+      const parsed = titlePageSchema(payableTitleSchema).safeParse(body);
+      if (!parsed.success) throw new Error('Resposta de listagem inválida.');
+      return {
+        data: parsed.data.data.map(fromPayable),
+        meta: parsed.data.meta,
+      };
+    }
+
+    const parsed = titlePageSchema(receivableTitleSchema).safeParse(body);
+    if (!parsed.success) throw new Error('Resposta de listagem inválida.');
     return {
-      data: rows.map((item: Record<string, unknown>) => normalizeAccount(item, tipo)),
-      meta: {
-        total: Number(body.meta?.total || 0),
-        page: Number(body.meta?.page || filters.page),
-        limit: Number(body.meta?.limit || filters.limit),
-        totalPages: Number(body.meta?.totalPages || 0),
-      },
+      data: parsed.data.data.map(fromReceivable),
+      meta: parsed.data.meta,
     };
   },
   create: async (
@@ -263,11 +305,11 @@ export const financialService = {
       headers: jsonHeaders(),
       body: JSON.stringify(toCreatePayload(tipo, dados)),
     });
-    const body = await parseJson(res);
+    const body = await readBody(res);
     if (!res.ok) {
-      throw new Error(body.message || body.error || 'Falha ao lançar conta.');
+      throw new Error(apiErrorMessage(body, 'Falha ao lançar conta.'));
     }
-    return normalizeAccount(body as Record<string, unknown>, tipo);
+    return parseTitle(tipo, body);
   },
   update: async (
     tipo: FinancialTipo,
@@ -279,20 +321,20 @@ export const financialService = {
       headers: jsonHeaders(),
       body: JSON.stringify(toCreatePayload(tipo, dados)),
     });
-    const body = await parseJson(res);
+    const body = await readBody(res);
     if (!res.ok) {
-      throw new Error(body.message || body.error || 'Falha ao atualizar conta.');
+      throw new Error(apiErrorMessage(body, 'Falha ao atualizar conta.'));
     }
-    return normalizeAccount(body as Record<string, unknown>, tipo);
+    return parseTitle(tipo, body);
   },
   delete: async (tipo: FinancialTipo, id: string): Promise<void> => {
     const res = await fetch(`${API_URL}/${collection(tipo)}/${id}`, {
       method: 'DELETE',
       headers: authHeaders(),
     });
-    const body = await parseJson(res);
+    const body = await readBody(res);
     if (!res.ok) {
-      throw new Error(body.message || body.error || 'Falha ao excluir conta.');
+      throw new Error(apiErrorMessage(body, 'Falha ao excluir conta.'));
     }
   },
   reverse: async (tipo: FinancialTipo, id: string): Promise<FinancialAccount> => {
@@ -300,11 +342,11 @@ export const financialService = {
       method: 'POST',
       headers: authHeaders(),
     });
-    const body = await parseJson(res);
+    const body = await readBody(res);
     if (!res.ok) {
-      throw new Error(body.message || body.error || 'Falha ao estornar liquidação.');
+      throw new Error(apiErrorMessage(body, 'Falha ao estornar liquidação.'));
     }
-    return normalizeAccount(body as Record<string, unknown>, tipo);
+    return parseTitle(tipo, body);
   },
   pay: async (
     tipo: FinancialTipo,
@@ -327,45 +369,30 @@ export const financialService = {
       headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
-    const body = await parseJson(res);
+    const body = await readBody(res);
     if (!res.ok) {
-      throw new Error(body.message || body.error || 'Falha ao liquidar título.');
+      throw new Error(apiErrorMessage(body, 'Falha ao liquidar título.'));
     }
-    return normalizeAccount(body as Record<string, unknown>, tipo);
+    return parseTitle(tipo, body);
   },
   settlementPreview: async (
     tipo: FinancialTipo,
     id: string,
     settledOn: string,
     waiveCharges = false,
-  ) => {
+  ): Promise<SettlementPreview> => {
     const params = new URLSearchParams({ settledOn });
     if (tipo === 'receivable' && waiveCharges) params.set('waiveCharges', 'true');
     const res = await fetch(
       `${API_URL}/${collection(tipo)}/${id}/settlement-preview?${params.toString()}`,
       { headers: authHeaders() },
     );
-    const body = await parseJson(res);
+    const body = await readBody(res);
     if (!res.ok) {
-      throw new Error(body.message || body.error || 'Falha ao calcular a baixa.');
+      throw new Error(apiErrorMessage(body, 'Falha ao calcular a baixa.'));
     }
-    return body as {
-      originalAmount: number;
-      dueOn: string;
-      daysLate: number;
-      chargeableDays: number;
-      fineAmount: number;
-      interestAmount: number;
-      dueAmount: number;
-      settings: {
-        lateFeeBps: number;
-        dailyInterestBps: number;
-        graceDays: number;
-        discountObtainedPlanAccountId: string | null;
-        discountGrantedPlanAccountId: string | null;
-        lateFeePaidPlanAccountId: string | null;
-        lateFeeReceivedPlanAccountId: string | null;
-      };
-    };
+    const parsed = settlementPreviewSchema.safeParse(body);
+    if (!parsed.success) throw new Error('Resposta de cálculo inválida.');
+    return parsed.data;
   },
 };
