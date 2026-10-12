@@ -15,14 +15,20 @@ const createPayableSchema = z.object({
   documentNumber: z.string().max(44).optional(),
   description: z.string().min(1, 'Descrição é obrigatória').max(255),
   issueOn: dateString.optional(),
-  installmentAmount: z.number().int('O valor deve ser em centavos (inteiro)'),
+  installmentAmount: z
+    .number()
+    .int('O valor deve ser em centavos (inteiro)')
+    .positive('O valor deve ser maior que zero.'),
   dueOn: dateString,
   planAccountId: z.string().uuid().optional(),
 });
 
 const paySchema = z.object({
   settledOn: dateString,
-  settledAmount: z.number().int('O valor pago deve ser em centavos (inteiro)'),
+  settledAmount: z
+    .number()
+    .int('O valor pago deve ser em centavos (inteiro)')
+    .positive('O valor pago deve ser maior que zero.'),
   treasury: z.enum(['cash', 'bank']),
   bankAccountId: z.string().uuid().optional().nullable(),
   remainderMode: z.enum(['none', 'new_title', 'plan_account']).optional().default('none'),

@@ -21,7 +21,10 @@ const createReceivableSchema = z.object({
   documentNumber: z.string().max(44).optional(),
   description: z.string().min(1, 'Descrição é obrigatória').max(255),
   issueOn: dateString.optional(),
-  installmentAmount: z.number().int('O valor deve ser em centavos (inteiro)'),
+  installmentAmount: z
+    .number()
+    .int('O valor deve ser em centavos (inteiro)')
+    .positive('O valor deve ser maior que zero.'),
   dueOn: dateString,
   planAccountId: z.string().uuid().optional(),
   bearerName: z.string().max(60).optional(),
@@ -36,7 +39,10 @@ const createReceivableSchema = z.object({
 
 const receiveSchema = z.object({
   settledOn: dateString,
-  settledAmount: z.number().int('O valor recebido deve ser em centavos (inteiro)'),
+  settledAmount: z
+    .number()
+    .int('O valor recebido deve ser em centavos (inteiro)')
+    .positive('O valor recebido deve ser maior que zero.'),
   treasury: z.enum(['cash', 'bank']),
   bankAccountId: z.string().uuid().optional().nullable(),
   waiveCharges: z.boolean().optional().default(false),
