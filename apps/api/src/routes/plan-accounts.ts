@@ -1,6 +1,7 @@
 import '../types/fastify.ts';
 
 import { payables, planAccounts, receivables } from '@erp-360/mod-financial';
+import { escapeIlike } from '@erp-360/shared';
 import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -78,10 +79,11 @@ export const planAccountsRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const conditions = [eq(planAccounts.tenantId, tenantId)];
 
       if (search) {
+        const like = `%${escapeIlike(search)}%`;
         conditions.push(
           or(
-            ilike(planAccounts.accountCode, `%${search}%`),
-            ilike(planAccounts.name, `%${search}%`),
+            ilike(planAccounts.accountCode, like),
+            ilike(planAccounts.name, like),
           )!,
         );
       }
