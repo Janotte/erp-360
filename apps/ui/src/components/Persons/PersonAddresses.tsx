@@ -1,7 +1,7 @@
-import { formatPostalCode, toTitleCasePtBr } from '@erp-360/shared';
+import { formatPostalCode, onlyDigits, toTitleCasePtBr } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -79,6 +79,13 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
   const [citySearchText, setCitySearchText] = useState('');
   const [citySearch, setCitySearch] = useState('');
   const [addressToDelete, setAddressToDelete] = useState<PersonAddress | null>(null);
+  const [cepError, setCepError] = useState('');
+  const numberRef = useRef<HTMLInputElement>(null);
+  const lookupPatch = useRef<{
+    stateId: string | null;
+    cityId: string | null;
+    cityName: string | null;
+  } | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setCitySearch(citySearchText.trim()), 300);
@@ -102,6 +109,46 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
     queryKey: ['cities', form?.stateId, citySearch],
     enabled: Boolean(form?.stateId) && citySearch.length >= 2,
     queryFn: () => locationsService.listCities(form!.stateId, citySearch),
+  });
+
+  const lookupMutation = useMutation({
+    mutationFn: (cep: string) => personsService.lookupCep(cep),
+    onSuccess: (data) => {
+      lookupPatch.current = {
+        stateId: data.stateId,
+        cityId: data.cityId,
+        cityName: data.cityName,
+      };
+      setForm((current) => {
+        if (!current) return current;
+        const next = { ...current };
+        if (data.street) next.street = data.street;
+        if (data.neighborhood) next.neighborhood = data.neighborhood;
+        if (data.stateId) {
+          next.stateId = data.stateId;
+          next.cityId = data.cityId ?? '';
+          next.cityName = data.cityName ?? '';
+        }
+        return next;
+      });
+      if (data.stateId && data.cityId) {
+        setCitySearchText(data.cityName ?? '');
+        setCitySearch((data.cityName ?? '').trim());
+        toast.success('Endereço preenchido. Confira número e complemento e salve.');
+      } else if (data.stateId) {
+        setCitySearchText('');
+        setCitySearch('');
+        toast.error(
+          'Endereço preenchido, mas a cidade não foi encontrada. Selecione a cidade.',
+        );
+      } else {
+        toast.success('Endereço preenchido. Confira número e complemento e salve.');
+      }
+      numberRef.current?.focus();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Falha ao consultar o CEP.');
+    },
   });
 
   const saveMutation = useMutation({
@@ -146,6 +193,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
     setEditingId(null);
     setCitySearchText('');
     setCitySearch('');
+    setCepError('');
   };
 
   const openCreate = () => {
@@ -153,6 +201,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
     setForm(emptyForm());
     setCitySearchText('');
     setCitySearch('');
+    setCepError('');
   };
 
   const openEdit = (address: PersonAddress) => {
@@ -170,6 +219,18 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
     });
     setCitySearchText(address.cityName ?? '');
     setCitySearch(address.cityName?.trim() ?? '');
+    setCepError('');
+  };
+
+  const lookupCep = () => {
+    if (!form || lookupMutation.isPending) return;
+    const digits = onlyDigits(form.postalCode);
+    if (digits.length !== 8) {
+      setCepError('CEP incompleto.');
+      return;
+    }
+    setCepError('');
+    lookupMutation.mutate(digits);
   };
 
   const updateForm = (patch: Partial<AddressFormState>) => {
@@ -281,15 +342,28 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
                 maxLength={9}
                 inputMode="numeric"
                 autoComplete="off"
-                onChange={(event) =>
-                  updateForm({ postalCode: formatPostalCode(event.target.value) })
-                }
+                onChange={(event) => {
+                  setCepError('');
+                  updateForm({ postalCode: formatPostalCode(event.target.value) });
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+                  event.preventDefault();
+                  lookupCep();
+                }}
               />
+              <p className="text-xs text-zinc-500">
+                {lookupMutation.isPending
+                  ? 'Consultando CEP...'
+                  : 'Digite o CEP e pressione Enter para preencher o endereço.'}
+              </p>
+              {cepError ? <p className="text-sm text-destructive">{cepError}</p> : null}
             </div>
             <div className="space-y-1">
               <Label htmlFor="number">Número</Label>
               <Input
                 id="number"
+                ref={numberRef}
                 value={form.number}
                 maxLength={60}
                 onChange={(event) => updateForm({ number: event.target.value })}
@@ -341,6 +415,19 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
               <Select
                 value={form.stateId || undefined}
                 onValueChange={(value) => {
+                  const patch = lookupPatch.current;
+                  if (patch?.stateId === value) {
+                    updateForm({
+                      stateId: value,
+                      cityId: patch.cityId ?? '',
+                      cityName: patch.cityName ?? '',
+                    });
+                    const cityLabel = patch.cityId ? (patch.cityName ?? '') : '';
+                    setCitySearchText(cityLabel);
+                    setCitySearch(cityLabel.trim());
+                    return;
+                  }
+                  lookupPatch.current = null;
                   updateForm({ stateId: value, cityId: '', cityName: '' });
                   setCitySearchText('');
                   setCitySearch('');
@@ -366,7 +453,13 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
                 placeholder="Digite ao menos 2 letras"
                 disabled={!form.stateId}
                 onChange={(event) => {
-                  setCitySearchText(event.target.value);
+                  const nextValue = event.target.value;
+                  if (lookupPatch.current?.cityName === nextValue) {
+                    setCitySearchText(nextValue);
+                    return;
+                  }
+                  lookupPatch.current = null;
+                  setCitySearchText(nextValue);
                   updateForm({ cityId: '', cityName: '' });
                 }}
               />
@@ -377,6 +470,9 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
             <Select
               value={form.cityId || undefined}
               onValueChange={(value) => {
+                const patch = lookupPatch.current;
+                if (!value && patch?.cityId) return;
+                if (patch?.cityId && value !== patch.cityId) lookupPatch.current = null;
                 const city = cities.find((item) => item.id === value);
                 updateForm({ cityId: value, cityName: city?.name ?? '' });
               }}

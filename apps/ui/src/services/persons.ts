@@ -66,11 +66,22 @@ export interface CnpjLookupAddress {
   stateAbbreviation: string | null;
 }
 
+export interface CepLookupResult {
+  postalCode: string;
+  street: string | null;
+  neighborhood: string | null;
+  stateId: string | null;
+  stateAbbreviation: string | null;
+  cityId: string | null;
+  cityName: string | null;
+}
+
 export interface CnpjLookupResult {
   taxId: string;
   name: string;
   birthDate: string | null;
   nfeEmail: string | null;
+  stateRegistration: string | null;
   address: CnpjLookupAddress | null;
   existingPersonId: string | null;
 }
@@ -193,6 +204,17 @@ export const personsService = {
       throw new Error(body.message || body.error || 'Falha ao consultar o CNPJ.');
     }
     return body as CnpjLookupResult;
+  },
+  lookupCep: async (cep: string): Promise<CepLookupResult> => {
+    const digits = onlyDigits(cep);
+    const res = await fetch(`${API_URL}/persons/lookup/cep/${digits}`, {
+      headers: authHeaders(),
+    });
+    const body = await readBody(res);
+    if (!res.ok) {
+      throw new Error(body.message || body.error || 'Falha ao consultar o CEP.');
+    }
+    return body as CepLookupResult;
   },
   get: async (id: string): Promise<Person> => {
     const res = await apiFetch(`/persons/${id}`);

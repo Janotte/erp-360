@@ -21,6 +21,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../db/index.js';
+import { lookupCep } from '../services/cep-lookup.ts';
 import { lookupCnpj } from '../services/cnpj-lookup.ts';
 import { personAddressRoutes } from './person-addresses.js';
 import { personContactRoutes } from './person-contacts.js';
@@ -112,6 +113,15 @@ export const personsRoutes: FastifyPluginAsyncZod = async (fastify) => {
     async (request, _reply) => {
       const { cnpj } = request.params;
       return await lookupCnpj({ tenantId: request.user.tenantId, cnpj });
+    },
+  );
+
+  fastify.get(
+    '/lookup/cep/:cep',
+    { schema: { params: z.object({ cep: z.string().min(8).max(9) }) } },
+    async (request, _reply) => {
+      const { cep } = request.params;
+      return lookupCep(cep);
     },
   );
 

@@ -36,6 +36,7 @@ export interface CnpjLookupResult {
   name: string;
   birthDate: string | null;
   nfeEmail: string | null;
+  stateRegistration: string | null;
   address: CnpjLookupAddress | null;
   existingPersonId: string | null;
 }
@@ -65,6 +66,56 @@ function readString(row: Record<string, unknown>, ...keys: string[]) {
     if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   }
   return '';
+}
+
+function normalizeStateRegistration(value: string) {
+  const compact = value.trim();
+  if (!compact) return null;
+  if (/^isento$/i.test(compact)) return 'ISENTO';
+  const digits = onlyDigits(compact);
+  if (!digits) return null;
+  return digits.slice(0, 20);
+}
+
+function stateAbbreviationOf(row: Record<string, unknown>) {
+  const state = row.estado;
+  if (state && typeof state === 'object') {
+    return readString(state as Record<string, unknown>, 'sigla').toUpperCase();
+  }
+  return readString(row, 'uf', 'estado').toUpperCase().slice(0, 2);
+}
+
+function pickStateRegistration(row: Record<string, unknown>, uf: string) {
+  const direct = normalizeStateRegistration(readString(row, 'inscricao_estadual', 'ie'));
+  if (direct) return direct;
+
+  const nested = row.estabelecimento;
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    const fromOffice = pickStateRegistration(nested as Record<string, unknown>, uf);
+    if (fromOffice) return fromOffice;
+  }
+
+  if (!Array.isArray(row.inscricoes_estaduais)) return null;
+  const wanted = uf.toUpperCase();
+  if (!wanted) return null;
+
+  const activeInState = row.inscricoes_estaduais.find((item) => {
+    if (!item || typeof item !== 'object') return false;
+    const entry = item as Record<string, unknown>;
+    return entry.ativo === true && stateAbbreviationOf(entry) === wanted;
+  }) as Record<string, unknown> | undefined;
+  if (!activeInState) return null;
+  return normalizeStateRegistration(readString(activeInState, 'inscricao_estadual', 'numero'));
+}
+
+async function lookupStateRegistration(cnpj: string, uf: string) {
+  try {
+    const { status, body } = await fetchJson(`https://publica.cnpj.ws/cnpj/${cnpj}`);
+    if (status < 200 || status >= 300) return null;
+    return pickStateRegistration(body, uf);
+  } catch {
+    return null;
+  }
 }
 
 function ibgeCode(row: Record<string, unknown>) {
@@ -216,6 +267,8 @@ export async function lookupCnpj(params: { tenantId: string; cnpj: string }): Pr
     const neighborhood = clip(readString(raw, 'bairro'), 60);
     const complement = clip(readString(raw, 'complemento'), 60);
     const postalCode = emptyToNull(normalizePostalCode(readString(raw, 'cep')));
+    const stateRegistration =
+      pickStateRegistration(raw, uf) ?? (await lookupStateRegistration(taxId, uf));
 
     const hasAddress = Boolean(street || neighborhood || postalCode || city);
     mapped = {
@@ -223,6 +276,7 @@ export async function lookupCnpj(params: { tenantId: string; cnpj: string }): Pr
       name,
       birthDate: birthDate && /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? birthDate : null,
       nfeEmail: nfeEmail && nfeEmail.includes('@') ? nfeEmail.slice(0, 60) : null,
+      stateRegistration,
       address: hasAddress
         ? {
             postalCode,
