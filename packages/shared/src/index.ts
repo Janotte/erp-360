@@ -157,5 +157,5 @@ export {
   toTitleCasePtBr,
 };
 export * from './financialContracts.ts';
-export * from './utils/FormatCurrency';
-export * from './utils/FormatRawDate';
+export * from './utils/FormatCurrency.ts';
+export * from './utils/FormatRawDate.ts';

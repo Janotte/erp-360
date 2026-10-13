@@ -8,7 +8,7 @@ import {
 } from '@erp-360/mod-financial';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
-import { db } from '../db/index.ts';
+import { db, type DbClient } from '../db/index.ts';
 import { getOrCreateFinancialSettings } from './financial-settings.ts';
 import { addDays, computeDueAmount, computeSettlementGaps } from './settlement-math.ts';
 
@@ -119,7 +119,11 @@ export async function settleTitle(input: SettleInput) {
           'O valor é menor que o devido. Gere um novo título ou lance a diferença no plano de contas.',
         );
       }
-      if (remainderMode === 'plan_account' && extra <= 0 && !input.differencePlanAccountId) {
+      if (
+        remainderMode === 'plan_account' &&
+        extra <= 0 &&
+        !input.differencePlanAccountId
+      ) {
         throw new SettlementError(400, 'Selecione a conta do plano para a diferença.');
       }
     } else {
@@ -369,7 +373,7 @@ export async function reverseSettlement(params: {
   });
 }
 
-type Queryable = typeof db;
+type Queryable = DbClient;
 
 async function loadTitle(
   kind: 'payable' | 'receivable',
@@ -490,7 +494,11 @@ export async function recalcCashBalances(tx: Queryable, tenantId: string) {
   }
 }
 
-export async function recalcBankBalances(tx: Queryable, tenantId: string, bankAccountId: string) {
+export async function recalcBankBalances(
+  tx: Queryable,
+  tenantId: string,
+  bankAccountId: string,
+) {
   const rows = await tx
     .select({
       id: bankEntries.id,
@@ -499,7 +507,10 @@ export async function recalcBankBalances(tx: Queryable, tenantId: string, bankAc
     })
     .from(bankEntries)
     .where(
-      and(eq(bankEntries.tenantId, tenantId), eq(bankEntries.bankAccountId, bankAccountId)),
+      and(
+        eq(bankEntries.tenantId, tenantId),
+        eq(bankEntries.bankAccountId, bankAccountId),
+      ),
     )
     .orderBy(
       asc(bankEntries.occurredOn),
@@ -540,9 +551,7 @@ export async function listCashFlow(tenantId: string, days = 60) {
       balance: sql<number>`coalesce(sum(${bankAccounts.balance}), 0)`,
     })
     .from(bankAccounts)
-    .where(
-      and(eq(bankAccounts.tenantId, tenantId), eq(bankAccounts.kind, 'operating')),
-    );
+    .where(and(eq(bankAccounts.tenantId, tenantId), eq(bankAccounts.kind, 'operating')));
 
   const openingBalance = Number(cash?.balance ?? 0) + Number(banks?.balance ?? 0);
 

@@ -1,7 +1,12 @@
-import { bankAccounts, bankEntries, cashEntries, treasuryTransfers } from '@erp-360/mod-financial';
+import {
+  bankAccounts,
+  bankEntries,
+  cashEntries,
+  treasuryTransfers,
+} from '@erp-360/mod-financial';
 import { and, eq } from 'drizzle-orm';
 
-import { db } from '../db/index.ts';
+import { db, type DbClient } from '../db/index.ts';
 import { recalcBankBalances, recalcCashBalances } from './settlement.ts';
 
 export class TransferError extends Error {
@@ -39,7 +44,10 @@ export async function createTreasuryTransfer(input: TransferInput) {
   if (input.toTreasury === 'bank' && !input.toBankAccountId) {
     throw new TransferError(400, 'Selecione a conta de destino.');
   }
-  if (sideKey(input.fromTreasury, input.fromBankAccountId) === sideKey(input.toTreasury, input.toBankAccountId)) {
+  if (
+    sideKey(input.fromTreasury, input.fromBankAccountId) ===
+    sideKey(input.toTreasury, input.toBankAccountId)
+  ) {
     throw new TransferError(400, 'Origem e destino precisam ser diferentes.');
   }
 
@@ -56,7 +64,10 @@ export async function createTreasuryTransfer(input: TransferInput) {
     const fromKind = fromAccount?.kind ?? 'operating';
     const toKind = toAccount?.kind ?? 'operating';
     if (fromKind === 'investment' && toKind === 'investment') {
-      throw new TransferError(400, 'Não é possível transferir entre contas de investimento.');
+      throw new TransferError(
+        400,
+        'Não é possível transferir entre contas de investimento.',
+      );
     }
     if (
       (fromKind === 'investment' && toKind !== 'operating') ||
@@ -170,7 +181,10 @@ export async function reverseTreasuryTransfer(params: {
       })
       .from(bankEntries)
       .where(
-        and(eq(bankEntries.transferId, transfer.id), eq(bankEntries.tenantId, params.tenantId)),
+        and(
+          eq(bankEntries.transferId, transfer.id),
+          eq(bankEntries.tenantId, params.tenantId),
+        ),
       );
 
     if (bankLines.some((line) => line.reconciled)) {
@@ -184,7 +198,10 @@ export async function reverseTreasuryTransfer(params: {
       .select({ id: cashEntries.id })
       .from(cashEntries)
       .where(
-        and(eq(cashEntries.transferId, transfer.id), eq(cashEntries.tenantId, params.tenantId)),
+        and(
+          eq(cashEntries.transferId, transfer.id),
+          eq(cashEntries.tenantId, params.tenantId),
+        ),
       );
 
     const bankAccountIds = [...new Set(bankLines.map((line) => line.bankAccountId))];
@@ -192,7 +209,10 @@ export async function reverseTreasuryTransfer(params: {
     await tx
       .delete(treasuryTransfers)
       .where(
-        and(eq(treasuryTransfers.id, transfer.id), eq(treasuryTransfers.tenantId, params.tenantId)),
+        and(
+          eq(treasuryTransfers.id, transfer.id),
+          eq(treasuryTransfers.tenantId, params.tenantId),
+        ),
       );
 
     if (cashLines.length) {
@@ -221,7 +241,7 @@ function defaultTransferDescription(params: {
   return `Transferência — ${params.fromLabel} → ${params.toLabel}`;
 }
 
-type Queryable = typeof db;
+type Queryable = DbClient;
 
 async function loadAccount(client: Queryable, tenantId: string, id: string) {
   const [account] = await client

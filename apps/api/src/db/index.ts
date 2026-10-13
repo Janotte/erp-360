@@ -24,3 +24,6 @@ const pool = new Pool({
 });
 
 export const db = drizzle(pool, { schema });
+
+export type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type DbClient = typeof db | DbTransaction;
