@@ -11,6 +11,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router';
 
 import {
   Sidebar,
@@ -59,12 +60,9 @@ const itensMenu: ItemMenu[] = [
   { title: 'Configurações', icon: Settings, url: '/settings' },
 ];
 
-interface AppSidebarProps {
-  pathAtivo: string;
-  onNavigate: (path: string) => void;
-}
-
-export function AppSidebar({ pathAtivo, onNavigate }: AppSidebarProps) {
+export function AppSidebar() {
+  const { pathname } = useLocation();
+  const pathAtivo = pathname.replace(/\/$/, '') || '/';
   const { isMobile, setOpenMobile } = useSidebar();
   const rotaFinanceira =
     pathAtivo === '/payables' ||
@@ -79,8 +77,7 @@ export function AppSidebar({ pathAtivo, onNavigate }: AppSidebarProps) {
     if (rotaFinanceira) setFinanceiroAberto(true);
   }, [rotaFinanceira]);
 
-  const navegar = (url: string) => {
-    onNavigate(url);
+  const fecharNoCelular = () => {
     if (isMobile) setOpenMobile(false);
   };
 
@@ -126,16 +123,10 @@ export function AppSidebar({ pathAtivo, onNavigate }: AppSidebarProps) {
                                 asChild
                                 isActive={pathAtivo === filho.url}
                               >
-                                <a
-                                  href={filho.url}
-                                  onClick={(event) => {
-                                    event.preventDefault();
-                                    navegar(filho.url);
-                                  }}
-                                >
+                                <Link to={filho.url} onClick={fecharNoCelular}>
                                   <filho.icon className="h-4 w-4" />
                                   <span>{filho.title}</span>
-                                </a>
+                                </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                           ))}
@@ -152,17 +143,14 @@ export function AppSidebar({ pathAtivo, onNavigate }: AppSidebarProps) {
                       tooltip={item.title}
                       isActive={pathAtivo === item.url}
                     >
-                      <a
-                        href={item.url}
+                      <Link
+                        to={item.url ?? '/dashboard'}
                         className="flex items-center gap-3"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          if (item.url) navegar(item.url);
-                        }}
+                        onClick={fecharNoCelular}
                       >
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
-                      </a>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );

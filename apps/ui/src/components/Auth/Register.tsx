@@ -1,6 +1,7 @@
 import { formatCnpj, toTitleCasePtBr } from '@erp-360/shared';
 import { useMutation } from '@tanstack/react-query';
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -16,11 +17,8 @@ import { Label } from '@/components/ui/label';
 
 import { sendRegisterAPI } from '../../services/auth';
 
-interface RegisterProps {
-  onRegisterSuccess: () => void;
-}
-
-export function Register({ onRegisterSuccess }: RegisterProps) {
+export function Register() {
+  const navigate = useNavigate();
   const [companyName, setCompanyName] = useState('');
   const [cnpj, setCnpj] = useState('');
   const [name, setName] = useState('');
@@ -31,7 +29,7 @@ export function Register({ onRegisterSuccess }: RegisterProps) {
     mutationFn: sendRegisterAPI,
     onSuccess: () => {
       setTimeout(() => {
-        onRegisterSuccess();
+        navigate('/login');
       }, 2000);
     },
   });
@@ -130,7 +128,7 @@ export function Register({ onRegisterSuccess }: RegisterProps) {
               Já possui cadastro?{' '}
               <button
                 type="button"
-                onClick={onRegisterSuccess}
+                onClick={() => navigate('/login')}
                 className="font-medium text-primary hover:underline cursor-pointer"
               >
                 Voltar para o Login

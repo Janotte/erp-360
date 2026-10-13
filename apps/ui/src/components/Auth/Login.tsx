@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -16,12 +17,8 @@ import { Label } from '@/components/ui/label';
 import { sendLoginAPI } from '../../services/auth';
 import { authStorage } from '../../utils/auth';
 
-interface LoginProps {
-  onLoginSuccess: () => void;
-  onAlternarParaRegistro: () => void;
-}
-
-export function Login({ onLoginSuccess, onAlternarParaRegistro }: LoginProps) {
+export function Login() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -29,7 +26,7 @@ export function Login({ onLoginSuccess, onAlternarParaRegistro }: LoginProps) {
     mutationFn: sendLoginAPI,
     onSuccess: (data) => {
       authStorage.setToken(data.token);
-      onLoginSuccess();
+      navigate('/dashboard');
     },
   });
 
@@ -86,7 +83,7 @@ export function Login({ onLoginSuccess, onAlternarParaRegistro }: LoginProps) {
               Não tem uma conta?{' '}
               <button
                 type="button"
-                onClick={onAlternarParaRegistro}
+                onClick={() => navigate('/register')}
                 className="font-medium text-primary hover:underline cursor-pointer"
               >
                 Cadastrar nova empresa
