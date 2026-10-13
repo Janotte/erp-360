@@ -1,5 +1,4 @@
-import { authStorage } from '../utils/auth';
-import { API_URL } from './apiClient';
+import { apiFetch } from './apiClient';
 
 export interface StateOption {
   id: string;
@@ -12,10 +11,6 @@ export interface CityOption {
   name: string;
 }
 
-const authHeaders = () => ({
-  Authorization: `Bearer ${authStorage.getToken()}`,
-});
-
 async function parseList<T>(res: Response, fallback: string): Promise<T[]> {
   if (!res.ok) {
     const erro = await res.json().catch(() => ({}));
@@ -26,9 +21,7 @@ async function parseList<T>(res: Response, fallback: string): Promise<T[]> {
 
 export const locationsService = {
   listStates: async (): Promise<StateOption[]> => {
-    const res = await fetch(`${API_URL}/locations/states`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/locations/states`);
     return parseList(res, 'Falha ao carregar estados.');
   },
   listCities: async (stateId: string, search: string): Promise<CityOption[]> => {
@@ -37,9 +30,7 @@ export const locationsService = {
       limit: '20',
       ...(search && { busca: search }),
     });
-    const res = await fetch(`${API_URL}/locations/cities?${params.toString()}`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/locations/cities?${params.toString()}`);
     return parseList(res, 'Falha ao carregar cidades.');
   },
 };

@@ -1,7 +1,6 @@
 import { onlyDigits, parsePersonKind, parseTaxpayerType } from '@erp-360/shared';
 
-import { authStorage } from '../utils/auth';
-import { API_URL } from './apiClient';
+import { apiFetch } from './apiClient';
 
 export type PersonKind = 'individual' | 'company' | 'foreigner';
 export type TaxpayerType = 1 | 2 | 9;
@@ -119,15 +118,6 @@ export interface PaginationResponse<T> {
   };
 }
 
-const authHeaders = () => ({
-  Authorization: `Bearer ${authStorage.getToken()}`,
-});
-
-const jsonHeaders = () => ({
-  'Content-Type': 'application/json',
-  ...authHeaders(),
-});
-
 async function readBody(res: Response) {
   return res.json().catch(() => ({}));
 }
@@ -184,9 +174,7 @@ export const personsService = {
       ...(filters.search && { busca: filters.search }),
     });
 
-    const res = await fetch(`${API_URL}/persons?${params.toString()}`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/persons?${params.toString()}`);
     if (!res.ok) {
       const erro = await res.json().catch(() => ({}));
       throw new Error(erro.message || erro.error || 'Falha ao carregar pessoas.');
@@ -199,9 +187,7 @@ export const personsService = {
   },
   lookupCnpj: async (cnpj: string): Promise<CnpjLookupResult> => {
     const digits = onlyDigits(cnpj);
-    const res = await fetch(`${API_URL}/persons/lookup/cnpj/${digits}`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/persons/lookup/cnpj/${digits}`);
     const body = await readBody(res);
     if (!res.ok) {
       throw new Error(body.message || body.error || 'Falha ao consultar o CNPJ.');
@@ -209,31 +195,26 @@ export const personsService = {
     return body as CnpjLookupResult;
   },
   get: async (id: string): Promise<Person> => {
-    const res = await fetch(`${API_URL}/persons/${id}`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/persons/${id}`);
     return parsePersonResponse(res, 'Falha ao carregar pessoa.');
   },
   create: async (dados: PersonInput): Promise<Person> => {
-    const res = await fetch(`${API_URL}/persons`, {
+    const res = await apiFetch(`/persons`, {
       method: 'POST',
-      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     return parsePersonResponse(res, 'Falha ao cadastrar.');
   },
   update: async (id: string, dados: PersonInput): Promise<Person> => {
-    const res = await fetch(`${API_URL}/persons/${id}`, {
+    const res = await apiFetch(`/persons/${id}`, {
       method: 'PUT',
-      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     return parsePersonResponse(res, 'Falha ao atualizar.');
   },
   delete: async (id: string): Promise<{ success: boolean; message?: string }> => {
-    const res = await fetch(`${API_URL}/persons/${id}`, {
+    const res = await apiFetch(`/persons/${id}`, {
       method: 'DELETE',
-      headers: authHeaders(),
     });
     if (!res.ok) {
       const erro = await res.json();
@@ -242,9 +223,7 @@ export const personsService = {
     return res.json();
   },
   listAddresses: async (personId: string): Promise<PersonAddress[]> => {
-    const res = await fetch(`${API_URL}/persons/${personId}/addresses`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/persons/${personId}/addresses`);
     if (!res.ok) {
       const erro = await readBody(res);
       throw new Error(erro.message || erro.error || 'Falha ao carregar endereços.');
@@ -255,9 +234,8 @@ export const personsService = {
     personId: string,
     dados: PersonAddressInput,
   ): Promise<PersonAddress> => {
-    const res = await fetch(`${API_URL}/persons/${personId}/addresses`, {
+    const res = await apiFetch(`/persons/${personId}/addresses`, {
       method: 'POST',
-      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     return parseAddressResponse(res, 'Falha ao cadastrar endereço.');
@@ -267,17 +245,15 @@ export const personsService = {
     addressId: string,
     dados: PersonAddressInput,
   ): Promise<PersonAddress> => {
-    const res = await fetch(`${API_URL}/persons/${personId}/addresses/${addressId}`, {
+    const res = await apiFetch(`/persons/${personId}/addresses/${addressId}`, {
       method: 'PUT',
-      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     return parseAddressResponse(res, 'Falha ao atualizar endereço.');
   },
   deleteAddress: async (personId: string, addressId: string): Promise<void> => {
-    const res = await fetch(`${API_URL}/persons/${personId}/addresses/${addressId}`, {
+    const res = await apiFetch(`/persons/${personId}/addresses/${addressId}`, {
       method: 'DELETE',
-      headers: authHeaders(),
     });
     if (!res.ok) {
       const erro = await readBody(res);
@@ -285,9 +261,7 @@ export const personsService = {
     }
   },
   listContacts: async (personId: string): Promise<PersonContact[]> => {
-    const res = await fetch(`${API_URL}/persons/${personId}/contacts`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/persons/${personId}/contacts`);
     if (!res.ok) {
       const erro = await readBody(res);
       throw new Error(erro.message || erro.error || 'Falha ao carregar contatos.');
@@ -298,9 +272,8 @@ export const personsService = {
     personId: string,
     dados: PersonContactInput,
   ): Promise<PersonContact> => {
-    const res = await fetch(`${API_URL}/persons/${personId}/contacts`, {
+    const res = await apiFetch(`/persons/${personId}/contacts`, {
       method: 'POST',
-      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     return parseContactResponse(res, 'Falha ao cadastrar contato.');
@@ -310,17 +283,15 @@ export const personsService = {
     contactId: string,
     dados: PersonContactInput,
   ): Promise<PersonContact> => {
-    const res = await fetch(`${API_URL}/persons/${personId}/contacts/${contactId}`, {
+    const res = await apiFetch(`/persons/${personId}/contacts/${contactId}`, {
       method: 'PUT',
-      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     return parseContactResponse(res, 'Falha ao atualizar contato.');
   },
   deleteContact: async (personId: string, contactId: string): Promise<void> => {
-    const res = await fetch(`${API_URL}/persons/${personId}/contacts/${contactId}`, {
+    const res = await apiFetch(`/persons/${personId}/contacts/${contactId}`, {
       method: 'DELETE',
-      headers: authHeaders(),
     });
     if (!res.ok) {
       const erro = await readBody(res);

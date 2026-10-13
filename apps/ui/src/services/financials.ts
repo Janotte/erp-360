@@ -12,8 +12,7 @@ import {
   titlePageSchema,
 } from '@erp-360/shared';
 
-import { authStorage } from '../utils/auth';
-import { API_URL } from './apiClient';
+import { apiFetch } from './apiClient';
 
 export interface FinancialAccount {
   id: string;
@@ -38,15 +37,6 @@ export interface FinancialAccount {
 }
 
 type FinancialTipo = 'payable' | 'receivable';
-
-const authHeaders = () => ({
-  Authorization: `Bearer ${authStorage.getToken()}`,
-});
-
-const jsonHeaders = () => ({
-  'Content-Type': 'application/json',
-  ...authHeaders(),
-});
 
 const collection = (tipo: FinancialTipo) =>
   tipo === 'payable' ? 'payables' : 'receivables';
@@ -213,9 +203,7 @@ export const financialService = {
     type?: 'revenue' | 'expense' | 'bank' | 'withdrawal',
   ): Promise<CatalogOption[]> => {
     const params = type ? `?type=${type}` : '';
-    const res = await fetch(`${API_URL}/financial/plan-accounts${params}`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/financial/plan-accounts${params}`);
     const body = await readBody(res);
     if (!res.ok) {
       throw new Error(apiErrorMessage(body, 'Falha ao listar planos de contas.'));
@@ -228,9 +216,7 @@ export const financialService = {
     }));
   },
   listPaymentMethods: async (): Promise<CatalogOption[]> => {
-    const res = await fetch(`${API_URL}/financial/payment-methods`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/financial/payment-methods`);
     const body = await readBody(res);
     if (!res.ok) {
       throw new Error(apiErrorMessage(body, 'Falha ao listar formas de pagamento.'));
@@ -243,9 +229,7 @@ export const financialService = {
     }));
   },
   listCardBrands: async (): Promise<CatalogOption[]> => {
-    const res = await fetch(`${API_URL}/financial/card-brands`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/financial/card-brands`);
     const body = await readBody(res);
     if (!res.ok) {
       throw new Error(apiErrorMessage(body, 'Falha ao listar bandeiras.'));
@@ -272,9 +256,7 @@ export const financialService = {
       ...(filters.dueTo && { dueTo: filters.dueTo }),
     });
 
-    const res = await fetch(`${API_URL}/${collection(tipo)}?${params.toString()}`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/${collection(tipo)}?${params.toString()}`);
     const body = await readBody(res);
     if (!res.ok) {
       throw new Error(apiErrorMessage(body, 'Falha ao listar lançamentos.'));
@@ -300,9 +282,8 @@ export const financialService = {
     tipo: FinancialTipo,
     dados: CreatePayableInput | CreateReceivableInput,
   ): Promise<FinancialAccount> => {
-    const res = await fetch(`${API_URL}/${collection(tipo)}`, {
+    const res = await apiFetch(`/${collection(tipo)}`, {
       method: 'POST',
-      headers: jsonHeaders(),
       body: JSON.stringify(toCreatePayload(tipo, dados)),
     });
     const body = await readBody(res);
@@ -316,9 +297,8 @@ export const financialService = {
     id: string,
     dados: CreatePayableInput | CreateReceivableInput,
   ): Promise<FinancialAccount> => {
-    const res = await fetch(`${API_URL}/${collection(tipo)}/${id}`, {
+    const res = await apiFetch(`/${collection(tipo)}/${id}`, {
       method: 'PUT',
-      headers: jsonHeaders(),
       body: JSON.stringify(toCreatePayload(tipo, dados)),
     });
     const body = await readBody(res);
@@ -328,9 +308,8 @@ export const financialService = {
     return parseTitle(tipo, body);
   },
   delete: async (tipo: FinancialTipo, id: string): Promise<void> => {
-    const res = await fetch(`${API_URL}/${collection(tipo)}/${id}`, {
+    const res = await apiFetch(`/${collection(tipo)}/${id}`, {
       method: 'DELETE',
-      headers: authHeaders(),
     });
     const body = await readBody(res);
     if (!res.ok) {
@@ -338,9 +317,8 @@ export const financialService = {
     }
   },
   reverse: async (tipo: FinancialTipo, id: string): Promise<FinancialAccount> => {
-    const res = await fetch(`${API_URL}/${collection(tipo)}/${id}/reverse`, {
+    const res = await apiFetch(`/${collection(tipo)}/${id}/reverse`, {
       method: 'POST',
-      headers: authHeaders(),
     });
     const body = await readBody(res);
     if (!res.ok) {
@@ -364,9 +342,8 @@ export const financialService = {
     },
   ): Promise<FinancialAccount> => {
     const endpoint = tipo === 'payable' ? 'pay' : 'receive';
-    const res = await fetch(`${API_URL}/${collection(tipo)}/${id}/${endpoint}`, {
+    const res = await apiFetch(`/${collection(tipo)}/${id}/${endpoint}`, {
       method: 'POST',
-      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     const body = await readBody(res);
@@ -383,9 +360,8 @@ export const financialService = {
   ): Promise<SettlementPreview> => {
     const params = new URLSearchParams({ settledOn });
     if (tipo === 'receivable' && waiveCharges) params.set('waiveCharges', 'true');
-    const res = await fetch(
-      `${API_URL}/${collection(tipo)}/${id}/settlement-preview?${params.toString()}`,
-      { headers: authHeaders() },
+    const res = await apiFetch(
+      `/${collection(tipo)}/${id}/settlement-preview?${params.toString()}`,
     );
     const body = await readBody(res);
     if (!res.ok) {

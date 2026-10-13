@@ -1,5 +1,4 @@
-import { authStorage } from '../utils/auth';
-import { API_URL } from './apiClient';
+import { apiFetch } from './apiClient';
 
 export const planAccountTypes = ['revenue', 'expense', 'bank', 'withdrawal'] as const;
 export type PlanAccountType = (typeof planAccountTypes)[number];
@@ -56,15 +55,6 @@ export interface PaginationResponse<T> {
   };
 }
 
-const authHeaders = () => ({
-  Authorization: `Bearer ${authStorage.getToken()}`,
-});
-
-const jsonHeaders = () => ({
-  'Content-Type': 'application/json',
-  ...authHeaders(),
-});
-
 async function readBody(res: Response) {
   return res.json().catch(() => ({}));
 }
@@ -87,9 +77,7 @@ export const planAccountsService = {
       ...(filters.search && { busca: filters.search }),
     });
 
-    const res = await fetch(`${API_URL}/plan-accounts?${params.toString()}`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/plan-accounts?${params.toString()}`);
     const body = await readBody(res);
     if (!res.ok) {
       throw new Error(
@@ -108,34 +96,29 @@ export const planAccountsService = {
   },
 
   get: async (id: string): Promise<PlanAccount> => {
-    const res = await fetch(`${API_URL}/plan-accounts/${id}`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/plan-accounts/${id}`);
     return parsePlanAccount(res, 'Falha ao carregar plano de contas.');
   },
 
   create: async (dados: PlanAccountInput): Promise<PlanAccount> => {
-    const res = await fetch(`${API_URL}/plan-accounts`, {
+    const res = await apiFetch(`/plan-accounts`, {
       method: 'POST',
-      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     return parsePlanAccount(res, 'Falha ao cadastrar plano de contas.');
   },
 
   update: async (id: string, dados: PlanAccountInput): Promise<PlanAccount> => {
-    const res = await fetch(`${API_URL}/plan-accounts/${id}`, {
+    const res = await apiFetch(`/plan-accounts/${id}`, {
       method: 'PUT',
-      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     return parsePlanAccount(res, 'Falha ao atualizar plano de contas.');
   },
 
   delete: async (id: string): Promise<void> => {
-    const res = await fetch(`${API_URL}/plan-accounts/${id}`, {
+    const res = await apiFetch(`/plan-accounts/${id}`, {
       method: 'DELETE',
-      headers: authHeaders(),
     });
     const body = await readBody(res);
     if (!res.ok) {

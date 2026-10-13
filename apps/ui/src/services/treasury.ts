@@ -1,14 +1,4 @@
-import { authStorage } from '../utils/auth';
-import { API_URL } from './apiClient';
-
-const authHeaders = () => ({
-  Authorization: `Bearer ${authStorage.getToken()}`,
-});
-
-const jsonHeaders = () => ({
-  'Content-Type': 'application/json',
-  ...authHeaders(),
-});
+import { apiFetch } from './apiClient';
 
 async function parseJson(res: Response) {
   return res.json().catch(() => ({}));
@@ -63,7 +53,7 @@ export interface CashFlowDay {
 
 export const treasuryService = {
   settings: async (): Promise<FinancialSettings> => {
-    const res = await fetch(`${API_URL}/financial/settings`, { headers: authHeaders() });
+    const res = await apiFetch(`/financial/settings`);
     const body = await parseJson(res);
     if (!res.ok) throw new Error(body.message || 'Falha ao carregar configurações.');
     return body as FinancialSettings;
@@ -71,9 +61,8 @@ export const treasuryService = {
   saveSettings: async (
     dados: Omit<FinancialSettings, 'tenantId'>,
   ): Promise<FinancialSettings> => {
-    const res = await fetch(`${API_URL}/financial/settings`, {
+    const res = await apiFetch(`/financial/settings`, {
       method: 'PUT',
-      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     const body = await parseJson(res);
@@ -81,25 +70,19 @@ export const treasuryService = {
     return body as FinancialSettings;
   },
   cashEntries: async (): Promise<TreasuryEntry[]> => {
-    const res = await fetch(`${API_URL}/financial/cash-entries`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/financial/cash-entries`);
     const body = await parseJson(res);
     if (!res.ok) throw new Error(body.message || 'Falha ao carregar o livro caixa.');
     return Array.isArray(body) ? body : [];
   },
   cashFlow: async (): Promise<{ openingBalance: number; days: CashFlowDay[] }> => {
-    const res = await fetch(`${API_URL}/financial/cash-flow?days=60`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/financial/cash-flow?days=60`);
     const body = await parseJson(res);
     if (!res.ok) throw new Error(body.message || 'Falha ao carregar o fluxo de caixa.');
     return body as { openingBalance: number; days: CashFlowDay[] };
   },
   bankAccounts: async (): Promise<BankAccount[]> => {
-    const res = await fetch(`${API_URL}/financial/bank-accounts`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/financial/bank-accounts`);
     const body = await parseJson(res);
     if (!res.ok) throw new Error(body.message || 'Falha ao listar contas bancárias.');
     return Array.isArray(body) ? body : [];
@@ -113,9 +96,8 @@ export const treasuryService = {
     openingOn?: string | null;
     openingAmount?: number;
   }): Promise<BankAccount> => {
-    const res = await fetch(`${API_URL}/financial/bank-accounts`, {
+    const res = await apiFetch(`/financial/bank-accounts`, {
       method: 'POST',
-      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     const body = await parseJson(res);
@@ -134,9 +116,8 @@ export const treasuryService = {
       openingAmount?: number;
     },
   ): Promise<BankAccount> => {
-    const res = await fetch(`${API_URL}/financial/bank-accounts/${id}`, {
+    const res = await apiFetch(`/financial/bank-accounts/${id}`, {
       method: 'PUT',
-      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     const body = await parseJson(res);
@@ -147,9 +128,8 @@ export const treasuryService = {
     cashOpeningOn?: string | null;
     cashOpeningAmount: number;
   }): Promise<FinancialSettings> => {
-    const res = await fetch(`${API_URL}/financial/cash-opening`, {
+    const res = await apiFetch(`/financial/cash-opening`, {
       method: 'PUT',
-      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     const body = await parseJson(res);
@@ -160,9 +140,7 @@ export const treasuryService = {
   bankEntries: async (
     id: string,
   ): Promise<{ account: BankAccount; entries: TreasuryEntry[] }> => {
-    const res = await fetch(`${API_URL}/financial/bank-accounts/${id}/entries`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/financial/bank-accounts/${id}/entries`);
     const body = await parseJson(res);
     if (!res.ok) throw new Error(body.message || 'Falha ao carregar extrato.');
     return body as { account: BankAccount; entries: TreasuryEntry[] };
@@ -176,9 +154,8 @@ export const treasuryService = {
     toBankAccountId?: string | null;
     description?: string | null;
   }) => {
-    const res = await fetch(`${API_URL}/financial/transfers`, {
+    const res = await apiFetch(`/financial/transfers`, {
       method: 'POST',
-      headers: jsonHeaders(),
       body: JSON.stringify(dados),
     });
     const body = await parseJson(res);
@@ -186,18 +163,16 @@ export const treasuryService = {
     return body;
   },
   reverseTransfer: async (id: string) => {
-    const res = await fetch(`${API_URL}/financial/transfers/${id}`, {
+    const res = await apiFetch(`/financial/transfers/${id}`, {
       method: 'DELETE',
-      headers: authHeaders(),
     });
     const body = await parseJson(res);
     if (!res.ok) throw new Error(body.message || 'Falha ao estornar a transferência.');
     return body as { id: string };
   },
   reconcile: async (id: string, reconciled: boolean): Promise<TreasuryEntry> => {
-    const res = await fetch(`${API_URL}/financial/bank-entries/${id}/reconcile`, {
+    const res = await apiFetch(`/financial/bank-entries/${id}/reconcile`, {
       method: 'POST',
-      headers: jsonHeaders(),
       body: JSON.stringify({ reconciled }),
     });
     const body = await parseJson(res);

@@ -4,7 +4,7 @@ const configuredUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
 
 export const API_URL = configuredUrl || 'http://localhost:3000';
 
-export async function apiFetch(endpoint: string, options: RequestInit = {}) {
+export async function apiFetch(path: string, options: RequestInit = {}) {
   const token = authStorage.getToken();
   const hasBody = options.body != null;
 
@@ -14,6 +14,5 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
     ...options.headers,
   };
 
-  const response = await fetch(endpoint, { ...options, headers });
-  return response;
+  return fetch(`${API_URL}${path}`, { ...options, headers });
 }

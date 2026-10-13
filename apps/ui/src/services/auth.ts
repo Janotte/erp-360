@@ -1,6 +1,6 @@
 import { type RegisterResponse, RegisterResponseSchema } from '@erp-360/shared';
 
-import { API_URL } from './apiClient';
+import { apiFetch } from './apiClient';
 
 export interface LoginResponse {
   token: string;
@@ -24,9 +24,8 @@ export const sendLoginAPI = async (data: {
   email: string;
   password: string;
 }): Promise<LoginResponse> => {
-  const response = await fetch(`${API_URL}/auth/login`, {
+  const response = await apiFetch(`/auth/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
 
@@ -39,9 +38,8 @@ export const sendLoginAPI = async (data: {
 };
 
 export const sendRegisterAPI = async (data: RegisterInput): Promise<RegisterResponse> => {
-  const response = await fetch(`${API_URL}/auth/register`, {
+  const response = await apiFetch(`/auth/register`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
 
