@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { config as loadDotenv } from 'dotenv';
 import { ZodError } from 'zod';
 
-import { AppEnv, appEnvSchema } from './schemas/app-env.schema.ts';
+import { AppEnv, appEnvSchema, parseCorsOrigins } from './schemas/app-env.schema.ts';
 
 loadDotenv({
   path: join(dirname(fileURLToPath(import.meta.url)), '../../.env'),
@@ -31,6 +31,8 @@ function loadEnv(): AppEnv {
 }
 
 const rawEnv = loadEnv();
+const configuredCorsOrigins = parseCorsOrigins(rawEnv.CORS_ORIGINS);
+const developmentCorsOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
 
 export const env = {
   nodeEnv: rawEnv.NODE_ENV,
@@ -59,6 +61,11 @@ export const env = {
   auth: {
     jwtSecret: rawEnv.JWT_SECRET,
     jwtExpiresIn: rawEnv.JWT_EXPIRES_IN,
+  },
+
+  cors: {
+    origins:
+      configuredCorsOrigins.length > 0 ? configuredCorsOrigins : developmentCorsOrigins,
   },
 } as const;
 

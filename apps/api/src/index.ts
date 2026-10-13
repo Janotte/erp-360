@@ -26,7 +26,7 @@ fastify.setValidatorCompiler(validatorCompiler);
 fastify.setSerializerCompiler(serializerCompiler);
 
 fastify.register(cors, {
-  origin: '*',
+  origin: [...env.cors.origins],
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 });
 
