@@ -1,6 +1,7 @@
 import '../types/fastify.ts';
 
 import { payables } from '@erp-360/mod-financial';
+import { escapeIlike } from '@erp-360/shared';
 import { and, asc, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -101,10 +102,11 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       if (dueFrom) conditions.push(gte(payables.dueOn, dueFrom));
       if (dueTo) conditions.push(lte(payables.dueOn, dueTo));
       if (search) {
+        const like = `%${escapeIlike(search)}%`;
         conditions.push(
           or(
-            ilike(payables.description, `%${search}%`),
-            ilike(payables.documentNumber, `%${search}%`),
+            ilike(payables.description, like),
+            ilike(payables.documentNumber, like),
           )!,
         );
       }
