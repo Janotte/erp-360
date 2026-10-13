@@ -79,10 +79,14 @@ export function PayModal({ tipo, account, onSuccess }: PayModalProps) {
     enabled: remainder > 0 || extra > 0,
   });
 
+  const previewDueAmount = preview?.dueAmount;
+  const previewFineAmount = preview?.fineAmount;
+  const previewInterestAmount = preview?.interestAmount;
+
   useEffect(() => {
-    if (!preview) return;
-    setValorPagoStr(formatCurrencyInput(preview.dueAmount));
-  }, [preview?.dueAmount, preview?.fineAmount, preview?.interestAmount, waiveCharges]);
+    if (previewDueAmount == null) return;
+    setValorPagoStr(formatCurrencyInput(previewDueAmount));
+  }, [previewDueAmount, previewFineAmount, previewInterestAmount, waiveCharges]);
 
   useEffect(() => {
     if (!preview?.settings || differencePlanAccountId) return;
