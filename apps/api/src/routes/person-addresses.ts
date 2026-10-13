@@ -13,11 +13,6 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../db/index.js';
-import { uniqueConflictMessage } from '../lib/postgres-errors.ts';
-
-const addressUniqueMessages = {
-  person_addresses_role_per_person: 'Esta pessoa já possui um endereço deste tipo.',
-};
 
 const personParams = z.object({
   id: z.string().uuid({ message: 'ID precisa ser um UUID válido' }),
@@ -116,30 +111,17 @@ export const personAddressRoutes: FastifyPluginAsyncZod = async (fastify) => {
         return reply.status(404).send({ message: 'Pessoa não encontrada' });
       }
 
-      try {
-        const [created] = await db
-          .insert(personAddresses)
-          .values({
-            ...toAddressValues(data),
-            personId: id,
-            tenantId,
-          })
-          .returning({ id: personAddresses.id });
+      const [created] = await db
+        .insert(personAddresses)
+        .values({
+          ...toAddressValues(data),
+          personId: id,
+          tenantId,
+        })
+        .returning({ id: personAddresses.id });
 
-        const [address] = await selectAddress(id, tenantId, created.id);
-        return reply.status(201).send(address);
-      } catch (error) {
-        const message = uniqueConflictMessage(
-          error,
-          addressUniqueMessages,
-          'Esta pessoa já possui um endereço deste tipo.',
-        );
-        if (message) return reply.status(409).send({ message });
-        if (isForeignKeyError(error)) {
-          return reply.status(400).send({ message: 'Cidade informada não existe.' });
-        }
-        throw error;
-      }
+      const [address] = await selectAddress(id, tenantId, created.id);
+      return reply.status(201).send(address);
     },
   );
 
@@ -151,37 +133,24 @@ export const personAddressRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const { id, addressId } = request.params;
       const data = request.body;
 
-      try {
-        const [updated] = await db
-          .update(personAddresses)
-          .set(toAddressValues(data))
-          .where(
-            and(
-              eq(personAddresses.id, addressId),
-              eq(personAddresses.personId, id),
-              eq(personAddresses.tenantId, tenantId),
-            ),
-          )
-          .returning({ id: personAddresses.id });
+      const [updated] = await db
+        .update(personAddresses)
+        .set(toAddressValues(data))
+        .where(
+          and(
+            eq(personAddresses.id, addressId),
+            eq(personAddresses.personId, id),
+            eq(personAddresses.tenantId, tenantId),
+          ),
+        )
+        .returning({ id: personAddresses.id });
 
-        if (!updated) {
-          return reply.status(404).send({ message: 'Endereço não encontrado' });
-        }
-
-        const [address] = await selectAddress(id, tenantId, updated.id);
-        return address;
-      } catch (error) {
-        const message = uniqueConflictMessage(
-          error,
-          addressUniqueMessages,
-          'Esta pessoa já possui um endereço deste tipo.',
-        );
-        if (message) return reply.status(409).send({ message });
-        if (isForeignKeyError(error)) {
-          return reply.status(400).send({ message: 'Cidade informada não existe.' });
-        }
-        throw error;
+      if (!updated) {
+        return reply.status(404).send({ message: 'Endereço não encontrado' });
       }
+
+      const [address] = await selectAddress(id, tenantId, updated.id);
+      return address;
     },
   );
 
@@ -211,14 +180,3 @@ export const personAddressRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
   );
 };
-
-function isForeignKeyError(error: unknown) {
-  const candidates = [error, (error as { cause?: unknown } | null)?.cause];
-  return candidates.some(
-    (candidate) =>
-      typeof candidate === 'object' &&
-      candidate !== null &&
-      'code' in candidate &&
-      candidate.code === '23503',
-  );
-}

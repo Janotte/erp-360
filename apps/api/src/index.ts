@@ -10,6 +10,7 @@ import {
 } from 'fastify-type-provider-zod';
 
 import { env } from './config/index.ts';
+import { registerErrorHandler } from './lib/error-handler.ts';
 import { authRoutes } from './routes/auth.js';
 import { financialCatalogRoutes } from './routes/financial-catalogs.ts';
 import { locationsRoutes } from './routes/locations.ts';
@@ -33,6 +34,8 @@ fastify.register(fastifyJwt, {
   secret: env.auth.jwtSecret,
   sign: { expiresIn: env.auth.jwtExpiresIn },
 });
+
+registerErrorHandler(fastify);
 
 fastify.decorate('autenticarETenant', async (request, reply) => {
   try {

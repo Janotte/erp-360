@@ -9,7 +9,6 @@ import { db } from '../db/index.ts';
 import {
   previewSettlement,
   reverseSettlement,
-  SettlementError,
   settleTitle,
 } from '../services/settlement.ts';
 
@@ -156,23 +155,16 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         }),
       },
     },
-    async (request, reply) => {
+    async (request, _reply) => {
       const { tenantId } = request.user;
       const { id } = request.params;
       const { settledOn } = request.query;
-      try {
-        return await previewSettlement({
-          kind: 'payable',
-          tenantId,
-          titleId: id,
-          settledOn,
-        });
-      } catch (error) {
-        if (error instanceof SettlementError) {
-          return reply.status(error.status).send({ message: error.message });
-        }
-        throw error;
-      }
+      return await previewSettlement({
+        kind: 'payable',
+        tenantId,
+        titleId: id,
+        settledOn,
+      });
     },
   );
 
@@ -184,31 +176,24 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         body: paySchema,
       },
     },
-    async (request, reply) => {
+    async (request, _reply) => {
       const { tenantId } = request.user;
       const { id } = request.params;
       const data = request.body;
 
-      try {
-        const result = await settleTitle({
-          kind: 'payable',
-          tenantId,
-          titleId: id,
-          settledOn: data.settledOn,
-          settledAmount: data.settledAmount,
-          treasury: data.treasury,
-          bankAccountId: data.bankAccountId,
-          remainderMode: data.remainderMode,
-          differencePlanAccountId: data.differencePlanAccountId,
-          remainderDueOn: data.remainderDueOn,
-        });
-        return result.title;
-      } catch (error) {
-        if (error instanceof SettlementError) {
-          return reply.status(error.status).send({ message: error.message });
-        }
-        throw error;
-      }
+      const result = await settleTitle({
+        kind: 'payable',
+        tenantId,
+        titleId: id,
+        settledOn: data.settledOn,
+        settledAmount: data.settledAmount,
+        treasury: data.treasury,
+        bankAccountId: data.bankAccountId,
+        remainderMode: data.remainderMode,
+        differencePlanAccountId: data.differencePlanAccountId,
+        remainderDueOn: data.remainderDueOn,
+      });
+      return result.title;
     },
   );
 
@@ -299,23 +284,16 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         params: z.object({ id: z.string().uuid() }),
       },
     },
-    async (request, reply) => {
+    async (request, _reply) => {
       const { tenantId } = request.user;
       const { id } = request.params;
 
-      try {
-        const updated = await reverseSettlement({
-          kind: 'payable',
-          tenantId,
-          titleId: id,
-        });
-        return updated;
-      } catch (error) {
-        if (error instanceof SettlementError) {
-          return reply.status(error.status).send({ message: error.message });
-        }
-        throw error;
-      }
+      const updated = await reverseSettlement({
+        kind: 'payable',
+        tenantId,
+        titleId: id,
+      });
+      return updated;
     },
   );
 };

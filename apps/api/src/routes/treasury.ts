@@ -21,7 +21,6 @@ import { listCashFlow } from '../services/settlement.ts';
 import {
   createTreasuryTransfer,
   reverseTreasuryTransfer,
-  TransferError,
 } from '../services/treasury-transfer.ts';
 
 const dateString = z
@@ -311,44 +310,30 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (fastify) => {
     { schema: { body: transferBody } },
     async (request, reply) => {
       const data = request.body;
-      try {
-        const transfer = await createTreasuryTransfer({
-          tenantId: request.user.tenantId,
-          occurredOn: data.occurredOn,
-          amount: data.amount,
-          fromTreasury: data.fromTreasury,
-          fromBankAccountId: data.fromBankAccountId,
-          toTreasury: data.toTreasury,
-          toBankAccountId: data.toBankAccountId,
-          description: data.description,
-        });
-        return reply.status(201).send(transfer);
-      } catch (error) {
-        if (error instanceof TransferError) {
-          return reply.status(error.status).send({ message: error.message });
-        }
-        throw error;
-      }
+      const transfer = await createTreasuryTransfer({
+        tenantId: request.user.tenantId,
+        occurredOn: data.occurredOn,
+        amount: data.amount,
+        fromTreasury: data.fromTreasury,
+        fromBankAccountId: data.fromBankAccountId,
+        toTreasury: data.toTreasury,
+        toBankAccountId: data.toBankAccountId,
+        description: data.description,
+      });
+      return reply.status(201).send(transfer);
     },
   );
 
   fastify.delete(
     '/transfers/:id',
     { schema: { params: z.object({ id: z.string().uuid() }) } },
-    async (request, reply) => {
+    async (request, _reply) => {
       const { id } = request.params;
-      try {
-        const reversed = await reverseTreasuryTransfer({
-          tenantId: request.user.tenantId,
-          transferId: id,
-        });
-        return reversed;
-      } catch (error) {
-        if (error instanceof TransferError) {
-          return reply.status(error.status).send({ message: error.message });
-        }
-        throw error;
-      }
+      const reversed = await reverseTreasuryTransfer({
+        tenantId: request.user.tenantId,
+        transferId: id,
+      });
+      return reversed;
     },
   );
 };

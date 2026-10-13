@@ -11,8 +11,12 @@ function walk(error: unknown, acc: PgErrorLike[] = []): PgErrorLike[] {
   return acc;
 }
 
+export function findPgError(error: unknown, code: string): PgErrorLike | null {
+  return walk(error).find((item) => item.code === code) ?? null;
+}
+
 export function uniqueViolation(error: unknown): PgErrorLike | null {
-  return walk(error).find((item) => item.code === '23505') ?? null;
+  return findPgError(error, '23505');
 }
 
 export function uniqueConflictMessage(
@@ -23,7 +27,8 @@ export function uniqueConflictMessage(
   const violation = uniqueViolation(error);
   if (!violation) return null;
 
-  const haystack = `${violation.constraint ?? ''} ${violation.detail ?? ''}`.toLowerCase();
+  const haystack =
+    `${violation.constraint ?? ''} ${violation.detail ?? ''}`.toLowerCase();
   const match = Object.entries(messages)
     .sort(([left], [right]) => right.length - left.length)
     .find(([needle]) => haystack.includes(needle.toLowerCase()));

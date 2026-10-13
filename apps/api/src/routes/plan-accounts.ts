@@ -6,15 +6,6 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../db/index.ts';
-import { uniqueConflictMessage } from '../lib/postgres-errors.ts';
-
-const planAccountUniqueMessages = {
-  plan_accounts_tenant_account_code_unique:
-    'Já existe um plano de contas com este código.',
-  account_code: 'Já existe um plano de contas com este código.',
-  plan_accounts_tenant_name_unique: 'Já existe um plano de contas com este nome.',
-  '(name)': 'Já existe um plano de contas com este nome.',
-};
 
 const planAccountTypes = ['revenue', 'expense', 'bank', 'withdrawal'] as const;
 
@@ -64,25 +55,15 @@ export const planAccountsRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const { tenantId } = request.user;
       const data = request.body;
 
-      try {
-        const [created] = await db
-          .insert(planAccounts)
-          .values({
-            ...toPlanAccountValues(data),
-            tenantId,
-          })
-          .returning();
+      const [created] = await db
+        .insert(planAccounts)
+        .values({
+          ...toPlanAccountValues(data),
+          tenantId,
+        })
+        .returning();
 
-        return reply.status(201).send(created);
-      } catch (error) {
-        const message = uniqueConflictMessage(
-          error,
-          planAccountUniqueMessages,
-          'Já existe um plano de contas com estes dados.',
-        );
-        if (message) return reply.status(409).send({ message });
-        throw error;
-      }
+      return reply.status(201).send(created);
     },
   );
 
@@ -181,27 +162,17 @@ export const planAccountsRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const { id } = request.params;
       const data = request.body;
 
-      try {
-        const [updated] = await db
-          .update(planAccounts)
-          .set(toPlanAccountValues(data))
-          .where(and(eq(planAccounts.id, id), eq(planAccounts.tenantId, tenantId)))
-          .returning();
+      const [updated] = await db
+        .update(planAccounts)
+        .set(toPlanAccountValues(data))
+        .where(and(eq(planAccounts.id, id), eq(planAccounts.tenantId, tenantId)))
+        .returning();
 
-        if (!updated) {
-          return reply.status(404).send({ message: 'Plano de contas não encontrado.' });
-        }
-
-        return updated;
-      } catch (error) {
-        const message = uniqueConflictMessage(
-          error,
-          planAccountUniqueMessages,
-          'Já existe um plano de contas com estes dados.',
-        );
-        if (message) return reply.status(409).send({ message });
-        throw error;
+      if (!updated) {
+        return reply.status(404).send({ message: 'Plano de contas não encontrado.' });
       }
+
+      return updated;
     },
   );
 
@@ -218,44 +189,35 @@ export const planAccountsRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const { tenantId } = request.user;
       const { id } = request.params;
 
-      try {
-        const [hasPayable] = await db
-          .select({ id: payables.id })
-          .from(payables)
-          .where(and(eq(payables.planAccountId, id), eq(payables.tenantId, tenantId)))
-          .limit(1);
+      const [hasPayable] = await db
+        .select({ id: payables.id })
+        .from(payables)
+        .where(and(eq(payables.planAccountId, id), eq(payables.tenantId, tenantId)))
+        .limit(1);
 
-        const [hasReceivable] = await db
-          .select({ id: receivables.id })
-          .from(receivables)
-          .where(
-            and(eq(receivables.planAccountId, id), eq(receivables.tenantId, tenantId)),
-          )
-          .limit(1);
+      const [hasReceivable] = await db
+        .select({ id: receivables.id })
+        .from(receivables)
+        .where(and(eq(receivables.planAccountId, id), eq(receivables.tenantId, tenantId)))
+        .limit(1);
 
-        if (hasPayable || hasReceivable) {
-          return reply.status(400).send({
-            message:
-              'Não é possível excluir este plano de contas porque ele possui lançamentos financeiros vinculados.',
-          });
-        }
-
-        const [deleted] = await db
-          .delete(planAccounts)
-          .where(and(eq(planAccounts.id, id), eq(planAccounts.tenantId, tenantId)))
-          .returning();
-
-        if (!deleted) {
-          return reply.status(404).send({ message: 'Plano de contas não encontrado.' });
-        }
-
-        return { success: true };
-      } catch (error) {
-        fastify.log.error(error);
-        return reply
-          .status(500)
-          .send({ message: 'Erro interno ao tentar excluir o registro.' });
+      if (hasPayable || hasReceivable) {
+        return reply.status(400).send({
+          message:
+            'Não é possível excluir este plano de contas porque ele possui lançamentos financeiros vinculados.',
+        });
       }
+
+      const [deleted] = await db
+        .delete(planAccounts)
+        .where(and(eq(planAccounts.id, id), eq(planAccounts.tenantId, tenantId)))
+        .returning();
+
+      if (!deleted) {
+        return reply.status(404).send({ message: 'Plano de contas não encontrado.' });
+      }
+
+      return { success: true };
     },
   );
 };

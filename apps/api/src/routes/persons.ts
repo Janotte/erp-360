@@ -21,17 +21,9 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../db/index.js';
-import { uniqueConflictMessage } from '../lib/postgres-errors.ts';
-import { CnpjLookupError, lookupCnpj } from '../services/cnpj-lookup.ts';
+import { lookupCnpj } from '../services/cnpj-lookup.ts';
 import { personAddressRoutes } from './person-addresses.js';
 import { personContactRoutes } from './person-contacts.js';
-
-const personUniqueMessages = {
-  persons_tenant_tax_id_unique: 'Já existe uma pessoa com este documento.',
-  tax_id: 'Já existe uma pessoa com este documento.',
-  persons_tenant_name_unique: 'Já existe uma pessoa com este nome.',
-  '(name)': 'Já existe uma pessoa com este nome.',
-};
 
 function personDocumentError(data: Person) {
   const taxId = data.taxId?.trim();
@@ -117,16 +109,9 @@ export const personsRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.get(
     '/lookup/cnpj/:cnpj',
     { schema: { params: z.object({ cnpj: z.string().min(14).max(18) }) } },
-    async (request, reply) => {
+    async (request, _reply) => {
       const { cnpj } = request.params;
-      try {
-        return await lookupCnpj({ tenantId: request.user.tenantId, cnpj });
-      } catch (error) {
-        if (error instanceof CnpjLookupError) {
-          return reply.status(error.status).send({ message: error.message });
-        }
-        throw error;
-      }
+      return await lookupCnpj({ tenantId: request.user.tenantId, cnpj });
     },
   );
 
@@ -144,25 +129,15 @@ export const personsRoutes: FastifyPluginAsyncZod = async (fastify) => {
         return reply.status(400).send({ message: documentError });
       }
 
-      try {
-        const [newPerson] = await db
-          .insert(persons)
-          .values({
-            ...toPersonValues(data),
-            tenantId,
-          })
-          .returning();
+      const [newPerson] = await db
+        .insert(persons)
+        .values({
+          ...toPersonValues(data),
+          tenantId,
+        })
+        .returning();
 
-        return reply.status(201).send(serializePerson(newPerson));
-      } catch (error) {
-        const message = uniqueConflictMessage(
-          error,
-          personUniqueMessages,
-          'Já existe uma pessoa com estes dados.',
-        );
-        if (message) return reply.status(409).send({ message });
-        throw error;
-      }
+      return reply.status(201).send(serializePerson(newPerson));
     },
   );
 
@@ -295,27 +270,17 @@ export const personsRoutes: FastifyPluginAsyncZod = async (fastify) => {
         return reply.status(400).send({ message: documentError });
       }
 
-      try {
-        const [person] = await db
-          .update(persons)
-          .set(toPersonValues(data))
-          .where(and(eq(persons.id, id), eq(persons.tenantId, tenantId)))
-          .returning();
+      const [person] = await db
+        .update(persons)
+        .set(toPersonValues(data))
+        .where(and(eq(persons.id, id), eq(persons.tenantId, tenantId)))
+        .returning();
 
-        if (!person) {
-          return reply.status(404).send({ message: 'Pessoa não encontrada' });
-        }
-
-        return serializePerson(person);
-      } catch (error) {
-        const message = uniqueConflictMessage(
-          error,
-          personUniqueMessages,
-          'Já existe uma pessoa com estes dados.',
-        );
-        if (message) return reply.status(409).send({ message });
-        throw error;
+      if (!person) {
+        return reply.status(404).send({ message: 'Pessoa não encontrada' });
       }
+
+      return serializePerson(person);
     },
   );
 
@@ -332,45 +297,38 @@ export const personsRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const { tenantId } = request.user;
       const { id } = request.params;
 
-      try {
-        const [hasPayable] = await db
-          .select()
-          .from(payables)
-          .where(and(eq(payables.creditorId, id), eq(payables.tenantId, tenantId)))
-          .limit(1);
+      const [hasPayable] = await db
+        .select()
+        .from(payables)
+        .where(and(eq(payables.creditorId, id), eq(payables.tenantId, tenantId)))
+        .limit(1);
 
-        const [hasReceivable] = await db
-          .select()
-          .from(receivables)
-          .where(and(eq(receivables.debtorId, id), eq(receivables.tenantId, tenantId)))
-          .limit(1);
+      const [hasReceivable] = await db
+        .select()
+        .from(receivables)
+        .where(and(eq(receivables.debtorId, id), eq(receivables.tenantId, tenantId)))
+        .limit(1);
 
-        // Se houver qualquer vínculo, bloqueia e retorna erro 400
-        if (hasPayable || hasReceivable) {
-          return reply.status(400).send({
-            message:
-              'Não é possível excluir esta pessoa porque ela possui movimentações financeiras vinculadas.',
-          });
-        }
-
-        // Executa a deleção garantindo que a pessoa pertence ao Tenant do usuário logado
-        const [deletedPerson] = await db
-          .delete(persons)
-          .where(and(eq(persons.id, id), eq(persons.tenantId, tenantId)))
-          .returning();
-
-        // Se o ID não existir ou pertencer a outro tenant, o array retornará vazio
-        if (!deletedPerson) {
-          return reply.status(404).send({ message: 'Pessoa não encontrada' });
-        }
-
-        return { success: true };
-      } catch (error) {
-        fastify.log.error(error);
-        return reply
-          .status(500)
-          .send({ message: 'Erro interno ao tentar excluir o registro.' });
+      // Se houver qualquer vínculo, bloqueia e retorna erro 400
+      if (hasPayable || hasReceivable) {
+        return reply.status(400).send({
+          message:
+            'Não é possível excluir esta pessoa porque ela possui movimentações financeiras vinculadas.',
+        });
       }
+
+      // Executa a deleção garantindo que a pessoa pertence ao Tenant do usuário logado
+      const [deletedPerson] = await db
+        .delete(persons)
+        .where(and(eq(persons.id, id), eq(persons.tenantId, tenantId)))
+        .returning();
+
+      // Se o ID não existir ou pertencer a outro tenant, o array retornará vazio
+      if (!deletedPerson) {
+        return reply.status(404).send({ message: 'Pessoa não encontrada' });
+      }
+
+      return { success: true };
     },
   );
 };
