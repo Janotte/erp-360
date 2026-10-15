@@ -25,6 +25,7 @@ export interface FinancialAccount {
   settledOn?: string;
   settledAmount?: number;
   status: 'pendente' | 'pago' | 'recebido' | 'cancelado';
+  personName?: string;
   planAccountId?: string;
   invoiceNumber?: string;
   bearerName?: string;
@@ -61,6 +62,7 @@ function fromPayable(row: PayableTitle): FinancialAccount {
     settledOn: definedText(row.paidOn),
     settledAmount: definedAmount(row.paidAmount),
     status: row.status,
+    personName: definedText(row.personName),
     planAccountId: definedText(row.planAccountId),
   };
 }
@@ -77,6 +79,7 @@ function fromReceivable(row: ReceivableTitle): FinancialAccount {
     settledOn: definedText(row.receivedOn),
     settledAmount: definedAmount(row.receivedAmount),
     status: row.status,
+    personName: definedText(row.personName),
     planAccountId: definedText(row.planAccountId),
     invoiceNumber: definedText(row.invoiceNumber),
     bearerName: definedText(row.bearerName),

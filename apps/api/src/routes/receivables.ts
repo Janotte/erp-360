@@ -1,8 +1,9 @@
 import '../types/fastify.ts';
 
 import { receivables } from '@erp-360/mod-financial';
+import { persons } from '@erp-360/mod-persons';
 import { escapeIlike } from '@erp-360/shared';
-import { and, asc, desc, eq, gte, ilike, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, ilike, lte, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -141,9 +142,15 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           or(
             ilike(receivables.description, like),
             ilike(receivables.documentNumber, like),
+            sql`unaccent(${persons.name}) ilike unaccent(${like})`,
           )!,
         );
       }
+
+      const debtor = and(
+        eq(persons.id, receivables.debtorId),
+        eq(persons.tenantId, receivables.tenantId),
+      );
 
       const sortColumns = {
         description: receivables.description,
@@ -157,8 +164,12 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           : [desc(sortColumn), asc(receivables.id)];
 
       const data = await db
-        .select()
+        .select({
+          ...getTableColumns(receivables),
+          personName: persons.name,
+        })
         .from(receivables)
+        .innerJoin(persons, debtor)
         .where(and(...conditions))
         .orderBy(...orderBy)
         .limit(limit)
@@ -167,6 +178,7 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const [totalCount] = await db
         .select({ count: sql<number>`count(*)` })
         .from(receivables)
+        .innerJoin(persons, debtor)
         .where(and(...conditions));
 
       return reply.send({

@@ -16,6 +16,7 @@ export const payableTitleSchema = z.object({
   paidAmount: cents,
   status: z.enum(['pendente', 'pago', 'cancelado']),
   planAccountId: id,
+  personName: text,
 });
 
 export type PayableTitle = z.infer<typeof payableTitleSchema>;
@@ -40,6 +41,7 @@ export const receivableTitleSchema = z.object({
   paymentMethodId: id,
   cardBrandId: id,
   transactionAuthorization: text,
+  personName: text,
 });
 
 export type ReceivableTitle = z.infer<typeof receivableTitleSchema>;

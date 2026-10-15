@@ -220,7 +220,7 @@ export function ReceivableList() {
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
             <Input
-              placeholder="Buscar por descrição ou documento..."
+              placeholder="Buscar por devedor, descrição ou documento..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               className="pl-9"
@@ -276,6 +276,7 @@ export function ReceivableList() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Devedor</TableHead>
               <TableHead
                 onClick={() => changeSort('description')}
                 className="cursor-pointer select-none hover:bg-zinc-50"
@@ -309,13 +310,14 @@ export function ReceivableList() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-4">
+                <TableCell colSpan={8} className="text-center py-4">
                   Carregando dados...
                 </TableCell>
               </TableRow>
             ) : accounts?.length ? (
               accounts.map((acc) => (
                 <TableRow key={acc.id}>
+                  <TableCell>{acc.personName || '-'}</TableCell>
                   <TableCell className="font-medium">{acc.description}</TableCell>
                   <TableCell>{acc.documentNumber || '-'}</TableCell>
                   <TableCell>{formatRawDate(acc.dueOn)}</TableCell>
@@ -385,7 +387,7 @@ export function ReceivableList() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-4 text-zinc-500">
+                <TableCell colSpan={8} className="text-center py-4 text-zinc-500">
                   Nenhuma conta a receber encontrada.
                 </TableCell>
               </TableRow>

@@ -220,7 +220,7 @@ export function PayableList() {
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
             <Input
-              placeholder="Buscar por descrição ou documento..."
+              placeholder="Buscar por credor, descrição ou documento..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               className="pl-9"
@@ -277,6 +277,7 @@ export function PayableList() {
           <TableHeader>
             <TableRow>
               <TableHead>Documento</TableHead>
+              <TableHead>Credor</TableHead>
               <TableHead
                 onClick={() => changeSort('description')}
                 className="cursor-pointer select-none hover:bg-zinc-50"
@@ -309,7 +310,7 @@ export function PayableList() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-4">
+                <TableCell colSpan={8} className="text-center py-4">
                   Carregando dados...
                 </TableCell>
               </TableRow>
@@ -317,6 +318,7 @@ export function PayableList() {
               accounts.map((acc) => (
                 <TableRow key={acc.id}>
                   <TableCell>{acc.documentNumber || '-'}</TableCell>
+                  <TableCell>{acc.personName || '-'}</TableCell>
                   <TableCell className="font-medium">{acc.description}</TableCell>
                   <TableCell>{formatRawDate(acc.dueOn)}</TableCell>
                   <TableCell className="text-right tabular-nums text-red-600">
@@ -385,7 +387,7 @@ export function PayableList() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-4 text-zinc-500">
+                <TableCell colSpan={8} className="text-center py-4 text-zinc-500">
                   Nenhuma conta a pagar encontrada.
                 </TableCell>
               </TableRow>
