@@ -207,9 +207,7 @@ export const personsService = {
   },
   lookupCep: async (cep: string): Promise<CepLookupResult> => {
     const digits = onlyDigits(cep);
-    const res = await fetch(`${API_URL}/persons/lookup/cep/${digits}`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`/persons/lookup/cep/${digits}`);
     const body = await readBody(res);
     if (!res.ok) {
       throw new Error(body.message || body.error || 'Falha ao consultar o CEP.');
