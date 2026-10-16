@@ -1,4 +1,4 @@
-import { maskCurrencyInput, parseCurrencyToCents } from '@erp-360/shared';
+import { civilDate, maskCurrencyInput, parseCurrencyToCents } from '@erp-360/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -29,7 +29,7 @@ function parseSide(value: string): { treasury: 'cash' | 'bank'; bankAccountId: s
 
 export function TransferModal({ mode, accounts, onSuccess }: TransferModalProps) {
   const queryClient = useQueryClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = civilDate();
   const operating = accounts.filter((item) => (item.kind ?? 'operating') === 'operating');
   const investments = accounts.filter((item) => item.kind === 'investment');
 

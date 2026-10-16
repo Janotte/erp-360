@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+import { markSessionActive } from '../../services/apiClient';
 import { sendLoginAPI } from '../../services/auth';
 import { authStorage } from '../../utils/auth';
 
@@ -28,6 +29,7 @@ export function Login() {
     onSuccess: (data) => {
       void queryClient.cancelQueries();
       queryClient.clear();
+      markSessionActive();
       authStorage.setToken(data.token);
       navigate('/dashboard');
     },

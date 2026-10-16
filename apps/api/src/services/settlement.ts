@@ -7,6 +7,7 @@ import {
   receivables,
   settlements,
 } from '@erp-360/mod-financial';
+import { civilDate } from '@erp-360/shared';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
 import { db, type DbClient } from '../db/index.ts';
@@ -645,8 +646,7 @@ export async function recalcBankBalances(
 }
 
 export async function listCashFlow(tenantId: string, days = 60) {
-  const today = new Date();
-  const todayIso = today.toISOString().slice(0, 10);
+  const todayIso = civilDate();
   const endIso = addDays(todayIso, days - 1);
 
   const [cash] = await db

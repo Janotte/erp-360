@@ -1,4 +1,5 @@
 import {
+  civilDate,
   formatCurrency,
   formatCurrencyInput,
   formatRawDate,
@@ -37,7 +38,7 @@ export function PayableForm({
   const [personId, setPersonId] = useState('');
   const [documentNumber, setDocumentNumber] = useState('');
   const [description, setDescription] = useState('');
-  const [issueOn, setIssueOn] = useState(new Date().toISOString().split('T')[0]);
+  const [issueOn, setIssueOn] = useState(civilDate());
   const [dueOn, setDueOn] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [planAccountId, setPlanAccountId] = useState('');

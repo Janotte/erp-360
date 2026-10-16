@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import {
   BrowserRouter,
   Navigate,
@@ -26,6 +26,7 @@ import { ReceivableList } from './components/Financial/Receivables/ReceivableLis
 import { FinancialSettingsForm } from './components/Financial/Settings/FinancialSettingsForm';
 import { Navbar } from './components/Navbar';
 import { ListPersons } from './components/Persons/ListPersons';
+import { setUnauthorizedHandler } from './services/apiClient';
 import { authStorage } from './utils/auth';
 
 const rotasPorHash: Record<string, string> = {
@@ -71,6 +72,22 @@ function Pagina({ children }: { children: ReactNode }) {
   );
 }
 
+function SessaoExpirada() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      void queryClient.cancelQueries();
+      queryClient.clear();
+      navigate('/login', { replace: true });
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [navigate, queryClient]);
+
+  return null;
+}
+
 function AreaLogada() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -97,6 +114,7 @@ function AreaLogada() {
 function App() {
   return (
     <BrowserRouter>
+      <SessaoExpirada />
       <Routes>
         <Route element={<Raiz />}>
           <Route

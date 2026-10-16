@@ -19,6 +19,7 @@ import { personsRoutes } from './routes/persons.ts';
 import { planAccountsRoutes } from './routes/plan-accounts.ts';
 import { receivablesRoutes } from './routes/receivables.ts';
 import { treasuryRoutes } from './routes/treasury.ts';
+import { activeUser } from './services/active-user.ts';
 
 const fastify = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
 
@@ -41,6 +42,11 @@ fastify.decorate('autenticarETenant', async (request, reply) => {
   try {
     await request.jwtVerify();
   } catch {
+    return reply.status(401).send({ message: 'Não autorizado' });
+  }
+
+  const user = await activeUser(request.user.userId, request.user.tenantId);
+  if (!user) {
     return reply.status(401).send({ message: 'Não autorizado' });
   }
 });

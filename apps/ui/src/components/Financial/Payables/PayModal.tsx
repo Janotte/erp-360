@@ -1,4 +1,5 @@
 import {
+  civilDate,
   formatCurrency,
   formatCurrencyInput,
   maskCurrencyInput,
@@ -23,14 +24,18 @@ interface PayModalProps {
 }
 
 function addDays(iso: string, days: number) {
-  const date = new Date(`${iso}T00:00:00`);
+  const [year, month, day] = iso.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
   date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  const nextYear = date.getFullYear();
+  const nextMonth = String(date.getMonth() + 1).padStart(2, '0');
+  const nextDay = String(date.getDate()).padStart(2, '0');
+  return `${nextYear}-${nextMonth}-${nextDay}`;
 }
 
 export function PayModal({ tipo, account, onSuccess }: PayModalProps) {
   const queryClient = useQueryClient();
-  const today = new Date().toISOString().split('T')[0];
+  const today = civilDate();
   const [settledOn, setSettledOn] = useState(today);
   const [valorPagoStr, setValorPagoStr] = useState(
     formatCurrencyInput(account.installmentAmount),
