@@ -204,6 +204,13 @@
       "when": 1792119174579,
       "tag": "0028_drop_plan_account_type",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792192853971,
+      "tag": "0029_tenant_due_list_idx",
+      "breakpoints": true
     }
   ]
 }

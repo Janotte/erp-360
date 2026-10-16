@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import {
   date,
   foreignKey,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -62,6 +63,7 @@ export const payables = pgTable(
       foreignColumns: [planAccounts.id, planAccounts.tenantId],
     }).onDelete('restrict'),
     unique('payables_id_tenant_id_unique').on(table.id, table.tenantId),
+    index('payables_tenant_due_idx').on(table.tenantId, table.dueOn, table.id),
     foreignKey({
       name: 'payables_original_title_tenant_fk',
       columns: [table.originalTitleId, table.tenantId],

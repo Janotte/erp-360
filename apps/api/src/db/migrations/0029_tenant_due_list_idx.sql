@@ -1,0 +1,2 @@
+CREATE INDEX "payables_tenant_due_idx" ON "payables" USING btree ("tenant_id","due_on","id");--> statement-breakpoint
+CREATE INDEX "receivables_tenant_due_idx" ON "receivables" USING btree ("tenant_id","due_on","id");

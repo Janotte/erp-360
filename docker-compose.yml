@@ -1,14 +1,20 @@
-version: '3.8'
+# Desenvolvimento local. As variáveis vêm de apps/api/.env via --env-file.
 services:
   postgres:
     image: postgres:16-alpine
     container_name: erp-360-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: mysecretpassword
-      POSTGRES_DB: erp360_db
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Defina DATABASE_PASSWORD em apps/api/.env}
+      POSTGRES_DB: ${DATABASE_NAME:-erp360_db}
     ports:
-      - '5432:5432'
+      - '${DATABASE_PORT:-5432}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     volumes:
       - pgdata:/var/lib/postgresql/data
 volumes:
