@@ -2,7 +2,12 @@ import '../../types/fastify.ts';
 
 import { receivables } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
-import { escapeIlike } from '@erp-360/shared';
+import {
+  escapeIlike,
+  receivableTitleSchema,
+  settlementPreviewSchema,
+  titlePageSchema,
+} from '@erp-360/shared';
 import { and, asc, desc, eq, getTableColumns, gte, ilike, lte, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -17,6 +22,8 @@ import {
 const dateString = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de data deve ser YYYY-MM-DD');
+
+const errorMessageSchema = z.object({ message: z.string() });
 
 /** Query string "false" não pode passar por z.coerce.boolean — Boolean("false") === true. */
 const queryBoolean = z
@@ -82,7 +89,12 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
   fastify.post(
     '/',
-    { schema: { body: createReceivableSchema } },
+    {
+      schema: {
+        body: createReceivableSchema,
+        response: { 201: receivableTitleSchema },
+      },
+    },
     async (request, reply) => {
       const { tenantId } = request.user;
       const data = request.body;
@@ -116,7 +128,12 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
   fastify.get(
     '/',
-    { schema: { querystring: listReceivablesQuery } },
+    {
+      schema: {
+        querystring: listReceivablesQuery,
+        response: { 200: titlePageSchema(receivableTitleSchema) },
+      },
+    },
     async (request, reply) => {
       const { tenantId } = request.user;
       const {
@@ -202,6 +219,7 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           settledOn: dateString,
           waiveCharges: queryBoolean,
         }),
+        response: { 200: settlementPreviewSchema },
       },
     },
     async (request, _reply) => {
@@ -224,6 +242,7 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: receiveSchema,
+        response: { 200: receivableTitleSchema },
       },
     },
     async (request, _reply) => {
@@ -245,7 +264,7 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         remainderDueOn: data.remainderDueOn,
         includeChargesOnNewTitle: data.includeChargesOnNewTitle,
       });
-      return result.title;
+      return receivableTitleSchema.parse(result.title);
     },
   );
 
@@ -255,6 +274,11 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: createReceivableSchema,
+        response: {
+          200: receivableTitleSchema,
+          400: errorMessageSchema,
+          404: errorMessageSchema,
+        },
       },
     },
     async (request, reply) => {
@@ -342,6 +366,7 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
     {
       schema: {
         params: z.object({ id: z.string().uuid() }),
+        response: { 200: receivableTitleSchema },
       },
     },
     async (request, _reply) => {
@@ -353,7 +378,7 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         tenantId,
         titleId: id,
       });
-      return updated;
+      return receivableTitleSchema.parse(updated);
     },
   );
 };

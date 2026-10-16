@@ -2,7 +2,12 @@ import '../../types/fastify.ts';
 
 import { payables } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
-import { escapeIlike } from '@erp-360/shared';
+import {
+  escapeIlike,
+  payableTitleSchema,
+  settlementPreviewSchema,
+  titlePageSchema,
+} from '@erp-360/shared';
 import { and, asc, desc, eq, getTableColumns, gte, ilike, lte, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -17,6 +22,8 @@ import {
 const dateString = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de data deve ser YYYY-MM-DD');
+
+const errorMessageSchema = z.object({ message: z.string() });
 
 const createPayableSchema = z.object({
   creditorId: z.string().uuid({ message: 'Creditor ID precisa ser um UUID válido' }),
@@ -58,31 +65,40 @@ const listPayablesQuery = z.object({
 export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
 
-  fastify.post('/', { schema: { body: createPayableSchema } }, async (request, reply) => {
-    const { tenantId } = request.user;
-    const data = request.body;
+  fastify.post(
+    '/',
+    { schema: { body: createPayableSchema, response: { 201: payableTitleSchema } } },
+    async (request, reply) => {
+      const { tenantId } = request.user;
+      const data = request.body;
 
-    const [newAccount] = await db
-      .insert(payables)
-      .values({
-        creditorId: data.creditorId,
-        documentNumber: data.documentNumber || null,
-        description: data.description,
-        issueOn: data.issueOn,
-        installmentAmount: data.installmentAmount,
-        dueOn: data.dueOn,
-        planAccountId: data.planAccountId || null,
-        tenantId,
-        status: 'pendente',
-      })
-      .returning();
+      const [newAccount] = await db
+        .insert(payables)
+        .values({
+          creditorId: data.creditorId,
+          documentNumber: data.documentNumber || null,
+          description: data.description,
+          issueOn: data.issueOn,
+          installmentAmount: data.installmentAmount,
+          dueOn: data.dueOn,
+          planAccountId: data.planAccountId || null,
+          tenantId,
+          status: 'pendente',
+        })
+        .returning();
 
-    return reply.status(201).send(newAccount);
-  });
+      return reply.status(201).send(newAccount);
+    },
+  );
 
   fastify.get(
     '/',
-    { schema: { querystring: listPayablesQuery } },
+    {
+      schema: {
+        querystring: listPayablesQuery,
+        response: { 200: titlePageSchema(payableTitleSchema) },
+      },
+    },
     async (request, reply) => {
       const { tenantId } = request.user;
       const {
@@ -167,6 +183,7 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         querystring: z.object({
           settledOn: dateString,
         }),
+        response: { 200: settlementPreviewSchema },
       },
     },
     async (request, _reply) => {
@@ -188,6 +205,7 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: paySchema,
+        response: { 200: payableTitleSchema },
       },
     },
     async (request, _reply) => {
@@ -207,7 +225,7 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         differencePlanAccountId: data.differencePlanAccountId,
         remainderDueOn: data.remainderDueOn,
       });
-      return result.title;
+      return payableTitleSchema.parse(result.title);
     },
   );
 
@@ -217,6 +235,11 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       schema: {
         params: z.object({ id: z.string().uuid() }),
         body: createPayableSchema,
+        response: {
+          200: payableTitleSchema,
+          400: errorMessageSchema,
+          404: errorMessageSchema,
+        },
       },
     },
     async (request, reply) => {
@@ -296,6 +319,7 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
     {
       schema: {
         params: z.object({ id: z.string().uuid() }),
+        response: { 200: payableTitleSchema },
       },
     },
     async (request, _reply) => {
@@ -307,7 +331,7 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         tenantId,
         titleId: id,
       });
-      return updated;
+      return payableTitleSchema.parse(updated);
     },
   );
 };
