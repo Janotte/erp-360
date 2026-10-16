@@ -11,10 +11,10 @@ import { db } from '../db/index.ts';
 const planAccountTypes = ['revenue', 'expense', 'bank', 'withdrawal'] as const;
 
 const planAccountBodySchema = z.object({
-  accountCode: z.string().min(1, 'Código é obrigatório').max(10),
+  accountCode: z.string().min(1, 'Código é obrigatório').max(15),
   name: z.string().min(1, 'Nome é obrigatório').max(120),
   type: z.enum(planAccountTypes),
-  parentAccountCode: z.string().max(10).optional().nullable(),
+  parentAccountCode: z.string().max(15).optional().nullable(),
   accountingDescription: z.string().max(60).optional().nullable(),
   accountIdentifier: z.string().max(10).optional().nullable(),
   accountingAccountCode: z.string().max(20).optional().nullable(),

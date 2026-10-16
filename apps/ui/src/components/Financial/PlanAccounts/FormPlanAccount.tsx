@@ -115,7 +115,7 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
           <Input
             id="accountCode"
             value={accountCode}
-            maxLength={10}
+            maxLength={15}
             onChange={(e) => setAccountCode(e.target.value)}
             required
           />
@@ -144,7 +144,7 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
           <Input
             id="parentAccountCode"
             value={parentAccountCode}
-            maxLength={10}
+            maxLength={15}
             onChange={(e) => setParentAccountCode(e.target.value)}
           />
         </div>

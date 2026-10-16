@@ -22,13 +22,13 @@ export const planAccounts = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     ...tenantColumns,
     /** Código do plano de contas */
-    accountCode: varchar('account_code', { length: 10 }).notNull(),
+    accountCode: varchar('account_code', { length: 15 }).notNull(),
     /** Nome do plano de contas */
     name: varchar('name', { length: 120 }).notNull(),
     /** Tipo de plano de contas */
     type: typePlanAccountEnum('type').notNull(),
     /** Código do plano de contas pai */
-    parentAccountCode: varchar('parent_account_code', { length: 10 }),
+    parentAccountCode: varchar('parent_account_code', { length: 15 }),
     /** Saldo da conta no dia (centavos) */
     dayBalance: integer('day_balance'),
     /** Saldo da conta no mês (centavos) */

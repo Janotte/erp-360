@@ -183,6 +183,13 @@
       "when": 1791847694842,
       "tag": "0025_nasty_silver_surfer",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792113851639,
+      "tag": "0026_amused_patriot",
+      "breakpoints": true
     }
   ]
 }
