@@ -6,8 +6,8 @@ import {
 } from '@erp-360/mod-financial';
 import { and, eq } from 'drizzle-orm';
 
-import { db, type DbClient } from '../db/index.ts';
-import { recalcBankBalances, recalcCashBalances } from './settlement.ts';
+import { db, type DbClient } from '../../db/index.ts';
+import { recalcBankBalances, recalcCashBalances } from '../titles/settlement.ts';
 
 export class TransferError extends Error {
   status: number;

@@ -11,15 +11,15 @@ import {
 
 import { env } from './config/index.ts';
 import { registerErrorHandler } from './lib/error-handler.ts';
-import { authRoutes } from './routes/auth.js';
-import { financialCatalogRoutes } from './routes/financial-catalogs.ts';
-import { locationsRoutes } from './routes/locations.ts';
-import { payablesRoutes } from './routes/payables.ts';
-import { personsRoutes } from './routes/persons.ts';
-import { planAccountsRoutes } from './routes/plan-accounts.ts';
-import { receivablesRoutes } from './routes/receivables.ts';
-import { treasuryRoutes } from './routes/treasury.ts';
-import { activeUser } from './services/active-user.ts';
+import { activeUser } from './modules/auth/active-user.ts';
+import { authRoutes } from './modules/auth/auth.js';
+import { locationsRoutes } from './modules/persons/locations.ts';
+import { personsRoutes } from './modules/persons/persons.ts';
+import { financialCatalogRoutes } from './modules/plan-accounts/financial-catalogs.ts';
+import { planAccountsRoutes } from './modules/plan-accounts/plan-accounts.ts';
+import { payablesRoutes } from './modules/titles/payables.ts';
+import { receivablesRoutes } from './modules/titles/receivables.ts';
+import { treasuryRoutes } from './modules/treasury/treasury.ts';
 
 const fastify = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
 

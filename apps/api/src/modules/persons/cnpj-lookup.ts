@@ -10,7 +10,7 @@ import {
 } from '@erp-360/shared';
 import { and, eq, sql } from 'drizzle-orm';
 
-import { db } from '../db/index.ts';
+import { db } from '../../db/index.ts';
 
 export class CnpjLookupError extends Error {
   status: number;

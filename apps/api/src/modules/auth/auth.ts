@@ -1,4 +1,4 @@
-import '../types/fastify.js';
+import '../../types/fastify.js';
 
 import { tenants, users } from '@erp-360/mod-core';
 import {
@@ -14,12 +14,12 @@ import { eq } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { db } from '../db/index.js';
+import { db } from '../../db/index.js';
 import {
   clearLoginFailures,
   isLoginBlocked,
   recordLoginFailure,
-} from '../services/login-attempts.js';
+} from './login-attempts.js';
 
 const loginBody = z.object({
   email: z.string().email(),

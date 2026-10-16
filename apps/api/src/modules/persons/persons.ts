@@ -1,4 +1,4 @@
-import '../types/fastify.js';
+import '../../types/fastify.js';
 
 import { payables, receivables } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
@@ -20,9 +20,9 @@ import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { db } from '../db/index.js';
-import { lookupCep } from '../services/cep-lookup.ts';
-import { lookupCnpj } from '../services/cnpj-lookup.ts';
+import { db } from '../../db/index.js';
+import { lookupCep } from './cep-lookup.ts';
+import { lookupCnpj } from './cnpj-lookup.ts';
 import { personAddressRoutes } from './person-addresses.js';
 import { personContactRoutes } from './person-contacts.js';
 

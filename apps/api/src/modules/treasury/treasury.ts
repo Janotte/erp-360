@@ -1,4 +1,4 @@
-import '../types/fastify.ts';
+import '../../types/fastify.ts';
 
 import {
   bankAccounts,
@@ -10,19 +10,19 @@ import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { db } from '../db/index.ts';
-import { getOrCreateFinancialSettings } from '../services/financial-settings.ts';
-import { listIncomeStatement } from '../services/income-statement.ts';
+import { db } from '../../db/index.ts';
+import { listCashFlow } from '../titles/settlement.ts';
+import { getOrCreateFinancialSettings } from './financial-settings.ts';
+import { listIncomeStatement } from './income-statement.ts';
 import {
   loadBankAccount,
   syncBankOpening,
   syncCashOpening,
-} from '../services/opening-balance.ts';
-import { listCashFlow } from '../services/settlement.ts';
+} from './opening-balance.ts';
 import {
   createTreasuryTransfer,
   reverseTreasuryTransfer,
-} from '../services/treasury-transfer.ts';
+} from './treasury-transfer.ts';
 
 const dateString = z
   .string()

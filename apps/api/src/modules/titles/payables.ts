@@ -1,37 +1,25 @@
-import '../types/fastify.ts';
+import '../../types/fastify.ts';
 
-import { receivables } from '@erp-360/mod-financial';
+import { payables } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
 import { escapeIlike } from '@erp-360/shared';
 import { and, asc, desc, eq, getTableColumns, gte, ilike, lte, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { db } from '../db/index.ts';
+import { db } from '../../db/index.ts';
 import {
   previewSettlement,
   reverseSettlement,
   settleTitle,
-} from '../services/settlement.ts';
+} from './settlement.ts';
 
 const dateString = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de data deve ser YYYY-MM-DD');
 
-/** Query string "false" não pode passar por z.coerce.boolean — Boolean("false") === true. */
-const queryBoolean = z
-  .union([
-    z.boolean(),
-    z.literal('true'),
-    z.literal('false'),
-    z.literal('1'),
-    z.literal('0'),
-  ])
-  .optional()
-  .transform((value) => value === true || value === 'true' || value === '1');
-
-const createReceivableSchema = z.object({
-  debtorId: z.string().uuid({ message: 'Debtor ID precisa ser um UUID válido' }),
+const createPayableSchema = z.object({
+  creditorId: z.string().uuid({ message: 'Creditor ID precisa ser um UUID válido' }),
   documentNumber: z.string().max(44).optional(),
   description: z.string().min(1, 'Descrição é obrigatória').max(255),
   issueOn: dateString.optional(),
@@ -41,82 +29,60 @@ const createReceivableSchema = z.object({
     .positive('O valor deve ser maior que zero.'),
   dueOn: dateString,
   planAccountId: z.string().uuid().optional(),
-  bearerName: z.string().max(60).optional(),
-  barcode: z.string().max(50).optional(),
-  bankSlipOurNumber: z.string().max(20).optional(),
-  invoiceNumber: z.string().max(44).optional(),
-  financialInstitutionId: z.string().uuid().optional(),
-  paymentMethodId: z.string().uuid().optional(),
-  cardBrandId: z.string().uuid().optional(),
-  transactionAuthorization: z.string().max(128).optional(),
 });
 
-const receiveSchema = z.object({
+const paySchema = z.object({
   settledOn: dateString,
   settledAmount: z
     .number()
-    .int('O valor recebido deve ser em centavos (inteiro)')
-    .positive('O valor recebido deve ser maior que zero.'),
+    .int('O valor pago deve ser em centavos (inteiro)')
+    .positive('O valor pago deve ser maior que zero.'),
   treasury: z.enum(['cash', 'bank']),
   bankAccountId: z.string().uuid().optional().nullable(),
-  waiveCharges: z.boolean().optional().default(false),
   remainderMode: z.enum(['none', 'new_title', 'plan_account']).optional().default('none'),
   differencePlanAccountId: z.string().uuid().optional().nullable(),
   remainderDueOn: dateString.optional().nullable(),
-  includeChargesOnNewTitle: z.boolean().optional().default(false),
 });
 
-const listReceivablesQuery = z.object({
+const listPayablesQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   sortField: z.enum(['description', 'dueOn', 'installmentAmount']).default('dueOn'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
-  status: z.enum(['pendente', 'recebido', 'cancelado']).optional(),
+  status: z.enum(['pendente', 'pago', 'cancelado']).optional(),
   busca: z.string().optional(),
   dueFrom: dateString.optional(),
   dueTo: dateString.optional(),
 });
 
-export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
+export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
 
-  fastify.post(
-    '/',
-    { schema: { body: createReceivableSchema } },
-    async (request, reply) => {
-      const { tenantId } = request.user;
-      const data = request.body;
+  fastify.post('/', { schema: { body: createPayableSchema } }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const data = request.body;
 
-      const [newAccount] = await db
-        .insert(receivables)
-        .values({
-          debtorId: data.debtorId,
-          documentNumber: data.documentNumber || null,
-          description: data.description,
-          issueOn: data.issueOn,
-          installmentAmount: data.installmentAmount,
-          dueOn: data.dueOn,
-          planAccountId: data.planAccountId || null,
-          bearerName: data.bearerName || null,
-          barcode: data.barcode || null,
-          bankSlipOurNumber: data.bankSlipOurNumber || null,
-          invoiceNumber: data.invoiceNumber || null,
-          financialInstitutionId: data.financialInstitutionId || null,
-          paymentMethodId: data.paymentMethodId || null,
-          cardBrandId: data.cardBrandId || null,
-          transactionAuthorization: data.transactionAuthorization || null,
-          tenantId,
-          status: 'pendente',
-        })
-        .returning();
+    const [newAccount] = await db
+      .insert(payables)
+      .values({
+        creditorId: data.creditorId,
+        documentNumber: data.documentNumber || null,
+        description: data.description,
+        issueOn: data.issueOn,
+        installmentAmount: data.installmentAmount,
+        dueOn: data.dueOn,
+        planAccountId: data.planAccountId || null,
+        tenantId,
+        status: 'pendente',
+      })
+      .returning();
 
-      return reply.status(201).send(newAccount);
-    },
-  );
+    return reply.status(201).send(newAccount);
+  });
 
   fastify.get(
     '/',
-    { schema: { querystring: listReceivablesQuery } },
+    { schema: { querystring: listPayablesQuery } },
     async (request, reply) => {
       const { tenantId } = request.user;
       const {
@@ -131,45 +97,45 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       } = request.query;
 
       const offset = (page - 1) * limit;
-      const conditions = [eq(receivables.tenantId, tenantId)];
+      const conditions = [eq(payables.tenantId, tenantId)];
 
-      if (status) conditions.push(eq(receivables.status, status));
-      if (dueFrom) conditions.push(gte(receivables.dueOn, dueFrom));
-      if (dueTo) conditions.push(lte(receivables.dueOn, dueTo));
+      if (status) conditions.push(eq(payables.status, status));
+      if (dueFrom) conditions.push(gte(payables.dueOn, dueFrom));
+      if (dueTo) conditions.push(lte(payables.dueOn, dueTo));
       if (search) {
         const like = `%${escapeIlike(search)}%`;
         conditions.push(
           or(
-            ilike(receivables.description, like),
-            ilike(receivables.documentNumber, like),
+            ilike(payables.description, like),
+            ilike(payables.documentNumber, like),
             sql`unaccent(${persons.name}) ilike unaccent(${like})`,
           )!,
         );
       }
 
-      const debtor = and(
-        eq(persons.id, receivables.debtorId),
-        eq(persons.tenantId, receivables.tenantId),
+      const creditor = and(
+        eq(persons.id, payables.creditorId),
+        eq(persons.tenantId, payables.tenantId),
       );
 
       const sortColumns = {
-        description: receivables.description,
-        dueOn: receivables.dueOn,
-        installmentAmount: receivables.installmentAmount,
+        description: payables.description,
+        dueOn: payables.dueOn,
+        installmentAmount: payables.installmentAmount,
       } as const;
       const sortColumn = sortColumns[sortField];
       const orderBy =
         sortOrder === 'asc'
-          ? [asc(sortColumn), asc(receivables.id)]
-          : [desc(sortColumn), asc(receivables.id)];
+          ? [asc(sortColumn), asc(payables.id)]
+          : [desc(sortColumn), asc(payables.id)];
 
       const data = await db
         .select({
-          ...getTableColumns(receivables),
+          ...getTableColumns(payables),
           personName: persons.name,
         })
-        .from(receivables)
-        .innerJoin(persons, debtor)
+        .from(payables)
+        .innerJoin(persons, creditor)
         .where(and(...conditions))
         .orderBy(...orderBy)
         .limit(limit)
@@ -177,8 +143,8 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
       const [totalCount] = await db
         .select({ count: sql<number>`count(*)` })
-        .from(receivables)
-        .innerJoin(persons, debtor)
+        .from(payables)
+        .innerJoin(persons, creditor)
         .where(and(...conditions));
 
       return reply.send({
@@ -200,30 +166,28 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         params: z.object({ id: z.string().uuid() }),
         querystring: z.object({
           settledOn: dateString,
-          waiveCharges: queryBoolean,
         }),
       },
     },
     async (request, _reply) => {
       const { tenantId } = request.user;
       const { id } = request.params;
-      const { settledOn, waiveCharges } = request.query;
+      const { settledOn } = request.query;
       return await previewSettlement({
-        kind: 'receivable',
+        kind: 'payable',
         tenantId,
         titleId: id,
         settledOn,
-        waiveCharges,
       });
     },
   );
 
   fastify.post(
-    '/:id/receive',
+    '/:id/pay',
     {
       schema: {
         params: z.object({ id: z.string().uuid() }),
-        body: receiveSchema,
+        body: paySchema,
       },
     },
     async (request, _reply) => {
@@ -232,18 +196,16 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const data = request.body;
 
       const result = await settleTitle({
-        kind: 'receivable',
+        kind: 'payable',
         tenantId,
         titleId: id,
         settledOn: data.settledOn,
         settledAmount: data.settledAmount,
         treasury: data.treasury,
         bankAccountId: data.bankAccountId,
-        waiveCharges: data.waiveCharges,
         remainderMode: data.remainderMode,
         differencePlanAccountId: data.differencePlanAccountId,
         remainderDueOn: data.remainderDueOn,
-        includeChargesOnNewTitle: data.includeChargesOnNewTitle,
       });
       return result.title;
     },
@@ -254,7 +216,7 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
     {
       schema: {
         params: z.object({ id: z.string().uuid() }),
-        body: createReceivableSchema,
+        body: createPayableSchema,
       },
     },
     async (request, reply) => {
@@ -263,13 +225,13 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const data = request.body;
 
       const [existing] = await db
-        .select({ status: receivables.status })
-        .from(receivables)
-        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
+        .select({ status: payables.status })
+        .from(payables)
+        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
         .limit(1);
 
       if (!existing) {
-        return reply.status(404).send({ message: 'Conta a receber não encontrada.' });
+        return reply.status(404).send({ message: 'Conta a pagar não encontrada.' });
       }
       if (existing.status !== 'pendente') {
         return reply.status(400).send({
@@ -278,25 +240,17 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       }
 
       const [updated] = await db
-        .update(receivables)
+        .update(payables)
         .set({
-          debtorId: data.debtorId,
+          creditorId: data.creditorId,
           documentNumber: data.documentNumber || null,
           description: data.description,
           issueOn: data.issueOn,
           installmentAmount: data.installmentAmount,
           dueOn: data.dueOn,
           planAccountId: data.planAccountId || null,
-          bearerName: data.bearerName || null,
-          barcode: data.barcode || null,
-          bankSlipOurNumber: data.bankSlipOurNumber || null,
-          invoiceNumber: data.invoiceNumber || null,
-          financialInstitutionId: data.financialInstitutionId || null,
-          paymentMethodId: data.paymentMethodId || null,
-          cardBrandId: data.cardBrandId || null,
-          transactionAuthorization: data.transactionAuthorization || null,
         })
-        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
+        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
         .returning();
 
       return updated;
@@ -315,13 +269,13 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const { id } = request.params;
 
       const [existing] = await db
-        .select({ status: receivables.status })
-        .from(receivables)
-        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
+        .select({ status: payables.status })
+        .from(payables)
+        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
         .limit(1);
 
       if (!existing) {
-        return reply.status(404).send({ message: 'Conta a receber não encontrada.' });
+        return reply.status(404).send({ message: 'Conta a pagar não encontrada.' });
       }
       if (existing.status !== 'pendente') {
         return reply.status(400).send({
@@ -330,8 +284,8 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       }
 
       await db
-        .delete(receivables)
-        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)));
+        .delete(payables)
+        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)));
 
       return { success: true };
     },
@@ -349,7 +303,7 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const { id } = request.params;
 
       const updated = await reverseSettlement({
-        kind: 'receivable',
+        kind: 'payable',
         tenantId,
         titleId: id,
       });

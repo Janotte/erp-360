@@ -10,8 +10,8 @@ import {
 import { civilDate } from '@erp-360/shared';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
-import { db, type DbClient } from '../db/index.ts';
-import { getOrCreateFinancialSettings } from './financial-settings.ts';
+import { db, type DbClient } from '../../db/index.ts';
+import { getOrCreateFinancialSettings } from '../treasury/financial-settings.ts';
 import {
   addDays,
   computeDueAmount,

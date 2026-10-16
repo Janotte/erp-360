@@ -6,7 +6,7 @@ import {
 } from '@erp-360/shared';
 import { and, eq, gte, isNotNull, isNull, lte } from 'drizzle-orm';
 
-import { db } from '../db/index.ts';
+import { db } from '../../db/index.ts';
 
 type Movement = {
   dreLine: PlanAccountDreLine | null;

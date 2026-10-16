@@ -1,4 +1,4 @@
-import '../types/fastify.ts';
+import '../../types/fastify.ts';
 
 import { payables, planAccounts, receivables } from '@erp-360/mod-financial';
 import {
@@ -11,7 +11,7 @@ import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { db } from '../db/index.ts';
+import { db } from '../../db/index.ts';
 
 const planAccountBodySchema = z
   .object({

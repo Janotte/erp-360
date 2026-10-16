@@ -1,4 +1,4 @@
-import '../types/fastify.js';
+import '../../types/fastify.js';
 
 import { personContacts, persons } from '@erp-360/mod-persons';
 import {
@@ -13,7 +13,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-import { db } from '../db/index.js';
+import { db } from '../../db/index.js';
 
 const personParams = z.object({
   id: z.string().uuid({ message: 'ID precisa ser um UUID válido' }),

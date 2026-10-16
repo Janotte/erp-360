@@ -1,8 +1,8 @@
 import { bankAccounts, bankEntries, cashEntries } from '@erp-360/mod-financial';
 import { and, eq } from 'drizzle-orm';
 
-import { db } from '../db/index.ts';
-import { recalcBankBalances, recalcCashBalances } from './settlement.ts';
+import { db } from '../../db/index.ts';
+import { recalcBankBalances, recalcCashBalances } from '../titles/settlement.ts';
 
 const OPENING_DESCRIPTION = 'Saldo inicial';
 

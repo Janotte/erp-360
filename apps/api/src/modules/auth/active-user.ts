@@ -1,7 +1,7 @@
 import { users } from '@erp-360/mod-core';
 import { and, eq } from 'drizzle-orm';
 
-import { db } from '../db/index.ts';
+import { db } from '../../db/index.ts';
 
 export async function activeUser(userId: string, tenantId: string) {
   const [user] = await db
