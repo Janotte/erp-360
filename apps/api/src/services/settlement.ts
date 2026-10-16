@@ -85,7 +85,7 @@ export async function previewSettlement(params: {
 
 export async function settleTitle(input: SettleInput) {
   return db.transaction(async (tx) => {
-    const title = await loadTitle(input.kind, input.tenantId, input.titleId, tx);
+    const title = await loadTitle(input.kind, input.tenantId, input.titleId, tx, true);
     if (title.status !== 'pendente') {
       throw new SettlementError(400, 'Somente contas pendentes podem ser liquidadas.');
     }
@@ -242,14 +242,15 @@ export async function settleTitle(input: SettleInput) {
       await tx.insert(cashEntries).values(legs.map((leg) => ({ ...entryBase, ...leg })));
       await recalcCashBalances(tx, input.tenantId);
     } else if (input.bankAccountId) {
+      const bankAccountId = input.bankAccountId;
       await tx.insert(bankEntries).values(
         legs.map((leg) => ({
           ...entryBase,
           ...leg,
-          bankAccountId: input.bankAccountId,
+          bankAccountId,
         })),
       );
-      await recalcBankBalances(tx, input.tenantId, input.bankAccountId);
+      await recalcBankBalances(tx, input.tenantId, bankAccountId);
     }
 
     if (input.kind === 'payable') {
@@ -260,8 +261,17 @@ export async function settleTitle(input: SettleInput) {
           paidAmount: input.settledAmount,
           status: 'pago',
         })
-        .where(and(eq(payables.id, input.titleId), eq(payables.tenantId, input.tenantId)))
+        .where(
+          and(
+            eq(payables.id, input.titleId),
+            eq(payables.tenantId, input.tenantId),
+            eq(payables.status, 'pendente'),
+          ),
+        )
         .returning();
+      if (!updated) {
+        throw new SettlementError(409, 'Este título já foi liquidado.');
+      }
       return { title: updated, settlement };
     }
 
@@ -273,9 +283,16 @@ export async function settleTitle(input: SettleInput) {
         status: 'recebido',
       })
       .where(
-        and(eq(receivables.id, input.titleId), eq(receivables.tenantId, input.tenantId)),
+        and(
+          eq(receivables.id, input.titleId),
+          eq(receivables.tenantId, input.tenantId),
+          eq(receivables.status, 'pendente'),
+        ),
       )
       .returning();
+    if (!updated) {
+      throw new SettlementError(409, 'Este título já foi liquidado.');
+    }
     return { title: updated, settlement };
   });
 }
@@ -286,7 +303,7 @@ export async function reverseSettlement(params: {
   titleId: string;
 }) {
   return db.transaction(async (tx) => {
-    const title = await loadTitle(params.kind, params.tenantId, params.titleId, tx);
+    const title = await loadTitle(params.kind, params.tenantId, params.titleId, tx, true);
     const expected = params.kind === 'payable' ? 'pago' : 'recebido';
     if (title.status !== expected) {
       throw new SettlementError(400, 'Somente títulos liquidados podem ser estornados.');
@@ -315,7 +332,8 @@ export async function reverseSettlement(params: {
               eq(payables.tenantId, params.tenantId),
             ),
           )
-          .limit(1);
+          .limit(1)
+          .for('update');
         if (child && child.status !== 'pendente') {
           throw new SettlementError(
             400,
@@ -339,7 +357,8 @@ export async function reverseSettlement(params: {
               eq(receivables.tenantId, params.tenantId),
             ),
           )
-          .limit(1);
+          .limit(1)
+          .for('update');
         if (child && child.status !== 'pendente') {
           throw new SettlementError(
             400,
@@ -376,9 +395,16 @@ export async function reverseSettlement(params: {
         .update(payables)
         .set({ paidOn: null, paidAmount: null, status: 'pendente' })
         .where(
-          and(eq(payables.id, params.titleId), eq(payables.tenantId, params.tenantId)),
+          and(
+            eq(payables.id, params.titleId),
+            eq(payables.tenantId, params.tenantId),
+            eq(payables.status, 'pago'),
+          ),
         )
         .returning();
+      if (!updated) {
+        throw new SettlementError(409, 'Este título já foi estornado.');
+      }
       return updated;
     }
 
@@ -389,9 +415,13 @@ export async function reverseSettlement(params: {
         and(
           eq(receivables.id, params.titleId),
           eq(receivables.tenantId, params.tenantId),
+          eq(receivables.status, 'recebido'),
         ),
       )
       .returning();
+    if (!updated) {
+      throw new SettlementError(409, 'Este título já foi estornado.');
+    }
     return updated;
   });
 }
@@ -454,13 +484,15 @@ async function loadTitle(
   tenantId: string,
   titleId: string,
   client: Queryable = db,
+  lock = false,
 ) {
   if (kind === 'payable') {
-    const [row] = await client
+    const query = client
       .select()
       .from(payables)
       .where(and(eq(payables.id, titleId), eq(payables.tenantId, tenantId)))
       .limit(1);
+    const [row] = await (lock ? query.for('update') : query);
     if (!row) throw new SettlementError(404, 'Conta a pagar não encontrada.');
     return {
       id: row.id,
@@ -475,11 +507,12 @@ async function loadTitle(
     };
   }
 
-  const [row] = await client
+  const query = client
     .select()
     .from(receivables)
     .where(and(eq(receivables.id, titleId), eq(receivables.tenantId, tenantId)))
     .limit(1);
+  const [row] = await (lock ? query.for('update') : query);
   if (!row) throw new SettlementError(404, 'Conta a receber não encontrada.');
   return {
     id: row.id,
@@ -546,7 +579,13 @@ async function insertRemainderTitle(
   return created.id;
 }
 
+async function lockTenantLedger(tx: Queryable, tenantId: string) {
+  // Uma trava por empresa cobre caixa e banco e evita deadlock entre os dois recálculos.
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${tenantId}, 0))`);
+}
+
 export async function recalcCashBalances(tx: Queryable, tenantId: string) {
+  await lockTenantLedger(tx, tenantId);
   const rows = await tx
     .select({
       id: cashEntries.id,
@@ -573,6 +612,7 @@ export async function recalcBankBalances(
   tenantId: string,
   bankAccountId: string,
 ) {
+  await lockTenantLedger(tx, tenantId);
   const rows = await tx
     .select({
       id: bankEntries.id,

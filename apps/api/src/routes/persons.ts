@@ -254,7 +254,7 @@ export const personsRoutes: FastifyPluginAsyncZod = async (fastify) => {
         .where(and(eq(persons.id, id), eq(persons.tenantId, tenantId)));
 
       if (!person) {
-        return reply.status(404).send({ error: 'Pessoa não encontrada' });
+        return reply.status(404).send({ message: 'Pessoa não encontrada' });
       }
 
       return serializePerson(person);

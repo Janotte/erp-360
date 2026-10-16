@@ -41,7 +41,7 @@ fastify.decorate('autenticarETenant', async (request, reply) => {
   try {
     await request.jwtVerify();
   } catch {
-    return reply.status(401).send({ error: 'Não autorizado' });
+    return reply.status(401).send({ message: 'Não autorizado' });
   }
 });
 

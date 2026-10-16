@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { type ReactNode } from 'react';
 import {
   BrowserRouter,
@@ -72,9 +73,12 @@ function Pagina({ children }: { children: ReactNode }) {
 
 function AreaLogada() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   if (!authStorage.isAuthenticated()) return <Navigate to="/login" replace />;
 
   const sair = () => {
+    void queryClient.cancelQueries();
+    queryClient.clear();
     authStorage.removeToken();
     navigate('/login');
   };

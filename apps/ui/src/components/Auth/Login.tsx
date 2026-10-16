@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 
@@ -19,12 +19,15 @@ import { authStorage } from '../../utils/auth';
 
 export function Login() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const { mutate, isPending, error } = useMutation({
     mutationFn: sendLoginAPI,
     onSuccess: (data) => {
+      void queryClient.cancelQueries();
+      queryClient.clear();
       authStorage.setToken(data.token);
       navigate('/dashboard');
     },

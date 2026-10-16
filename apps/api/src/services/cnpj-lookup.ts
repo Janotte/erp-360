@@ -85,7 +85,7 @@ function stateAbbreviationOf(row: Record<string, unknown>) {
   return readString(row, 'uf', 'estado').toUpperCase().slice(0, 2);
 }
 
-function pickStateRegistration(row: Record<string, unknown>, uf: string) {
+function pickStateRegistration(row: Record<string, unknown>, uf: string): string | null {
   const direct = normalizeStateRegistration(readString(row, 'inscricao_estadual', 'ie'));
   if (direct) return direct;
 

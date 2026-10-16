@@ -42,8 +42,11 @@ function foreignKeyMessage(error: unknown): string | null {
 
 export function registerErrorHandler(fastify: FastifyInstance) {
   fastify.setErrorHandler((error, request, reply) => {
-    if (fastifyClientStatus(error)) {
-      return reply.send(error);
+    const statusCode = fastifyClientStatus(error);
+    if (statusCode) {
+      const message =
+        error instanceof Error && error.message ? error.message : 'Requisição recusada.';
+      return reply.status(statusCode).send({ message });
     }
 
     const http = httpError(error);
