@@ -1,3 +1,5 @@
+import { type IncomeStatement, incomeStatementSchema } from '@erp-360/shared';
+
 import { apiFetch } from './apiClient';
 
 async function parseJson(res: Response) {
@@ -74,6 +76,15 @@ export const treasuryService = {
     const body = await parseJson(res);
     if (!res.ok) throw new Error(body.message || 'Falha ao carregar o livro caixa.');
     return Array.isArray(body) ? body : [];
+  },
+  incomeStatement: async (from: string, to: string): Promise<IncomeStatement> => {
+    const params = new URLSearchParams({ from, to });
+    const res = await apiFetch(`/financial/income-statement?${params.toString()}`);
+    const body = await parseJson(res);
+    if (!res.ok) throw new Error(body.message || 'Falha ao carregar a DRE.');
+    const parsed = incomeStatementSchema.safeParse(body);
+    if (!parsed.success) throw new Error('Resposta da DRE inválida.');
+    return parsed.data;
   },
   cashFlow: async (): Promise<{ openingBalance: number; days: CashFlowDay[] }> => {
     const res = await apiFetch(`/financial/cash-flow?days=60`);

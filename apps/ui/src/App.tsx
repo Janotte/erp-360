@@ -18,6 +18,7 @@ import { Dashboard } from './components/Dashboard';
 import { ListBankAccounts } from './components/Financial/BankAccounts/ListBankAccounts';
 import { ListCashBook } from './components/Financial/CashBook/ListCashBook';
 import { CashFlowView } from './components/Financial/CashFlow/CashFlowView';
+import { IncomeStatementView } from './components/Financial/IncomeStatement/IncomeStatementView';
 import { PayableList } from './components/Financial/Payables/PayableList';
 import { ListPlanAccounts } from './components/Financial/PlanAccounts/ListPlanAccounts';
 import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
@@ -35,6 +36,7 @@ const rotasPorHash: Record<string, string> = {
   '#cash-book': '/cash-book',
   '#bank-accounts': '/bank-accounts',
   '#cash-flow': '/cash-flow',
+  '#income-statement': '/income-statement',
   '#settings': '/settings',
 };
 
@@ -165,6 +167,14 @@ function App() {
               element={
                 <Pagina>
                   <CashFlowView />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/income-statement"
+              element={
+                <Pagina>
+                  <IncomeStatementView />
                 </Pagina>
               }
             />

@@ -12,6 +12,7 @@ import { z } from 'zod';
 
 import { db } from '../db/index.ts';
 import { getOrCreateFinancialSettings } from '../services/financial-settings.ts';
+import { listIncomeStatement } from '../services/income-statement.ts';
 import {
   loadBankAccount,
   syncBankOpening,
@@ -172,6 +173,26 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (fastify) => {
     },
     async (request) => {
       return listCashFlow(request.user.tenantId, request.query.days);
+    },
+  );
+
+  fastify.get(
+    '/income-statement',
+    {
+      schema: {
+        querystring: z
+          .object({
+            from: dateString,
+            to: dateString,
+          })
+          .refine((query) => query.from <= query.to, {
+            message: 'A data inicial não pode ser posterior à data final.',
+          }),
+      },
+    },
+    async (request) => {
+      const { from, to } = request.query;
+      return listIncomeStatement(request.user.tenantId, from, to);
     },
   );
 

@@ -113,6 +113,31 @@ export function dreLinesForNature(nature: PlanAccountNature): readonly PlanAccou
   return [];
 }
 
+export const incomeStatementAccountSchema = z.object({
+  accountCode: z.string(),
+  name: z.string(),
+  amount: z.number().int(),
+});
+
+export const incomeStatementLineSchema = z.object({
+  line: z.enum(planAccountDreLines),
+  amount: z.number().int(),
+  accounts: z.array(incomeStatementAccountSchema),
+});
+
+export const incomeStatementSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  lines: z.array(incomeStatementLineSchema),
+  netRevenue: z.number().int(),
+  grossProfit: z.number().int(),
+  operatingResult: z.number().int(),
+  financialResult: z.number().int(),
+  netIncome: z.number().int(),
+});
+
+export type IncomeStatement = z.infer<typeof incomeStatementSchema>;
+
 export const planAccountCatalogSchema = z.object({
   id: z.string().uuid(),
   accountCode: z.string(),

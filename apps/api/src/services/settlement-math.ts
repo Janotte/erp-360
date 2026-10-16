@@ -76,3 +76,82 @@ export function computeSettlementGaps(params: {
 
   return { remainder, extra };
 }
+
+export type SettlementLegDirection = 'with' | 'against';
+
+export interface SettlementTreasuryLeg {
+  planAccountId: string | null;
+  description: string;
+  inflowAmount: number;
+  outflowAmount: number;
+}
+
+function treasuryAmounts(
+  kind: 'payable' | 'receivable',
+  direction: SettlementLegDirection,
+  amount: number,
+) {
+  const inflow = kind === 'receivable' ? direction === 'with' : direction === 'against';
+  return inflow
+    ? { inflowAmount: amount, outflowAmount: 0 }
+    : { inflowAmount: 0, outflowAmount: amount };
+}
+
+function clipDescription(value: string) {
+  return value.slice(0, 255);
+}
+
+export function settlementTreasuryLegs(params: {
+  kind: 'payable' | 'receivable';
+  settledAmount: number;
+  remainder: number;
+  extra: number;
+  remainderMode: 'none' | 'new_title' | 'plan_account';
+  titlePlanAccountId: string | null;
+  differencePlanAccountId: string | null;
+  description: string;
+}): SettlementTreasuryLeg[] {
+  const writeOff =
+    params.remainder > 0 &&
+    params.remainderMode === 'plan_account' &&
+    params.differencePlanAccountId
+      ? {
+          titleAmount: params.settledAmount + params.remainder,
+          differenceAmount: params.remainder,
+          direction: 'against' as const,
+        }
+      : params.extra > 0 && params.remainder <= 0 && params.differencePlanAccountId
+        ? {
+            titleAmount: params.settledAmount - params.extra,
+            differenceAmount: params.extra,
+            direction: 'with' as const,
+          }
+        : null;
+
+  if (!writeOff) {
+    return [
+      {
+        planAccountId: params.titlePlanAccountId,
+        description: clipDescription(params.description),
+        ...treasuryAmounts(params.kind, 'with', params.settledAmount),
+      },
+    ];
+  }
+
+  const legs: SettlementTreasuryLeg[] = [];
+  if (writeOff.titleAmount > 0) {
+    legs.push({
+      planAccountId: params.titlePlanAccountId,
+      description: clipDescription(params.description),
+      ...treasuryAmounts(params.kind, 'with', writeOff.titleAmount),
+    });
+  }
+  if (writeOff.differenceAmount > 0) {
+    legs.push({
+      planAccountId: params.differencePlanAccountId,
+      description: clipDescription(`${params.description} (diferença)`),
+      ...treasuryAmounts(params.kind, writeOff.direction, writeOff.differenceAmount),
+    });
+  }
+  return legs;
+}

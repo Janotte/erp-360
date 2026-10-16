@@ -3,6 +3,7 @@ import {
   bankEntries,
   cashEntries,
   payables,
+  planAccounts,
   receivables,
   settlements,
 } from '@erp-360/mod-financial';
@@ -10,7 +11,12 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
 import { db, type DbClient } from '../db/index.ts';
 import { getOrCreateFinancialSettings } from './financial-settings.ts';
-import { addDays, computeDueAmount, computeSettlementGaps } from './settlement-math.ts';
+import {
+  addDays,
+  computeDueAmount,
+  computeSettlementGaps,
+  settlementTreasuryLegs,
+} from './settlement-math.ts';
 
 export class SettlementError extends Error {
   status: number;
@@ -198,34 +204,51 @@ export async function settleTitle(input: SettleInput) {
       })
       .returning();
 
-    const description = title.description;
-    const planAccountId = title.planAccountId;
-    if (input.treasury === 'cash') {
-      await tx.insert(cashEntries).values({
+    const allocatesDifference =
+      (remainder > 0 && remainderMode === 'plan_account') || (extra > 0 && remainder <= 0);
+    if (allocatesDifference && !title.planAccountId) {
+      throw new SettlementError(
+        400,
+        'Informe o plano de contas do título para lançar a diferença.',
+      );
+    }
+    if (allocatesDifference && input.differencePlanAccountId) {
+      await assertDifferenceAccount(tx, {
         tenantId: input.tenantId,
-        occurredOn: input.settledOn,
-        planAccountId,
-        description,
-        inflowAmount: input.kind === 'receivable' ? input.settledAmount : 0,
-        outflowAmount: input.kind === 'payable' ? input.settledAmount : 0,
-        receivableId: input.kind === 'receivable' ? input.titleId : null,
-        payableId: input.kind === 'payable' ? input.titleId : null,
-        settlementId: settlement.id,
+        planAccountId: input.differencePlanAccountId,
+        nature: expectedDifferenceNature(input.kind, remainder, extra, remainderMode),
       });
+    }
+
+    const description = title.description;
+    const legs = settlementTreasuryLegs({
+      kind: input.kind,
+      settledAmount: input.settledAmount,
+      remainder,
+      extra,
+      remainderMode,
+      titlePlanAccountId: title.planAccountId,
+      differencePlanAccountId: input.differencePlanAccountId || null,
+      description,
+    });
+    const entryBase = {
+      tenantId: input.tenantId,
+      occurredOn: input.settledOn,
+      receivableId: input.kind === 'receivable' ? input.titleId : null,
+      payableId: input.kind === 'payable' ? input.titleId : null,
+      settlementId: settlement.id,
+    };
+    if (input.treasury === 'cash') {
+      await tx.insert(cashEntries).values(legs.map((leg) => ({ ...entryBase, ...leg })));
       await recalcCashBalances(tx, input.tenantId);
     } else if (input.bankAccountId) {
-      await tx.insert(bankEntries).values({
-        tenantId: input.tenantId,
-        bankAccountId: input.bankAccountId,
-        occurredOn: input.settledOn,
-        planAccountId,
-        description,
-        inflowAmount: input.kind === 'receivable' ? input.settledAmount : 0,
-        outflowAmount: input.kind === 'payable' ? input.settledAmount : 0,
-        receivableId: input.kind === 'receivable' ? input.titleId : null,
-        payableId: input.kind === 'payable' ? input.titleId : null,
-        settlementId: settlement.id,
-      });
+      await tx.insert(bankEntries).values(
+        legs.map((leg) => ({
+          ...entryBase,
+          ...leg,
+          bankAccountId: input.bankAccountId,
+        })),
+      );
       await recalcBankBalances(tx, input.tenantId, input.bankAccountId);
     }
 
@@ -374,6 +397,57 @@ export async function reverseSettlement(params: {
 }
 
 type Queryable = DbClient;
+
+function expectedDifferenceNature(
+  kind: 'payable' | 'receivable',
+  remainder: number,
+  extra: number,
+  remainderMode: RemainderMode,
+) {
+  if (remainder > 0 && remainderMode === 'plan_account') {
+    return kind === 'receivable' ? 'expense' : 'revenue';
+  }
+  return kind === 'receivable' ? 'revenue' : 'expense';
+}
+
+async function assertDifferenceAccount(
+  tx: Queryable,
+  params: {
+    tenantId: string;
+    planAccountId: string;
+    nature: 'revenue' | 'expense';
+  },
+) {
+  const [account] = await tx
+    .select({
+      nature: planAccounts.nature,
+      acceptsEntries: planAccounts.acceptsEntries,
+      isActive: planAccounts.isActive,
+    })
+    .from(planAccounts)
+    .where(
+      and(
+        eq(planAccounts.id, params.planAccountId),
+        eq(planAccounts.tenantId, params.tenantId),
+      ),
+    )
+    .limit(1);
+
+  if (!account || !account.isActive) {
+    throw new SettlementError(400, 'Conta do plano para a diferença não encontrada.');
+  }
+  if (!account.acceptsEntries) {
+    throw new SettlementError(400, 'A conta da diferença precisa receber lançamento.');
+  }
+  if (account.nature !== params.nature) {
+    throw new SettlementError(
+      400,
+      params.nature === 'expense'
+        ? 'A diferença entra numa conta de despesa.'
+        : 'A diferença entra numa conta de receita.',
+    );
+  }
+}
 
 async function loadTitle(
   kind: 'payable' | 'receivable',

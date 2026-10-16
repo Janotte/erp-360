@@ -3,6 +3,7 @@ import {
   BookOpen,
   ChevronRight,
   CreditCard,
+  FileText,
   Landmark,
   LayoutDashboard,
   type LucideIcon,
@@ -54,6 +55,7 @@ const itensMenu: ItemMenu[] = [
       { title: 'Livro caixa', icon: Wallet, url: '/cash-book' },
       { title: 'Contas bancárias', icon: Landmark, url: '/bank-accounts' },
       { title: 'Fluxo de caixa', icon: BookOpen, url: '/cash-flow' },
+      { title: 'DRE', icon: FileText, url: '/income-statement' },
       { title: 'Plano de Contas', icon: BookOpen, url: '/plan-accounts' },
     ],
   },
@@ -70,7 +72,8 @@ export function AppSidebar() {
     pathAtivo === '/plan-accounts' ||
     pathAtivo === '/cash-book' ||
     pathAtivo === '/bank-accounts' ||
-    pathAtivo === '/cash-flow';
+    pathAtivo === '/cash-flow' ||
+    pathAtivo === '/income-statement';
   const [financeiroAberto, setFinanceiroAberto] = useState(rotaFinanceira);
 
   useEffect(() => {

@@ -139,6 +139,14 @@ A margem líquida sobre o faturamento bruto é 32,6% (22.850 / 70.000). Os R$ 22
 
 Os nós numerados só com o grupo são sintéticos. As contas que recebem título, cliente, fornecedor, DAS, folha ou banco são analíticas, filhas desses nós.
 
+## DRE pelo caixa
+
+`GET /financial/income-statement?from=YYYY-MM-DD&to=YYYY-MM-DD` soma, no período, os movimentos de caixa e de banco cuja conta tem `dreLine`.
+
+O valor de uma conta de receita é entrada menos saída. O valor de uma conta de despesa é saída menos entrada. A fórmula dos subtotais é a deste documento. Conta sem linha, saldo inicial e transferência entre caixa e banco ficam de fora.
+
+Quando a baixa lança a diferença numa conta do plano, o título recebe o valor devido e a conta da diferença recebe o que falta ou o que excede. No cartão, a receita fica com o valor da nota e a tarifa sai na conta de despesa. O caixa ou o banco movimenta só o líquido. Sem essa conta de diferença, o valor liquidado permanece inteiro na conta do título.
+
 ## Fora deste desenho
 
-Este documento fixa a classificação e a fórmula. A troca do enum no banco, a tela, a migração das contas já cadastradas e o encerramento contábil do período ficam para a implementação.
+O encerramento do período em lucros acumulados e a distribuição de lucros ficam para quando houver lançamento contábil.
