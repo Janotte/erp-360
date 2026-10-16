@@ -15,6 +15,7 @@
     "build": "turbo build",
     "clean": "turbo clean",
     "lint": "turbo lint",
+    "test": "turbo test",
     "lint:fix": "turbo lint -- --fix",
     "format": "turbo format",
     "format:fix": "prettier --write ."
