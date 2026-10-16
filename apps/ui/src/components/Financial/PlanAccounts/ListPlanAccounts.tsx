@@ -1,4 +1,8 @@
-import { formatCurrency } from '@erp-360/shared';
+import {
+  formatCurrency,
+  planAccountDreLineLabels,
+  planAccountNatureLabels,
+} from '@erp-360/shared';
 import {
   keepPreviousData,
   useMutation,
@@ -179,6 +183,8 @@ export function ListPlanAccounts() {
               >
                 <div className="flex items-center">Nome {renderSortIcon('name')}</div>
               </TableHead>
+              <TableHead>Natureza</TableHead>
+              <TableHead>Linha da DRE</TableHead>
               <TableHead>Descrição contábil</TableHead>
               <TableHead>Código contábil</TableHead>
               <TableHead className="text-right">Saldo</TableHead>
@@ -188,7 +194,7 @@ export function ListPlanAccounts() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-4">
+                <TableCell colSpan={8} className="text-center py-4">
                   Carregando dados...
                 </TableCell>
               </TableRow>
@@ -197,6 +203,10 @@ export function ListPlanAccounts() {
                 <TableRow key={account.id}>
                   <TableCell className="font-medium">{account.accountCode}</TableCell>
                   <TableCell>{account.name}</TableCell>
+                  <TableCell>{planAccountNatureLabels[account.nature]}</TableCell>
+                  <TableCell>
+                    {account.dreLine ? planAccountDreLineLabels[account.dreLine] : '-'}
+                  </TableCell>
                   <TableCell>{account.accountingDescription || '-'}</TableCell>
                   <TableCell>{account.accountingAccountCode || '-'}</TableCell>
                   <TableCell className="text-right tabular-nums">
@@ -230,7 +240,7 @@ export function ListPlanAccounts() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-4 text-zinc-500">
+                <TableCell colSpan={8} className="text-center py-4 text-zinc-500">
                   Nenhum plano de contas encontrado.
                 </TableCell>
               </TableRow>

@@ -1,3 +1,12 @@
+import {
+  dreLinesForNature,
+  type PlanAccountDreLine,
+  planAccountDreLineLabels,
+  planAccountDreLines,
+  type PlanAccountNature,
+  planAccountNatureLabels,
+  planAccountNatures,
+} from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
@@ -11,14 +20,20 @@ import {
   type PlanAccount,
   type PlanAccountInput,
   planAccountsService,
-  type PlanAccountType,
-  planAccountTypeLabels,
-  planAccountTypes,
 } from '@/services/planAccounts';
 
-function parsePlanAccountType(value: unknown): PlanAccountType | '' {
-  return planAccountTypes.includes(value as PlanAccountType)
-    ? (value as PlanAccountType)
+const selectClassName =
+  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
+
+function parseNature(value: unknown): PlanAccountNature | '' {
+  return planAccountNatures.includes(value as PlanAccountNature)
+    ? (value as PlanAccountNature)
+    : '';
+}
+
+function parseDreLine(value: unknown): PlanAccountDreLine | '' {
+  return planAccountDreLines.includes(value as PlanAccountDreLine)
+    ? (value as PlanAccountDreLine)
     : '';
 }
 
@@ -32,9 +47,16 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
   const [accountId, setAccountId] = useState(accountToUpdate?.id);
   const [accountCode, setAccountCode] = useState(accountToUpdate?.accountCode ?? '');
   const [name, setName] = useState(accountToUpdate?.name ?? '');
-  const [type, setType] = useState<PlanAccountType | ''>(
-    parsePlanAccountType(accountToUpdate?.type),
+  const [nature, setNature] = useState<PlanAccountNature | ''>(
+    parseNature(accountToUpdate?.nature),
   );
+  const [dreLine, setDreLine] = useState<PlanAccountDreLine | ''>(
+    parseDreLine(accountToUpdate?.dreLine),
+  );
+  const [acceptsEntries, setAcceptsEntries] = useState(
+    accountToUpdate?.acceptsEntries !== false,
+  );
+  const [isTreasury, setIsTreasury] = useState(accountToUpdate?.isTreasury === true);
   const [parentAccountCode, setParentAccountCode] = useState(
     accountToUpdate?.parentAccountCode || '',
   );
@@ -61,7 +83,10 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
     const account = { ...accountToUpdate, ...accountLoaded };
     setAccountCode(account.accountCode ?? '');
     setName(account.name ?? '');
-    setType(parsePlanAccountType(account.type));
+    setNature(parseNature(account.nature));
+    setDreLine(parseDreLine(account.dreLine));
+    setAcceptsEntries(account.acceptsEntries !== false);
+    setIsTreasury(account.isTreasury === true);
     setParentAccountCode(account.parentAccountCode || '');
     setIsActive(account.isActive !== false);
     setAccountingDescription(account.accountingDescription || '');
@@ -94,11 +119,16 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!type) return;
+    if (!nature) return;
+    const allowedLines = dreLinesForNature(nature);
+    if (allowedLines.length > 0 && !dreLine) return;
     mutation.mutate({
       accountCode,
       name,
-      type,
+      nature,
+      dreLine: allowedLines.length > 0 ? dreLine || null : null,
+      acceptsEntries,
+      isTreasury: nature === 'asset' ? isTreasury : false,
       parentAccountCode: parentAccountCode || null,
       isActive,
       accountingDescription: accountingDescription || null,
@@ -121,20 +151,27 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="planAccountType">Tipo</Label>
+          <Label htmlFor="planAccountNature">Natureza</Label>
           <select
-            id="planAccountType"
-            value={type}
-            onChange={(event) => setType(parsePlanAccountType(event.target.value))}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            id="planAccountNature"
+            value={nature}
+            onChange={(event) => {
+              const next = parseNature(event.target.value);
+              setNature(next);
+              if (!next || !dreLinesForNature(next).includes(dreLine as PlanAccountDreLine)) {
+                setDreLine('');
+              }
+              if (next !== 'asset') setIsTreasury(false);
+            }}
+            className={selectClassName}
             required
           >
             <option value="" disabled>
-              Selecione o tipo
+              Selecione a natureza
             </option>
-            {planAccountTypes.map((planType) => (
-              <option key={planType} value={planType}>
-                {planAccountTypeLabels[planType]}
+            {planAccountNatures.map((item) => (
+              <option key={item} value={item}>
+                {planAccountNatureLabels[item]}
               </option>
             ))}
           </select>
@@ -158,6 +195,28 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
           />
         </div>
       </div>
+
+      {nature === 'revenue' || nature === 'expense' ? (
+        <div className="space-y-1">
+          <Label htmlFor="planAccountDreLine">Linha da DRE</Label>
+          <select
+            id="planAccountDreLine"
+            value={dreLine}
+            onChange={(event) => setDreLine(parseDreLine(event.target.value))}
+            className={selectClassName}
+            required
+          >
+            <option value="" disabled>
+              Selecione a linha
+            </option>
+            {dreLinesForNature(nature).map((line) => (
+              <option key={line} value={line}>
+                {planAccountDreLineLabels[line]}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
 
       <div className="space-y-1">
         <Label htmlFor="name">Nome</Label>
@@ -190,15 +249,39 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
         />
       </div>
 
-      <div className="flex items-center space-x-2">
-        <Checkbox
-          id="isActive"
-          checked={isActive}
-          onCheckedChange={(v) => setIsActive(!!v)}
-        />
-        <label htmlFor="isActive" className="text-sm font-medium">
-          Ativo
-        </label>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="acceptsEntries"
+            checked={acceptsEntries}
+            onCheckedChange={(v) => setAcceptsEntries(!!v)}
+          />
+          <label htmlFor="acceptsEntries" className="text-sm font-medium">
+            Recebe lançamento
+          </label>
+        </div>
+        {nature === 'asset' ? (
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="isTreasury"
+              checked={isTreasury}
+              onCheckedChange={(v) => setIsTreasury(!!v)}
+            />
+            <label htmlFor="isTreasury" className="text-sm font-medium">
+              Conta de caixa ou banco
+            </label>
+          </div>
+        ) : null}
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="isActive"
+            checked={isActive}
+            onCheckedChange={(v) => setIsActive(!!v)}
+          />
+          <label htmlFor="isActive" className="text-sm font-medium">
+            Ativo
+          </label>
+        </div>
       </div>
 
       {mutation.isError && (

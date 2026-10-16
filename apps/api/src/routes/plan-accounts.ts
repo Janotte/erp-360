@@ -1,25 +1,52 @@
 import '../types/fastify.ts';
 
 import { payables, planAccounts, receivables } from '@erp-360/mod-financial';
-import { escapeIlike } from '@erp-360/shared';
+import {
+  dreLinesForNature,
+  escapeIlike,
+  planAccountDreLines,
+  planAccountNatures,
+} from '@erp-360/shared';
 import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../db/index.ts';
 
-const planAccountTypes = ['revenue', 'expense', 'bank', 'withdrawal'] as const;
-
-const planAccountBodySchema = z.object({
-  accountCode: z.string().min(1, 'Código é obrigatório').max(15),
-  name: z.string().min(1, 'Nome é obrigatório').max(120),
-  type: z.enum(planAccountTypes),
-  parentAccountCode: z.string().max(15).optional().nullable(),
-  accountingDescription: z.string().max(60).optional().nullable(),
-  accountIdentifier: z.string().max(10).optional().nullable(),
-  accountingAccountCode: z.string().max(20).optional().nullable(),
-  isActive: z.boolean().optional().default(true),
-});
+const planAccountBodySchema = z
+  .object({
+    accountCode: z.string().min(1, 'Código é obrigatório').max(15),
+    name: z.string().min(1, 'Nome é obrigatório').max(120),
+    nature: z.enum(planAccountNatures),
+    dreLine: z.enum(planAccountDreLines).optional().nullable(),
+    acceptsEntries: z.boolean().optional().default(true),
+    isTreasury: z.boolean().optional().default(false),
+    parentAccountCode: z.string().max(15).optional().nullable(),
+    accountingDescription: z.string().max(60).optional().nullable(),
+    accountIdentifier: z.string().max(10).optional().nullable(),
+    accountingAccountCode: z.string().max(20).optional().nullable(),
+    isActive: z.boolean().optional().default(true),
+  })
+  .superRefine((data, ctx) => {
+    const allowed = dreLinesForNature(data.nature);
+    if (allowed.length === 0) {
+      if (data.dreLine) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['dreLine'],
+          message: 'Conta patrimonial não tem linha de DRE.',
+        });
+      }
+      return;
+    }
+    if (!data.dreLine || !allowed.includes(data.dreLine)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['dreLine'],
+        message: 'Escolha a linha da DRE compatível com a natureza.',
+      });
+    }
+  });
 
 const listPlanAccountsQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -37,7 +64,10 @@ function toPlanAccountValues(data: z.infer<typeof planAccountBodySchema>) {
   return {
     accountCode: data.accountCode.trim(),
     name: data.name.trim(),
-    type: data.type,
+    nature: data.nature,
+    dreLine: dreLinesForNature(data.nature).length === 0 ? null : data.dreLine,
+    acceptsEntries: data.acceptsEntries ?? true,
+    isTreasury: data.nature === 'asset' ? (data.isTreasury ?? false) : false,
     parentAccountCode: emptyToNull(data.parentAccountCode),
     accountingDescription: emptyToNull(data.accountingDescription),
     accountIdentifier: emptyToNull(data.accountIdentifier),

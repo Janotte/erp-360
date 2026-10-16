@@ -202,11 +202,19 @@ export interface FinancialPaginationResponse {
 }
 
 export const financialService = {
-  listPlanAccounts: async (
-    type?: 'revenue' | 'expense' | 'bank' | 'withdrawal',
-  ): Promise<CatalogOption[]> => {
-    const params = type ? `?type=${type}` : '';
-    const res = await apiFetch(`/financial/plan-accounts${params}`);
+  listPlanAccounts: async (filters?: {
+    nature?: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+    acceptsEntries?: boolean;
+    isTreasury?: boolean;
+  }): Promise<CatalogOption[]> => {
+    const params = new URLSearchParams();
+    if (filters?.nature) params.set('nature', filters.nature);
+    if (filters?.acceptsEntries != null) {
+      params.set('acceptsEntries', String(filters.acceptsEntries));
+    }
+    if (filters?.isTreasury != null) params.set('isTreasury', String(filters.isTreasury));
+    const query = params.toString();
+    const res = await apiFetch(`/financial/plan-accounts${query ? `?${query}` : ''}`);
     const body = await readBody(res);
     if (!res.ok) {
       throw new Error(apiErrorMessage(body, 'Falha ao listar planos de contas.'));

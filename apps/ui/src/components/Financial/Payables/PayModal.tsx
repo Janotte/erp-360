@@ -69,13 +69,17 @@ export function PayModal({ tipo, account, onSuccess }: PayModalProps) {
     extraVsOriginal > 0
       ? extraVsOriginal
       : extraVsDue;
-  const differenceType = extra > 0
+  const differenceNature = extra > 0
     ? tipo === 'payable' ? 'expense' : 'revenue'
     : tipo === 'payable' ? 'revenue' : 'expense';
 
   const { data: differenceAccounts = [] } = useQuery({
-    queryKey: ['financial', 'plan-accounts', differenceType],
-    queryFn: () => financialService.listPlanAccounts(differenceType),
+    queryKey: ['financial', 'plan-accounts', differenceNature, 'entries'],
+    queryFn: () =>
+      financialService.listPlanAccounts({
+        nature: differenceNature,
+        acceptsEntries: true,
+      }),
     enabled: remainder > 0 || extra > 0,
   });
 

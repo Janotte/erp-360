@@ -98,8 +98,9 @@ export function ListBankAccounts() {
   });
 
   const { data: bankPlanAccounts = [] } = useQuery({
-    queryKey: ['financial', 'plan-accounts', 'bank'],
-    queryFn: () => financialService.listPlanAccounts('bank'),
+    queryKey: ['financial', 'plan-accounts', 'treasury'],
+    queryFn: () =>
+      financialService.listPlanAccounts({ isTreasury: true, acceptsEntries: true }),
   });
 
   const { data: statement } = useQuery({

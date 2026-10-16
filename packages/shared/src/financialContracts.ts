@@ -58,6 +58,61 @@ export function titlePageSchema<T extends z.ZodType>(row: T) {
   });
 }
 
+export const planAccountNatures = [
+  'asset',
+  'liability',
+  'equity',
+  'revenue',
+  'expense',
+] as const;
+export type PlanAccountNature = (typeof planAccountNatures)[number];
+
+export const planAccountNatureLabels: Record<PlanAccountNature, string> = {
+  asset: 'Ativo',
+  liability: 'Passivo',
+  equity: 'Patrimônio líquido',
+  revenue: 'Receita',
+  expense: 'Despesa',
+};
+
+export const planAccountDreLines = [
+  'gross_revenue',
+  'deduction',
+  'cost',
+  'operating_expense',
+  'financial_income',
+  'financial_expense',
+  'other_income',
+  'other_expense',
+] as const;
+export type PlanAccountDreLine = (typeof planAccountDreLines)[number];
+
+export const planAccountDreLineLabels: Record<PlanAccountDreLine, string> = {
+  gross_revenue: 'Receita bruta',
+  deduction: 'Dedução',
+  cost: 'Custo',
+  operating_expense: 'Despesa operacional',
+  financial_income: 'Receita financeira',
+  financial_expense: 'Despesa financeira',
+  other_income: 'Outra receita',
+  other_expense: 'Outra despesa',
+};
+
+const revenueDreLines = ['gross_revenue', 'financial_income', 'other_income'] as const;
+const expenseDreLines = [
+  'deduction',
+  'cost',
+  'operating_expense',
+  'financial_expense',
+  'other_expense',
+] as const;
+
+export function dreLinesForNature(nature: PlanAccountNature): readonly PlanAccountDreLine[] {
+  if (nature === 'revenue') return revenueDreLines;
+  if (nature === 'expense') return expenseDreLines;
+  return [];
+}
+
 export const planAccountCatalogSchema = z.object({
   id: z.string().uuid(),
   accountCode: z.string(),

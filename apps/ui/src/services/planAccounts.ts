@@ -1,20 +1,17 @@
+import type { PlanAccountDreLine, PlanAccountNature } from '@erp-360/shared';
+
 import { apiFetch } from './apiClient';
 
-export const planAccountTypes = ['revenue', 'expense', 'bank', 'withdrawal'] as const;
-export type PlanAccountType = (typeof planAccountTypes)[number];
-
-export const planAccountTypeLabels: Record<PlanAccountType, string> = {
-  revenue: 'Receita',
-  expense: 'Despesa',
-  bank: 'Banco',
-  withdrawal: 'Retirada',
-};
+export type { PlanAccountDreLine, PlanAccountNature };
 
 export interface PlanAccount {
   id: string;
   accountCode: string;
   name: string;
-  type: PlanAccountType;
+  nature: PlanAccountNature;
+  dreLine?: PlanAccountDreLine | null;
+  acceptsEntries: boolean;
+  isTreasury: boolean;
   parentAccountCode?: string | null;
   isActive: boolean;
   dayBalance?: number | null;
@@ -29,7 +26,10 @@ export interface PlanAccount {
 export interface PlanAccountInput {
   accountCode: string;
   name: string;
-  type: PlanAccountType;
+  nature: PlanAccountNature;
+  dreLine?: PlanAccountDreLine | null;
+  acceptsEntries?: boolean;
+  isTreasury?: boolean;
   parentAccountCode?: string | null;
   isActive?: boolean;
   accountingDescription?: string | null;

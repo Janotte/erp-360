@@ -1,6 +1,8 @@
 import { tenantColumns } from '@erp-360/mod-core';
+import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   integer,
   pgEnum,
   pgTable,
@@ -9,11 +11,23 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
-export const typePlanAccountEnum = pgEnum('type_plan_account', [
+export const planAccountNatureEnum = pgEnum('plan_account_nature', [
+  'asset',
+  'liability',
+  'equity',
   'revenue',
   'expense',
-  'bank',
-  'withdrawal',
+]);
+
+export const planAccountDreLineEnum = pgEnum('plan_account_dre_line', [
+  'gross_revenue',
+  'deduction',
+  'cost',
+  'operating_expense',
+  'financial_income',
+  'financial_expense',
+  'other_income',
+  'other_expense',
 ]);
 
 export const planAccounts = pgTable(
@@ -25,8 +39,14 @@ export const planAccounts = pgTable(
     accountCode: varchar('account_code', { length: 15 }).notNull(),
     /** Nome do plano de contas */
     name: varchar('name', { length: 120 }).notNull(),
-    /** Tipo de plano de contas */
-    type: typePlanAccountEnum('type').notNull(),
+    /** Natureza patrimonial ou de resultado */
+    nature: planAccountNatureEnum('nature').notNull(),
+    /** Linha da DRE. Vazio em conta patrimonial */
+    dreLine: planAccountDreLineEnum('dre_line'),
+    /** Conta analítica, que recebe lançamento */
+    acceptsEntries: boolean('accepts_entries').default(true).notNull(),
+    /** Conta de caixa ou banco, usada na tesouraria */
+    isTreasury: boolean('is_treasury').default(false).notNull(),
     /** Código do plano de contas pai */
     parentAccountCode: varchar('parent_account_code', { length: 15 }),
     /** Saldo da conta no dia (centavos) */
@@ -53,5 +73,13 @@ export const planAccounts = pgTable(
       table.accountCode,
     ),
     unique('plan_accounts_tenant_name_unique').on(table.tenantId, table.name),
+    check(
+      'plan_accounts_dre_line_nature_check',
+      sql`(
+        (${table.nature} = 'revenue' AND ${table.dreLine} IN ('gross_revenue', 'financial_income', 'other_income'))
+        OR (${table.nature} = 'expense' AND ${table.dreLine} IN ('deduction', 'cost', 'operating_expense', 'financial_expense', 'other_expense'))
+        OR (${table.nature} IN ('asset', 'liability', 'equity') AND ${table.dreLine} IS NULL)
+      ) AND (${table.isTreasury} = false OR ${table.nature} = 'asset')`,
+    ),
   ],
 );

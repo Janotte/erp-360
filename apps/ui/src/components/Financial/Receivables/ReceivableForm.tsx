@@ -71,7 +71,7 @@ export function ReceivableForm({
 
   const { data: planAccounts = [] } = useQuery({
     queryKey: ['financial', 'plan-accounts'],
-    queryFn: () => financialService.listPlanAccounts(),
+    queryFn: () => financialService.listPlanAccounts({ acceptsEntries: true }),
   });
 
   const { data: paymentMethods = [] } = useQuery({
