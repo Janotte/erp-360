@@ -52,6 +52,8 @@ export interface PaginationResponse<T> {
     page: number;
     limit: number;
     totalPages: number;
+    balanceFrom?: string;
+    balanceTo?: string;
   };
 }
 
@@ -91,6 +93,8 @@ export const planAccountsService = {
         page: Number(body.meta?.page || filters.page),
         limit: Number(body.meta?.limit || filters.limit),
         totalPages: Number(body.meta?.totalPages || 0),
+        balanceFrom: body.meta?.balanceFrom || undefined,
+        balanceTo: body.meta?.balanceTo || undefined,
       },
     };
   },

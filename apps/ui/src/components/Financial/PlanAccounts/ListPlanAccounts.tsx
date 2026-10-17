@@ -1,5 +1,6 @@
 import {
   formatCurrency,
+  formatRawDate,
   planAccountDreLineLabels,
   planAccountNatureLabels,
 } from '@erp-360/shared';
@@ -164,6 +165,13 @@ export function ListPlanAccounts() {
           <Plus className="h-4 w-4" /> Novo Plano
         </Button>
       </div>
+
+      {meta?.balanceFrom && meta.balanceTo ? (
+        <p className="text-sm text-zinc-500">
+          Receita e despesa mostram o saldo de {formatRawDate(meta.balanceFrom)} a{' '}
+          {formatRawDate(meta.balanceTo)}. As demais contas mostram o saldo acumulado.
+        </p>
+      ) : null}
 
       <div className="rounded-md border border-zinc-200 bg-white shadow-2xs">
         <Table>

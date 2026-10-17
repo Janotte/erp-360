@@ -12,6 +12,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
+import { planAccountBalances } from './balances.ts';
 
 const planAccountBodySchema = z
   .object({
@@ -141,13 +142,20 @@ export const planAccountsRoutes: FastifyPluginAsyncZod = async (fastify) => {
         .from(planAccounts)
         .where(and(...conditions));
 
+      const balances = await planAccountBalances(tenantId);
+
       return reply.send({
-        data,
+        data: data.map((account) => ({
+          ...account,
+          balance: balances.balances.get(account.id) ?? 0,
+        })),
         meta: {
           total: Number(totalCount?.count || 0),
           page,
           limit,
           totalPages: Math.ceil(Number(totalCount?.count || 0) / limit),
+          balanceFrom: balances.from,
+          balanceTo: balances.to,
         },
       });
     },

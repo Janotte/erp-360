@@ -147,6 +147,12 @@ O valor de uma conta de receita é entrada menos saída. O valor de uma conta de
 
 Quando a baixa lança a diferença numa conta do plano, o título recebe o valor devido e a conta da diferença recebe o que falta ou o que excede. No cartão, a receita fica com o valor da nota e a tarifa sai na conta de despesa. O caixa ou o banco movimenta só o líquido. Sem essa conta de diferença, o valor liquidado permanece inteiro na conta do título.
 
+## Saldo no plano de contas
+
+A listagem calcula o saldo a partir dos movimentos de caixa e de banco ligados à conta. Receita, passivo e patrimônio usam entradas menos saídas. Despesa e ativo usam saídas menos entradas. A conta sintética soma as filhas da mesma natureza pelo código do pai.
+
+Receita e despesa usam o mês corrente. Ativo, passivo e patrimônio acumulam desde o início. Saldo inicial e transferência entre caixa e banco ficam de fora. O saldo de caixa e de banco continua na tesouraria, porque a baixa classifica o valor na conta do título.
+
 ## Fora deste desenho
 
 O encerramento do período em lucros acumulados e a distribuição de lucros ficam para quando houver lançamento contábil.
