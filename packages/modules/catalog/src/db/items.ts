@@ -1,10 +1,11 @@
-import { tenantColumns } from '@erp-360/mod-core';
+import { tenantColumns, tenants } from '@erp-360/mod-core';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
   foreignKey,
   index,
+  integer,
   numeric,
   pgEnum,
   pgTable,
@@ -42,8 +43,10 @@ export const catalogItems = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     ...tenantColumns,
-    /** Código comercial. Vai para cProd na NF-e. */
-    code: varchar('code', { length: 60 }).notNull(),
+    /** Código comercial de 000001 a 999999. Vai para cProd na NF-e. */
+    code: varchar('code', { length: 6 }).notNull(),
+    /** Código livre da empresa. Opcional. */
+    sku: varchar('sku', { length: 60 }),
     type: catalogItemTypeEnum('type').notNull(),
     fiscalItemType: fiscalItemTypeEnum('fiscal_item_type').notNull(),
     /**
@@ -76,6 +79,7 @@ export const catalogItems = pgTable(
   (table) => [
     unique('catalog_items_id_tenant_id_unique').on(table.id, table.tenantId),
     unique('catalog_items_tenant_code_unique').on(table.tenantId, table.code),
+    unique('catalog_items_tenant_sku_unique').on(table.tenantId, table.sku),
     unique('catalog_items_tenant_barcode_unique').on(table.tenantId, table.barcode),
     foreignKey({
       name: 'catalog_items_category_tenant_fk',
@@ -97,7 +101,11 @@ export const catalogItems = pgTable(
         or (${table.type} = 'product' and ${table.fiscalItemType} <> 'service')
       )`,
     ),
-    check('catalog_items_code_not_blank', sql`length(trim(${table.code})) > 0`),
+    check('catalog_items_code_format', sql`${table.code} ~ '^[0-9]{6}$'`),
+    check(
+      'catalog_items_sku_not_blank',
+      sql`${table.sku} is null or length(trim(${table.sku})) > 0`,
+    ),
     check('catalog_items_name_not_blank', sql`length(trim(${table.name})) > 0`),
     check(
       'catalog_items_barcode_check',
@@ -120,6 +128,23 @@ export const catalogItems = pgTable(
         and (${table.widthCm} is null or ${table.widthCm} >= 0)
         and (${table.heightCm} is null or ${table.heightCm} >= 0)
       )`,
+    ),
+  ],
+);
+
+/** Próximo código do item, um contador por empresa. Excluir um item não reaproveita o número. */
+export const catalogItemCounters = pgTable(
+  'catalog_item_counters',
+  {
+    tenantId: uuid('tenant_id')
+      .primaryKey()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    lastNumber: integer('last_number').notNull(),
+  },
+  (table) => [
+    check(
+      'catalog_item_counters_range',
+      sql`${table.lastNumber} >= 0 and ${table.lastNumber} <= 999999`,
     ),
   ],
 );

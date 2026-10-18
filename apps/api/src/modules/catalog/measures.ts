@@ -143,6 +143,39 @@ export const measureRoutes: FastifyPluginAsyncZod = async (fastify) => {
   });
 
   fastify.get(
+    '/options',
+    {
+      schema: {
+        querystring: z.object({
+          usage: z.enum(['product', 'service']),
+        }),
+      },
+    },
+    async (request) => {
+      const visible =
+        request.query.usage === 'product'
+          ? measures.showOnProduct
+          : measures.showOnService;
+      return db
+        .select({
+          id: measures.id,
+          name: measures.name,
+          abbreviation: measures.abbreviation,
+          measureType: measures.measureType,
+        })
+        .from(measures)
+        .where(
+          and(
+            eq(measures.tenantId, request.user.tenantId),
+            eq(measures.isActive, true),
+            eq(visible, true),
+          ),
+        )
+        .orderBy(asc(measures.abbreviation), asc(measures.name));
+    },
+  );
+
+  fastify.get(
     '/:id',
     {
       schema: {

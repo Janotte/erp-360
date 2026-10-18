@@ -14,7 +14,9 @@ import { registerErrorHandler } from './lib/error-handler.ts';
 import { activeUser } from './modules/auth/active-user.ts';
 import { authRoutes } from './modules/auth/auth.js';
 import { categoryRoutes } from './modules/catalog/categories.ts';
+import { itemRoutes } from './modules/catalog/items.ts';
 import { measureRoutes } from './modules/catalog/measures.ts';
+import { ncmRoutes } from './modules/catalog/ncms.ts';
 import { locationsRoutes } from './modules/persons/locations.ts';
 import { personsRoutes } from './modules/persons/persons.ts';
 import { financialCatalogRoutes } from './modules/plan-accounts/financial-catalogs.ts';
@@ -65,7 +67,9 @@ export function buildApp(options?: { logger?: boolean }) {
   fastify.register(treasuryRoutes, { prefix: '/financial' });
   fastify.register(planAccountsRoutes, { prefix: '/plan-accounts' });
   fastify.register(categoryRoutes, { prefix: '/catalog/categories' });
+  fastify.register(itemRoutes, { prefix: '/catalog/items' });
   fastify.register(measureRoutes, { prefix: '/catalog/measures' });
+  fastify.register(ncmRoutes, { prefix: '/catalog/ncms' });
 
   return fastify;
 }

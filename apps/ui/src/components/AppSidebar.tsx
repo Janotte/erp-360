@@ -1,6 +1,7 @@
 import {
   ArrowUpRight,
   BookOpen,
+  Box,
   ChevronRight,
   CreditCard,
   FileText,
@@ -54,6 +55,7 @@ const itensMenu: ItemMenu[] = [
     icon: Package,
     filhos: [
       { title: 'Categorias', icon: FolderTree, url: '/categories' },
+      { title: 'Itens', icon: Box, url: '/items' },
       { title: 'Medidas', icon: Ruler, url: '/measures' },
     ],
   },

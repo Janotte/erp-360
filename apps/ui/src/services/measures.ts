@@ -24,6 +24,13 @@ export interface MeasureInput {
   isActive?: boolean;
 }
 
+export interface MeasureOption {
+  id: string;
+  name: string;
+  abbreviation: string;
+  measureType: MeasureType;
+}
+
 export interface MeasureFilters {
   page: number;
   limit: number;
@@ -75,6 +82,16 @@ export const measuresService = {
         totalPages: Number(body.meta?.totalPages || 0),
       },
     };
+  },
+
+  options: async (usage: 'product' | 'service'): Promise<MeasureOption[]> => {
+    const params = new URLSearchParams({ usage });
+    const res = await apiFetch(`/catalog/measures/options?${params.toString()}`);
+    const body = await readBody(res);
+    if (!res.ok) {
+      throw new Error(body.message || body.error || 'Falha ao carregar medidas.');
+    }
+    return Array.isArray(body) ? body : [];
   },
 
   get: async (id: string): Promise<Measure> => {

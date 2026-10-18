@@ -20,6 +20,9 @@ const uniqueMessages: Record<string, string> = {
     'Já existe uma categoria com este nome neste nível.',
   catalog_categories_root_name_unique:
     'Já existe uma categoria com este nome neste nível.',
+  catalog_items_tenant_code_unique: 'Já existe um item com este código.',
+  catalog_items_tenant_sku_unique: 'Já existe um item com este SKU.',
+  catalog_items_tenant_barcode_unique: 'Já existe um item com este código de barras.',
 };
 
 function fastifyClientStatus(error: unknown): number | null {
@@ -45,11 +48,16 @@ function foreignKeyMessage(error: unknown): string | null {
     `${violation.constraint ?? ''} ${violation.detail ?? ''}`.toLowerCase();
   if (haystack.includes('city')) return 'Cidade informada não existe.';
   if (haystack.includes('catalog_items_measure')) {
-    return 'Não é possível excluir esta medida porque ela está em uso.';
+    return haystack.includes('still referenced')
+      ? 'Não é possível excluir esta medida porque ela está em uso.'
+      : 'A medida informada não existe.';
   }
   if (haystack.includes('catalog_items_category')) {
-    return 'Não é possível excluir esta categoria porque ela está em uso.';
+    return haystack.includes('still referenced')
+      ? 'Não é possível excluir esta categoria porque ela está em uso.'
+      : 'A categoria informada não existe.';
   }
+  if (haystack.includes('ncm_code')) return 'A NCM informada não existe.';
   if (haystack.includes('catalog_categories_parent')) {
     if (haystack.includes('still referenced')) {
       return 'Não é possível excluir esta categoria porque ela possui subcategorias.';
@@ -79,6 +87,24 @@ function checkMessage(error: unknown): string | null {
   if (name.includes('catalog_categories_parent_not_self')) {
     return 'A categoria não pode ser pai de si mesma.';
   }
+  if (name.includes('catalog_items_fiscal_type')) {
+    return 'O tipo fiscal não confere com produto ou serviço.';
+  }
+  if (name.includes('catalog_items_barcode')) {
+    return 'O código de barras precisa ter 8, 12, 13 ou 14 dígitos.';
+  }
+  if (name.includes('catalog_items_cest')) return 'O CEST precisa ter 7 dígitos.';
+  if (name.includes('catalog_items_list_price')) {
+    return 'O preço de tabela não pode ser negativo.';
+  }
+  if (name.includes('catalog_items_measures')) {
+    return 'Peso e dimensões não podem ser negativos.';
+  }
+  if (name.includes('catalog_items_sku')) return 'O SKU não pode ficar em branco.';
+  if (name.includes('catalog_items_code_format')) {
+    return 'O código do item precisa ter 6 dígitos.';
+  }
+  if (name.includes('catalog_items_name')) return 'Informe o nome.';
   return null;
 }
 
