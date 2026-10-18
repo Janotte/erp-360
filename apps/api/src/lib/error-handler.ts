@@ -16,6 +16,10 @@ const uniqueMessages: Record<string, string> = {
   person_contacts_one_principal: 'Esta pessoa já possui um contato Principal.',
   measures_tenant_name_unique: 'Já existe uma medida com este nome.',
   measures_tenant_abbreviation_unique: 'Já existe uma medida com esta sigla.',
+  catalog_categories_sibling_name_unique:
+    'Já existe uma categoria com este nome neste nível.',
+  catalog_categories_root_name_unique:
+    'Já existe uma categoria com este nome neste nível.',
 };
 
 function fastifyClientStatus(error: unknown): number | null {
@@ -43,6 +47,15 @@ function foreignKeyMessage(error: unknown): string | null {
   if (haystack.includes('catalog_items_measure')) {
     return 'Não é possível excluir esta medida porque ela está em uso.';
   }
+  if (haystack.includes('catalog_items_category')) {
+    return 'Não é possível excluir esta categoria porque ela está em uso.';
+  }
+  if (haystack.includes('catalog_categories_parent')) {
+    if (haystack.includes('still referenced')) {
+      return 'Não é possível excluir esta categoria porque ela possui subcategorias.';
+    }
+    return 'A categoria pai informada não existe.';
+  }
   return 'Operação inválida por vínculo com outro registro.';
 }
 
@@ -61,6 +74,10 @@ function checkMessage(error: unknown): string | null {
     name.includes('measures_abbreviation_not_blank')
   ) {
     return 'Preencha nome e sigla.';
+  }
+  if (name.includes('catalog_categories_name')) return 'Informe o nome.';
+  if (name.includes('catalog_categories_parent_not_self')) {
+    return 'A categoria não pode ser pai de si mesma.';
   }
   return null;
 }

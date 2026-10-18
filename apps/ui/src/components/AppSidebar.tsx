@@ -4,6 +4,7 @@ import {
   ChevronRight,
   CreditCard,
   FileText,
+  FolderTree,
   Landmark,
   LayoutDashboard,
   type LucideIcon,
@@ -51,7 +52,10 @@ const itensMenu: ItemMenu[] = [
   {
     title: 'Catálogo',
     icon: Package,
-    filhos: [{ title: 'Medidas', icon: Ruler, url: '/measures' }],
+    filhos: [
+      { title: 'Categorias', icon: FolderTree, url: '/categories' },
+      { title: 'Medidas', icon: Ruler, url: '/measures' },
+    ],
   },
   {
     title: 'Financeiro',

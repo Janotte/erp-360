@@ -15,6 +15,7 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from './components/AppSidebar';
 import { Login } from './components/Auth/Login';
 import { Register } from './components/Auth/Register';
+import { ListCategories } from './components/Catalog/Categories/ListCategories';
 import { ListMeasures } from './components/Catalog/Measures/ListMeasures';
 import { Dashboard } from './components/Dashboard';
 import { ListBankAccounts } from './components/Financial/BankAccounts/ListBankAccounts';
@@ -33,6 +34,7 @@ import { authStorage } from './utils/auth';
 const rotasPorHash: Record<string, string> = {
   '#dashboard': '/dashboard',
   '#persons': '/persons',
+  '#categories': '/categories',
   '#measures': '/measures',
   '#receivables': '/receivables',
   '#payables': '/payables',
@@ -143,6 +145,14 @@ function App() {
               element={
                 <Pagina>
                   <ListPersons />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/categories"
+              element={
+                <Pagina>
+                  <ListCategories />
                 </Pagina>
               }
             />

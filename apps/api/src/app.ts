@@ -13,6 +13,7 @@ import { env } from './config/index.ts';
 import { registerErrorHandler } from './lib/error-handler.ts';
 import { activeUser } from './modules/auth/active-user.ts';
 import { authRoutes } from './modules/auth/auth.js';
+import { categoryRoutes } from './modules/catalog/categories.ts';
 import { measureRoutes } from './modules/catalog/measures.ts';
 import { locationsRoutes } from './modules/persons/locations.ts';
 import { personsRoutes } from './modules/persons/persons.ts';
@@ -63,6 +64,7 @@ export function buildApp(options?: { logger?: boolean }) {
   fastify.register(financialCatalogRoutes, { prefix: '/financial' });
   fastify.register(treasuryRoutes, { prefix: '/financial' });
   fastify.register(planAccountsRoutes, { prefix: '/plan-accounts' });
+  fastify.register(categoryRoutes, { prefix: '/catalog/categories' });
   fastify.register(measureRoutes, { prefix: '/catalog/measures' });
 
   return fastify;
