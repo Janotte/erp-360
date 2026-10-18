@@ -14,6 +14,8 @@ const uniqueMessages: Record<string, string> = {
   plan_accounts_tenant_name_unique: 'Já existe um plano de contas com este nome.',
   person_addresses_role_per_person: 'Esta pessoa já possui um endereço deste tipo.',
   person_contacts_one_principal: 'Esta pessoa já possui um contato Principal.',
+  measures_tenant_name_unique: 'Já existe uma medida com este nome.',
+  measures_tenant_abbreviation_unique: 'Já existe uma medida com esta sigla.',
 };
 
 function fastifyClientStatus(error: unknown): number | null {
@@ -24,7 +26,8 @@ function fastifyClientStatus(error: unknown): number | null {
 }
 
 function httpError(error: unknown): { status: number; message: string } | null {
-  if (!(error instanceof Error) || !('status' in error) || 'statusCode' in error) return null;
+  if (!(error instanceof Error) || !('status' in error) || 'statusCode' in error)
+    return null;
   const status = error.status;
   if (typeof status !== 'number') return null;
   return { status, message: error.message };
@@ -37,7 +40,29 @@ function foreignKeyMessage(error: unknown): string | null {
   const haystack =
     `${violation.constraint ?? ''} ${violation.detail ?? ''}`.toLowerCase();
   if (haystack.includes('city')) return 'Cidade informada não existe.';
+  if (haystack.includes('catalog_items_measure')) {
+    return 'Não é possível excluir esta medida porque ela está em uso.';
+  }
   return 'Operação inválida por vínculo com outro registro.';
+}
+
+function checkMessage(error: unknown): string | null {
+  const violation = findPgError(error, '23514');
+  if (!violation) return null;
+  const name = violation.constraint ?? '';
+  if (name.includes('measures_abbreviation_uppercase')) {
+    return 'A sigla deve estar em maiúsculas.';
+  }
+  if (name.includes('measures_visibility')) {
+    return 'Marque produto, serviço ou os dois.';
+  }
+  if (
+    name.includes('measures_name') ||
+    name.includes('measures_abbreviation_not_blank')
+  ) {
+    return 'Preencha nome e sigla.';
+  }
+  return null;
 }
 
 export function registerErrorHandler(fastify: FastifyInstance) {
@@ -63,6 +88,9 @@ export function registerErrorHandler(fastify: FastifyInstance) {
 
     const foreignKey = foreignKeyMessage(error);
     if (foreignKey) return reply.status(400).send({ message: foreignKey });
+
+    const check = checkMessage(error);
+    if (check) return reply.status(400).send({ message: check });
 
     request.log.error({ err: error }, 'falha não tratada');
     return reply.status(500).send({ message: 'Erro interno no servidor.' });

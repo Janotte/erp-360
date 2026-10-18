@@ -1,3 +1,4 @@
+import * as catalogSchema from '@erp-360/mod-catalog';
 import * as coreSchema from '@erp-360/mod-core';
 import * as financialSchema from '@erp-360/mod-financial';
 import * as personsSchema from '@erp-360/mod-persons';
@@ -13,6 +14,7 @@ const schema = {
   ...coreSchema,
   ...personsSchema,
   ...financialSchema,
+  ...catalogSchema,
 };
 
 const pool = new Pool({

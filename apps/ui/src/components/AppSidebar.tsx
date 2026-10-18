@@ -7,6 +7,8 @@ import {
   Landmark,
   LayoutDashboard,
   type LucideIcon,
+  Package,
+  Ruler,
   Settings,
   Users,
   Wallet,
@@ -47,6 +49,11 @@ const itensMenu: ItemMenu[] = [
   { title: 'Dashboard', icon: LayoutDashboard, url: '/dashboard' },
   { title: 'Pessoas', icon: Users, url: '/persons' },
   {
+    title: 'Catálogo',
+    icon: Package,
+    filhos: [{ title: 'Medidas', icon: Ruler, url: '/measures' }],
+  },
+  {
     title: 'Financeiro',
     icon: CreditCard,
     filhos: [
@@ -66,19 +73,17 @@ export function AppSidebar() {
   const { pathname } = useLocation();
   const pathAtivo = pathname.replace(/\/$/, '') || '/';
   const { isMobile, setOpenMobile } = useSidebar();
-  const rotaFinanceira =
-    pathAtivo === '/payables' ||
-    pathAtivo === '/receivables' ||
-    pathAtivo === '/plan-accounts' ||
-    pathAtivo === '/cash-book' ||
-    pathAtivo === '/bank-accounts' ||
-    pathAtivo === '/cash-flow' ||
-    pathAtivo === '/income-statement';
-  const [financeiroAberto, setFinanceiroAberto] = useState(rotaFinanceira);
+  const grupoDaRota = itensMenu.find((item) =>
+    item.filhos?.some((filho) => filho.url === pathAtivo),
+  )?.title;
+  const [abertos, setAbertos] = useState<Record<string, boolean>>(() =>
+    grupoDaRota ? { [grupoDaRota]: true } : {},
+  );
 
   useEffect(() => {
-    if (rotaFinanceira) setFinanceiroAberto(true);
-  }, [rotaFinanceira]);
+    if (!grupoDaRota) return;
+    setAbertos((atual) => ({ ...atual, [grupoDaRota]: true }));
+  }, [grupoDaRota]);
 
   const fecharNoCelular = () => {
     if (isMobile) setOpenMobile(false);
@@ -102,23 +107,30 @@ export function AppSidebar() {
             <SidebarMenu>
               {itensMenu.map((item) => {
                 if (item.filhos?.length) {
+                  const aberto = abertos[item.title] ?? false;
+                  const ativo = item.filhos.some((filho) => filho.url === pathAtivo);
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
                         tooltip={item.title}
-                        isActive={rotaFinanceira}
-                        onClick={() => setFinanceiroAberto((aberto) => !aberto)}
+                        isActive={ativo}
+                        onClick={() =>
+                          setAbertos((atual) => ({
+                            ...atual,
+                            [item.title]: !atual[item.title],
+                          }))
+                        }
                       >
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                         <ChevronRight
                           className={`ml-auto h-4 w-4 transition-transform ${
-                            financeiroAberto ? 'rotate-90' : ''
+                            aberto ? 'rotate-90' : ''
                           }`}
                         />
                       </SidebarMenuButton>
 
-                      {financeiroAberto && (
+                      {aberto && (
                         <SidebarMenuSub>
                           {item.filhos.map((filho) => (
                             <SidebarMenuSubItem key={filho.url}>
