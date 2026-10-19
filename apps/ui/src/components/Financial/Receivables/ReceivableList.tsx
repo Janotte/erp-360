@@ -65,7 +65,7 @@ import {
 import {
   type FinancialAccount,
   financialService,
-  type ReceivableSortField,
+  type TitleSortField,
 } from '@/services/financials';
 
 import { titleRowTextClass } from '../titleRowTone';
@@ -90,8 +90,10 @@ export function ReceivableList() {
   const [status, setStatus] = useState('todos');
   const [dueFrom, setDueFrom] = useState('');
   const [dueTo, setDueTo] = useState('');
+  const [issueFrom, setIssueFrom] = useState('');
+  const [issueTo, setIssueTo] = useState('');
   const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState<ReceivableSortField>('dueOn');
+  const [sortField, setSortField] = useState<TitleSortField>('dueOn');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
@@ -109,7 +111,7 @@ export function ReceivableList() {
     queryKey: [
       'financial',
       'receivable',
-      { page, status, search, dueFrom, dueTo, sortField, sortOrder },
+      { page, status, search, dueFrom, dueTo, issueFrom, issueTo, sortField, sortOrder },
     ],
     placeholderData: keepPreviousData,
     queryFn: () =>
@@ -122,10 +124,12 @@ export function ReceivableList() {
         search: search || undefined,
         dueFrom: dueFrom || undefined,
         dueTo: dueTo || undefined,
+        issueFrom: issueFrom || undefined,
+        issueTo: issueTo || undefined,
       }),
   });
 
-  const changeSort = (field: ReceivableSortField) => {
+  const changeSort = (field: TitleSortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
@@ -135,7 +139,7 @@ export function ReceivableList() {
     setPage(1);
   };
 
-  const renderSortIcon = (field: ReceivableSortField) => {
+  const renderSortIcon = (field: TitleSortField) => {
     if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4 shrink-0" />;
     return sortOrder === 'asc' ? (
       <ArrowUp className="ml-2 h-4 w-4 shrink-0 text-primary" />
@@ -271,12 +275,46 @@ export function ReceivableList() {
             />
           </div>
         </div>
+        <div className="flex flex-col sm:flex-row gap-3 items-center">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-sm text-zinc-500 shrink-0">Emissão de</span>
+            <Input
+              type="date"
+              value={issueFrom}
+              onChange={(e) => {
+                setIssueFrom(e.target.value);
+                setPage(1);
+              }}
+              className="w-full sm:w-40"
+            />
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-sm text-zinc-500 shrink-0">até</span>
+            <Input
+              type="date"
+              value={issueTo}
+              onChange={(e) => {
+                setIssueTo(e.target.value);
+                setPage(1);
+              }}
+              className="w-full sm:w-40"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="rounded-md border border-zinc-200 bg-white shadow-2xs">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead
+                onClick={() => changeSort('documentNumber')}
+                className="cursor-pointer select-none hover:bg-zinc-50"
+              >
+                <div className="flex items-center">
+                  Documento {renderSortIcon('documentNumber')}
+                </div>
+              </TableHead>
               <TableHead
                 onClick={() => changeSort('personName')}
                 className="cursor-pointer select-none hover:bg-zinc-50"
@@ -293,7 +331,14 @@ export function ReceivableList() {
                   Descrição {renderSortIcon('description')}
                 </div>
               </TableHead>
-              <TableHead>Nº Documento</TableHead>
+              <TableHead
+                onClick={() => changeSort('issueOn')}
+                className="cursor-pointer select-none hover:bg-zinc-50"
+              >
+                <div className="flex items-center">
+                  Emissão {renderSortIcon('issueOn')}
+                </div>
+              </TableHead>
               <TableHead
                 onClick={() => changeSort('dueOn')}
                 className="cursor-pointer select-none hover:bg-zinc-50"
@@ -310,41 +355,26 @@ export function ReceivableList() {
                   Valor {renderSortIcon('installmentAmount')}
                 </div>
               </TableHead>
-              <TableHead className="text-right">Recebido</TableHead>
-              <TableHead>Status</TableHead>
               <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-4">
+                <TableCell colSpan={7} className="text-center py-4">
                   Carregando dados...
                 </TableCell>
               </TableRow>
             ) : accounts?.length ? (
               accounts.map((acc) => (
                 <TableRow key={acc.id} className={titleRowTextClass(acc.status, acc.dueOn)}>
+                  <TableCell>{acc.documentNumber || '-'}</TableCell>
                   <TableCell>{acc.personName || '-'}</TableCell>
                   <TableCell className="font-medium">{acc.description}</TableCell>
-                  <TableCell>{acc.documentNumber || '-'}</TableCell>
+                  <TableCell>{formatRawDate(acc.issueOn)}</TableCell>
                   <TableCell>{formatRawDate(acc.dueOn)}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatCurrency(acc.installmentAmount)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {acc.settledAmount ? formatCurrency(acc.settledAmount) : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                        acc.status === 'recebido'
-                          ? 'bg-emerald-50 text-emerald-600'
-                          : 'bg-amber-50 text-amber-600'
-                      }`}
-                    >
-                      {acc.status}
-                    </span>
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -395,7 +425,7 @@ export function ReceivableList() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-4 text-zinc-500">
+                <TableCell colSpan={7} className="text-center py-4 text-zinc-500">
                   Nenhuma conta a receber encontrada.
                 </TableCell>
               </TableRow>

@@ -84,13 +84,22 @@ const listReceivablesQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   sortField: z
-    .enum(['personName', 'description', 'dueOn', 'installmentAmount'])
+    .enum([
+      'documentNumber',
+      'personName',
+      'description',
+      'issueOn',
+      'dueOn',
+      'installmentAmount',
+    ])
     .default('dueOn'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
   status: z.enum(['pendente', 'recebido', 'cancelado']).optional(),
   busca: z.string().optional(),
   dueFrom: dateString.optional(),
   dueTo: dateString.optional(),
+  issueFrom: dateString.optional(),
+  issueTo: dateString.optional(),
 });
 
 export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
@@ -154,6 +163,8 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         busca: search,
         dueFrom,
         dueTo,
+        issueFrom,
+        issueTo,
       } = request.query;
 
       const offset = (page - 1) * limit;
@@ -162,6 +173,8 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       if (status) conditions.push(eq(receivables.status, status));
       if (dueFrom) conditions.push(gte(receivables.dueOn, dueFrom));
       if (dueTo) conditions.push(lte(receivables.dueOn, dueTo));
+      if (issueFrom) conditions.push(gte(receivables.issueOn, issueFrom));
+      if (issueTo) conditions.push(lte(receivables.issueOn, issueTo));
       if (search) {
         const like = `%${escapeIlike(search)}%`;
         conditions.push(
@@ -179,8 +192,10 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       );
 
       const sortColumns = {
+        documentNumber: receivables.documentNumber,
         personName: persons.name,
         description: receivables.description,
+        issueOn: receivables.issueOn,
         dueOn: receivables.dueOn,
         installmentAmount: receivables.installmentAmount,
       } as const;

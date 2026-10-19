@@ -178,18 +178,25 @@ export interface CatalogOption {
   label: string;
 }
 
-export type FinancialSortField = 'description' | 'dueOn' | 'installmentAmount';
-export type ReceivableSortField = FinancialSortField | 'personName';
+export type TitleSortField =
+  | 'documentNumber'
+  | 'personName'
+  | 'description'
+  | 'issueOn'
+  | 'dueOn'
+  | 'installmentAmount';
 
 export interface FinancialListFilters {
   page: number;
   limit: number;
-  sortField: ReceivableSortField;
+  sortField: TitleSortField;
   sortOrder: 'asc' | 'desc';
   status?: string;
   search?: string;
   dueFrom?: string;
   dueTo?: string;
+  issueFrom?: string;
+  issueTo?: string;
 }
 
 export interface FinancialPaginationResponse {
@@ -266,6 +273,8 @@ export const financialService = {
       ...(filters.search && { busca: filters.search }),
       ...(filters.dueFrom && { dueFrom: filters.dueFrom }),
       ...(filters.dueTo && { dueTo: filters.dueTo }),
+      ...(filters.issueFrom && { issueFrom: filters.issueFrom }),
+      ...(filters.issueTo && { issueTo: filters.issueTo }),
     });
 
     const res = await apiFetch(`/${collection(tipo)}?${params.toString()}`);

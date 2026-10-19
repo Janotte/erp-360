@@ -54,12 +54,23 @@ const paySchema = z.object({
 const listPayablesQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
-  sortField: z.enum(['description', 'dueOn', 'installmentAmount']).default('dueOn'),
+  sortField: z
+    .enum([
+      'documentNumber',
+      'personName',
+      'description',
+      'issueOn',
+      'dueOn',
+      'installmentAmount',
+    ])
+    .default('dueOn'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
   status: z.enum(['pendente', 'pago', 'cancelado']).optional(),
   busca: z.string().optional(),
   dueFrom: dateString.optional(),
   dueTo: dateString.optional(),
+  issueFrom: dateString.optional(),
+  issueTo: dateString.optional(),
 });
 
 export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
@@ -110,6 +121,8 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         busca: search,
         dueFrom,
         dueTo,
+        issueFrom,
+        issueTo,
       } = request.query;
 
       const offset = (page - 1) * limit;
@@ -118,6 +131,8 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       if (status) conditions.push(eq(payables.status, status));
       if (dueFrom) conditions.push(gte(payables.dueOn, dueFrom));
       if (dueTo) conditions.push(lte(payables.dueOn, dueTo));
+      if (issueFrom) conditions.push(gte(payables.issueOn, issueFrom));
+      if (issueTo) conditions.push(lte(payables.issueOn, issueTo));
       if (search) {
         const like = `%${escapeIlike(search)}%`;
         conditions.push(
@@ -135,7 +150,10 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       );
 
       const sortColumns = {
+        documentNumber: payables.documentNumber,
+        personName: persons.name,
         description: payables.description,
+        issueOn: payables.issueOn,
         dueOn: payables.dueOn,
         installmentAmount: payables.installmentAmount,
       } as const;
