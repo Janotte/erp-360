@@ -68,6 +68,7 @@ import {
   type FinancialSortField,
 } from '@/services/financials';
 
+import { titleRowTextClass } from '../titleRowTone';
 import { PayableForm } from './PayableForm';
 import { PayModal } from './PayModal';
 import { ReplicatePayableDialog } from './ReplicatePayableDialog';
@@ -316,12 +317,12 @@ export function PayableList() {
               </TableRow>
             ) : accounts?.length ? (
               accounts.map((acc) => (
-                <TableRow key={acc.id}>
+                <TableRow key={acc.id} className={titleRowTextClass(acc.status, acc.dueOn)}>
                   <TableCell>{acc.documentNumber || '-'}</TableCell>
                   <TableCell>{acc.personName || '-'}</TableCell>
                   <TableCell className="font-medium">{acc.description}</TableCell>
                   <TableCell>{formatRawDate(acc.dueOn)}</TableCell>
-                  <TableCell className="text-right tabular-nums text-red-600">
+                  <TableCell className="text-right tabular-nums">
                     {formatCurrency(acc.installmentAmount)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">

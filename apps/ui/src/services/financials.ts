@@ -179,11 +179,12 @@ export interface CatalogOption {
 }
 
 export type FinancialSortField = 'description' | 'dueOn' | 'installmentAmount';
+export type ReceivableSortField = FinancialSortField | 'personName';
 
 export interface FinancialListFilters {
   page: number;
   limit: number;
-  sortField: FinancialSortField;
+  sortField: ReceivableSortField;
   sortOrder: 'asc' | 'desc';
   status?: string;
   search?: string;

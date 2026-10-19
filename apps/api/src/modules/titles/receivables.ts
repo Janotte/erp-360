@@ -8,16 +8,23 @@ import {
   settlementPreviewSchema,
   titlePageSchema,
 } from '@erp-360/shared';
-import { and, asc, desc, eq, getTableColumns, gte, ilike, lte, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableColumns,
+  gte,
+  ilike,
+  lte,
+  or,
+  sql,
+} from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
-import {
-  previewSettlement,
-  reverseSettlement,
-  settleTitle,
-} from './settlement.ts';
+import { previewSettlement, reverseSettlement, settleTitle } from './settlement.ts';
 
 const dateString = z
   .string()
@@ -76,7 +83,9 @@ const receiveSchema = z.object({
 const listReceivablesQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
-  sortField: z.enum(['description', 'dueOn', 'installmentAmount']).default('dueOn'),
+  sortField: z
+    .enum(['personName', 'description', 'dueOn', 'installmentAmount'])
+    .default('dueOn'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
   status: z.enum(['pendente', 'recebido', 'cancelado']).optional(),
   busca: z.string().optional(),
@@ -170,6 +179,7 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       );
 
       const sortColumns = {
+        personName: persons.name,
         description: receivables.description,
         dueOn: receivables.dueOn,
         installmentAmount: receivables.installmentAmount,

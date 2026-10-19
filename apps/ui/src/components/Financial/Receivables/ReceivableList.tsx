@@ -65,9 +65,10 @@ import {
 import {
   type FinancialAccount,
   financialService,
-  type FinancialSortField,
+  type ReceivableSortField,
 } from '@/services/financials';
 
+import { titleRowTextClass } from '../titleRowTone';
 import { PayModal } from '../Payables/PayModal';
 import { ReceivableForm } from './ReceivableForm';
 import { ReplicateReceivableDialog } from './ReplicateReceivableDialog';
@@ -90,7 +91,7 @@ export function ReceivableList() {
   const [dueFrom, setDueFrom] = useState('');
   const [dueTo, setDueTo] = useState('');
   const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState<FinancialSortField>('dueOn');
+  const [sortField, setSortField] = useState<ReceivableSortField>('dueOn');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
@@ -124,7 +125,7 @@ export function ReceivableList() {
       }),
   });
 
-  const changeSort = (field: FinancialSortField) => {
+  const changeSort = (field: ReceivableSortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
@@ -134,7 +135,7 @@ export function ReceivableList() {
     setPage(1);
   };
 
-  const renderSortIcon = (field: FinancialSortField) => {
+  const renderSortIcon = (field: ReceivableSortField) => {
     if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4 shrink-0" />;
     return sortOrder === 'asc' ? (
       <ArrowUp className="ml-2 h-4 w-4 shrink-0 text-primary" />
@@ -276,7 +277,14 @@ export function ReceivableList() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Devedor</TableHead>
+              <TableHead
+                onClick={() => changeSort('personName')}
+                className="cursor-pointer select-none hover:bg-zinc-50"
+              >
+                <div className="flex items-center">
+                  Devedor {renderSortIcon('personName')}
+                </div>
+              </TableHead>
               <TableHead
                 onClick={() => changeSort('description')}
                 className="cursor-pointer select-none hover:bg-zinc-50"
@@ -316,12 +324,12 @@ export function ReceivableList() {
               </TableRow>
             ) : accounts?.length ? (
               accounts.map((acc) => (
-                <TableRow key={acc.id}>
+                <TableRow key={acc.id} className={titleRowTextClass(acc.status, acc.dueOn)}>
                   <TableCell>{acc.personName || '-'}</TableCell>
                   <TableCell className="font-medium">{acc.description}</TableCell>
                   <TableCell>{acc.documentNumber || '-'}</TableCell>
                   <TableCell>{formatRawDate(acc.dueOn)}</TableCell>
-                  <TableCell className="text-right tabular-nums text-emerald-600">
+                  <TableCell className="text-right tabular-nums">
                     {formatCurrency(acc.installmentAmount)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
