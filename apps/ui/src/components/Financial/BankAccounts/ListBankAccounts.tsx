@@ -33,9 +33,26 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { financialService } from '@/services/financials';
-import { type BankAccount, type BankAccountKind, treasuryService } from '@/services/treasury';
+import {
+  type BankAccount,
+  type BankAccountKind,
+  type TreasuryEntry,
+  treasuryService,
+} from '@/services/treasury';
 
+import { InvestmentEntryModal } from './InvestmentEntryModal';
 import { TransferModal, type TransferMode } from './TransferModal';
+
+function canDeleteInvestmentEntry(entry: TreasuryEntry) {
+  return (
+    !entry.openingBalance &&
+    !entry.transferId &&
+    !entry.settlementId &&
+    !entry.receivableId &&
+    !entry.payableId &&
+    !entry.reconciled
+  );
+}
 
 export function ListBankAccounts() {
   const queryClient = useQueryClient();
@@ -51,6 +68,8 @@ export function ListBankAccounts() {
   const [openingAmountStr, setOpeningAmountStr] = useState('');
   const [transferMode, setTransferMode] = useState<TransferMode | null>(null);
   const [reverseTransferId, setReverseTransferId] = useState<string | null>(null);
+  const [openEntry, setOpenEntry] = useState(false);
+  const [deleteEntryId, setDeleteEntryId] = useState<string | null>(null);
 
   const resetForm = () => {
     setEditingId(null);
@@ -130,6 +149,17 @@ export function ListBankAccounts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['treasury', 'bank-entries', selectedId] });
       toast.success('Conciliação atualizada.');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const deleteEntryMutation = useMutation({
+    mutationFn: (id: string) => treasuryService.deleteInvestmentEntry(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['treasury'] });
+      queryClient.invalidateQueries({ queryKey: ['listaPlanAccounts'] });
+      setDeleteEntryId(null);
+      toast.success('Lançamento excluído.');
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -220,9 +250,16 @@ export function ListBankAccounts() {
                     Saldo {formatCurrency(statement.account.balance ?? 0)}
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => openEdit(selected)}>
-                  Editar
-                </Button>
+                <div className="flex gap-2">
+                  {statement.account.kind === 'investment' ? (
+                    <Button size="sm" onClick={() => setOpenEntry(true)}>
+                      Lançar
+                    </Button>
+                  ) : null}
+                  <Button variant="outline" size="sm" onClick={() => openEdit(selected)}>
+                    Editar
+                  </Button>
+                </div>
               </div>
               <Table>
                 <TableHeader>
@@ -275,6 +312,16 @@ export function ListBankAccounts() {
                               Estornar
                             </Button>
                           ) : null}
+                          {statement.account.kind === 'investment' &&
+                          canDeleteInvestmentEntry(entry) ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setDeleteEntryId(entry.id)}
+                            >
+                              Excluir
+                            </Button>
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     ))
@@ -323,6 +370,54 @@ export function ListBankAccounts() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(deleteEntryId)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteEntryId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir lançamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              O lançamento será removido do extrato e o saldo da conta de investimento será
+              recalculado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteEntryMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                if (deleteEntryId) deleteEntryMutation.mutate(deleteEntryId);
+              }}
+            >
+              {deleteEntryMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog
+        open={openEntry}
+        onOpenChange={setOpenEntry}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Lançar na conta de investimento</DialogTitle>
+          </DialogHeader>
+          {selectedId ? (
+            <InvestmentEntryModal
+              key={selectedId}
+              bankAccountId={selectedId}
+              onSuccess={() => setOpenEntry(false)}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={openForm}

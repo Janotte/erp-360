@@ -29,7 +29,11 @@ export interface TreasuryEntry {
   outflowAmount: number;
   balance: number;
   reconciled?: boolean;
+  openingBalance?: boolean;
   transferId?: string | null;
+  settlementId?: string | null;
+  receivableId?: string | null;
+  payableId?: string | null;
 }
 
 export interface FinancialSettings {
@@ -179,6 +183,30 @@ export const treasuryService = {
     });
     const body = await parseJson(res);
     if (!res.ok) throw new Error(body.message || 'Falha ao estornar a transferência.');
+    return body as { id: string };
+  },
+  createInvestmentEntry: async (
+    bankAccountId: string,
+    dados: {
+      occurredOn: string;
+      description: string;
+      direction: 'in' | 'out';
+      amount: number;
+      planAccountId: string;
+    },
+  ) => {
+    const res = await apiFetch(`/financial/bank-accounts/${bankAccountId}/entries`, {
+      method: 'POST',
+      body: JSON.stringify(dados),
+    });
+    const body = await parseJson(res);
+    if (!res.ok) throw new Error(body.message || 'Falha ao lançar na conta de investimento.');
+    return body as TreasuryEntry;
+  },
+  deleteInvestmentEntry: async (id: string) => {
+    const res = await apiFetch(`/financial/bank-entries/${id}`, { method: 'DELETE' });
+    const body = await parseJson(res);
+    if (!res.ok) throw new Error(body.message || 'Falha ao excluir o lançamento.');
     return body as { id: string };
   },
   reconcile: async (id: string, reconciled: boolean): Promise<TreasuryEntry> => {

@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { db } from '../../db/index.ts';
 import { listCashFlow } from '../titles/settlement.ts';
 import { getOrCreateFinancialSettings } from './financial-settings.ts';
+import { createInvestmentEntry, deleteInvestmentEntry } from './investment-entry.ts';
 import { listIncomeStatement } from './income-statement.ts';
 import {
   loadBankAccount,
@@ -299,6 +300,47 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (fastify) => {
           desc(bankEntries.createdAt),
         );
       return { account, entries };
+    },
+  );
+
+  fastify.post(
+    '/bank-accounts/:id/entries',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        body: z.object({
+          occurredOn: dateString,
+          description: z.string().min(1).max(255),
+          direction: z.enum(['in', 'out']),
+          amount: z.number().int().positive(),
+          planAccountId: z.string().uuid(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const data = request.body;
+      const entry = await createInvestmentEntry({
+        tenantId: request.user.tenantId,
+        bankAccountId: id,
+        occurredOn: data.occurredOn,
+        description: data.description,
+        direction: data.direction,
+        amount: data.amount,
+        planAccountId: data.planAccountId,
+      });
+      return reply.status(201).send(entry);
+    },
+  );
+
+  fastify.delete(
+    '/bank-entries/:id',
+    { schema: { params: z.object({ id: z.string().uuid() }) } },
+    async (request) => {
+      return deleteInvestmentEntry({
+        tenantId: request.user.tenantId,
+        entryId: request.params.id,
+      });
     },
   );
 
