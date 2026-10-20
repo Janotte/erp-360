@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { effectiveDueOn } from '../src/modules/titles/business-days.ts';
 import {
   addDays,
   applyBps,
@@ -81,6 +82,54 @@ describe('cálculo da liquidação', () => {
     assert.equal(pastGrace.fineAmount, 2_000);
     assert.equal(pastGrace.interestAmount, 150);
     assert.equal(pastGrace.dueAmount, 102_150);
+  });
+
+  it('trata vencimento em fim de semana ou feriado como o próximo dia útil', () => {
+    assert.equal(effectiveDueOn('2026-10-04'), '2026-10-05');
+    assert.equal(effectiveDueOn('2026-04-03'), '2026-04-06');
+    assert.equal(effectiveDueOn('2026-10-12'), '2026-10-13');
+    assert.equal(effectiveDueOn('2026-10-01'), '2026-10-01');
+
+    const onNextBusinessDay = computeDueAmount({
+      kind: 'receivable',
+      originalAmount: 22_634,
+      dueOn: '2026-10-04',
+      settledOn: '2026-10-05',
+      lateFeeBps: 200,
+      dailyInterestBps: 3,
+      graceDays: 0,
+      waiveCharges: false,
+    });
+    assert.equal(onNextBusinessDay.daysLate, 0);
+    assert.equal(onNextBusinessDay.fineAmount, 0);
+    assert.equal(onNextBusinessDay.interestAmount, 0);
+    assert.equal(onNextBusinessDay.dueAmount, 22_634);
+
+    assert.deepEqual(
+      computeSettlementGaps({
+        kind: 'receivable',
+        originalAmount: 22_634,
+        dueAmount: onNextBusinessDay.dueAmount,
+        settledAmount: 21_966,
+        daysLate: onNextBusinessDay.daysLate,
+        waiveCharges: false,
+      }),
+      { remainder: 668, extra: -668 },
+    );
+
+    const afterNextBusinessDay = computeDueAmount({
+      kind: 'receivable',
+      originalAmount: 22_634,
+      dueOn: '2026-10-04',
+      settledOn: '2026-10-06',
+      lateFeeBps: 200,
+      dailyInterestBps: 3,
+      graceDays: 0,
+      waiveCharges: false,
+    });
+    assert.equal(afterNextBusinessDay.daysLate, 1);
+    assert.equal(afterNextBusinessDay.fineAmount, applyBps(22_634, 200));
+    assert.equal(afterNextBusinessDay.interestAmount, applyBps(22_634, 3));
   });
 
   it('zera encargos quando o recebimento perdoa multa e juros', () => {

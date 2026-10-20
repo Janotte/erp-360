@@ -1,3 +1,5 @@
+import { effectiveDueOn } from './business-days.ts';
+
 export function daysBetween(from: string, to: string): number {
   const start = Date.parse(`${from}T00:00:00`);
   const end = Date.parse(`${to}T00:00:00`);
@@ -27,8 +29,10 @@ export function computeDueAmount(params: {
   graceDays: number;
   waiveCharges: boolean;
 }) {
+  const dueOn = params.kind === 'receivable' ? effectiveDueOn(params.dueOn) : params.dueOn;
+  const calendarDaysLate = Math.max(0, daysBetween(dueOn, params.settledOn));
+
   if (params.kind === 'payable' || params.waiveCharges) {
-    const calendarDaysLate = Math.max(0, daysBetween(params.dueOn, params.settledOn));
     return {
       daysLate: calendarDaysLate,
       chargeableDays: 0,
@@ -37,8 +41,6 @@ export function computeDueAmount(params: {
       dueAmount: params.originalAmount,
     };
   }
-
-  const calendarDaysLate = Math.max(0, daysBetween(params.dueOn, params.settledOn));
   const chargeableDays = Math.max(0, calendarDaysLate - params.graceDays);
   const late = chargeableDays > 0;
   const fineAmount = late ? applyBps(params.originalAmount, params.lateFeeBps) : 0;
