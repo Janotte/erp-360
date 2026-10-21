@@ -23,6 +23,43 @@ import { measuresService } from '@/services/measures';
 const selectClassName =
   'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
 
+function focusNextItemField(form: HTMLFormElement, current: HTMLElement) {
+  const fields = Array.from(form.querySelectorAll<HTMLElement>('[data-item-field]')).filter(
+    (field) => !field.hasAttribute('disabled'),
+  );
+  const index = fields.findIndex((field) => field === current || field.contains(current));
+  if (index < 0) return;
+  fields[index + 1]?.focus();
+}
+
+function maskListPrice(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 15);
+  if (!digits) return '';
+  const padded = digits.padStart(5, '0');
+  const fraction = padded.slice(-4);
+  const integers = padded.slice(0, -4).replace(/^0+(?=\d)/, '') || '0';
+  const grouped = integers.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${grouped},${fraction}`;
+}
+
+function formatListPrice(value: string | null | undefined) {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return '';
+  const normalized = trimmed.includes(',')
+    ? trimmed.replace(/\./g, '').replace(',', '.')
+    : trimmed;
+  const [integers, fraction = ''] = normalized.split('.');
+  const intDigits = integers.replace(/\D/g, '').replace(/^0+(?=\d)/, '') || '0';
+  const fractionDigits = fraction.replace(/\D/g, '').padEnd(4, '0').slice(0, 4);
+  return maskListPrice(`${intDigits}${fractionDigits}`);
+}
+
+function listPriceForApi(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return trimmed.replace(/\./g, '').replace(',', '.');
+}
+
 function parseItemType(value: string): CatalogItemType {
   return value === 'service' ? 'service' : 'product';
 }
@@ -53,7 +90,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
   const [measureId, setMeasureId] = useState(itemToUpdate?.measureId ?? '');
   const [description, setDescription] = useState(itemToUpdate?.description ?? '');
   const [barcode, setBarcode] = useState(itemToUpdate?.barcode ?? '');
-  const [listPrice, setListPrice] = useState(itemToUpdate?.listPrice ?? '');
+  const [listPrice, setListPrice] = useState(formatListPrice(itemToUpdate?.listPrice));
   const [ncmCode, setNcmCode] = useState(itemToUpdate?.ncmCode ?? '');
   const [ncmDescription, setNcmDescription] = useState(
     itemToUpdate?.ncmDescription ?? '',
@@ -109,7 +146,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
     setMeasureId(item.measureId ?? '');
     setDescription(item.description ?? '');
     setBarcode(item.barcode ?? '');
-    setListPrice(item.listPrice ?? '');
+    setListPrice(formatListPrice(item.listPrice));
     setNcmCode(item.ncmCode ?? '');
     setNcmDescription(item.ncmDescription ?? '');
     setCestCode(item.cestCode ?? '');
@@ -189,7 +226,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
       measureId,
       description,
       barcode,
-      listPrice,
+      listPrice: listPriceForApi(listPrice),
       ncmCode,
       cestCode,
       netWeightKg,
@@ -202,7 +239,23 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4 pt-2"
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (target instanceof HTMLTextAreaElement && event.shiftKey) return;
+        if (target instanceof HTMLButtonElement && target.type === 'submit') return;
+        if (!target.closest('[data-item-field]')) return;
+        event.preventDefault();
+        focusNextItemField(event.currentTarget, target);
+      }}
+    >
+      <p className="text-sm text-zinc-500">
+        Campos com <span className="text-destructive">*</span> são obrigatórios.
+      </p>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <Label htmlFor="itemCode">Código</Label>
@@ -219,6 +272,8 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
           <Label htmlFor="itemSku">SKU</Label>
           <Input
             id="itemSku"
+            data-item-field
+            autoFocus
             value={sku}
             maxLength={60}
             onChange={(event) => setSku(event.target.value)}
@@ -229,9 +284,12 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="itemName">Nome</Label>
+        <Label htmlFor="itemName">
+          Nome <span className="text-destructive">*</span>
+        </Label>
         <Input
           id="itemName"
+          data-item-field
           value={name}
           maxLength={120}
           onChange={(event) => setName(event.target.value)}
@@ -244,6 +302,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
           <Label htmlFor="itemType">Tipo</Label>
           <select
             id="itemType"
+            data-item-field
             value={type}
             onChange={(event) => changeType(parseItemType(event.target.value))}
             className={selectClassName}
@@ -259,6 +318,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
           <Label htmlFor="itemFiscalType">Tipo fiscal</Label>
           <select
             id="itemFiscalType"
+            data-item-field
             value={fiscalItemType}
             onChange={(event) => changeFiscal(parseFiscalType(event.target.value))}
             className={selectClassName}
@@ -275,6 +335,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
           <Label htmlFor="itemCategory">Categoria</Label>
           <select
             id="itemCategory"
+            data-item-field
             value={categoryId}
             onChange={(event) => setCategoryId(event.target.value)}
             className={selectClassName}
@@ -291,9 +352,12 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <Label htmlFor="itemMeasure">Medida</Label>
+          <Label htmlFor="itemMeasure">
+            Medida <span className="text-destructive">*</span>
+          </Label>
           <select
             id="itemMeasure"
+            data-item-field
             value={
               measureChoices.some((measure) => measure.id === measureId) ? measureId : ''
             }
@@ -321,10 +385,11 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
           <Label htmlFor="itemPrice">Preço de tabela</Label>
           <Input
             id="itemPrice"
+            data-item-field
             value={listPrice}
             inputMode="decimal"
             placeholder="0,0000"
-            onChange={(event) => setListPrice(event.target.value)}
+            onChange={(event) => setListPrice(maskListPrice(event.target.value))}
           />
         </div>
       </div>
@@ -333,6 +398,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
         <Label htmlFor="itemDescription">Descrição</Label>
         <textarea
           id="itemDescription"
+          data-item-field
           value={description}
           maxLength={2000}
           rows={2}
@@ -346,6 +412,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
           <Label htmlFor="itemBarcode">Código de barras</Label>
           <Input
             id="itemBarcode"
+            data-item-field
             value={barcode}
             inputMode="numeric"
             maxLength={14}
@@ -356,6 +423,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
           <Label htmlFor="itemNcm">NCM</Label>
           <Input
             id="itemNcm"
+            data-item-field
             value={ncmCode}
             maxLength={10}
             placeholder="0000.00.00"
@@ -373,6 +441,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
                 <li key={ncm.code}>
                   <button
                     type="button"
+                    tabIndex={-1}
                     className="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-50"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
@@ -400,6 +469,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
         <Label htmlFor="itemCest">CEST</Label>
         <Input
           id="itemCest"
+          data-item-field
           value={cestCode}
           inputMode="numeric"
           maxLength={7}
@@ -412,6 +482,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
           <Label htmlFor="itemNetWeight">Peso líquido (kg)</Label>
           <Input
             id="itemNetWeight"
+            data-item-field
             value={netWeightKg}
             inputMode="decimal"
             onChange={(event) => setNetWeightKg(event.target.value)}
@@ -421,6 +492,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
           <Label htmlFor="itemGrossWeight">Peso bruto (kg)</Label>
           <Input
             id="itemGrossWeight"
+            data-item-field
             value={grossWeightKg}
             inputMode="decimal"
             onChange={(event) => setGrossWeightKg(event.target.value)}
@@ -430,6 +502,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
           <Label htmlFor="itemLength">Comprimento (cm)</Label>
           <Input
             id="itemLength"
+            data-item-field
             value={lengthCm}
             inputMode="decimal"
             onChange={(event) => setLengthCm(event.target.value)}
@@ -439,6 +512,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
           <Label htmlFor="itemWidth">Largura (cm)</Label>
           <Input
             id="itemWidth"
+            data-item-field
             value={widthCm}
             inputMode="decimal"
             onChange={(event) => setWidthCm(event.target.value)}
@@ -448,6 +522,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
           <Label htmlFor="itemHeight">Altura (cm)</Label>
           <Input
             id="itemHeight"
+            data-item-field
             value={heightCm}
             inputMode="decimal"
             onChange={(event) => setHeightCm(event.target.value)}
@@ -459,6 +534,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
         <div className="flex items-center space-x-2">
           <Checkbox
             id="itemStock"
+            data-item-field
             checked={stockLocked ? false : tracksStock}
             disabled={stockLocked}
             onCheckedChange={(value) => setTracksStock(!!value)}
@@ -470,6 +546,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
         <div className="flex items-center space-x-2">
           <Checkbox
             id="itemActive"
+            data-item-field
             checked={isActive}
             onCheckedChange={(value) => setIsActive(!!value)}
           />
@@ -491,7 +568,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
       ) : null}
 
       <div className="flex justify-end pt-2">
-        <Button type="submit" disabled={mutation.isPending || !measureId}>
+        <Button type="submit" data-item-field disabled={mutation.isPending || !measureId}>
           {mutation.isPending ? 'Salvando...' : itemId ? 'Atualizar' : 'Cadastrar'}
         </Button>
       </div>
