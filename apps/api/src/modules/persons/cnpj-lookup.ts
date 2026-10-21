@@ -34,8 +34,11 @@ export interface CnpjLookupAddress {
 export interface CnpjLookupResult {
   taxId: string;
   name: string;
+  tradeName: string | null;
   birthDate: string | null;
   nfeEmail: string | null;
+  phone: string | null;
+  cnae: string | null;
   stateRegistration: string | null;
   address: CnpjLookupAddress | null;
   existingPersonId: string | null;
@@ -116,6 +119,26 @@ async function lookupStateRegistration(cnpj: string, uf: string) {
   } catch {
     return null;
   }
+}
+
+function readCnae(row: Record<string, unknown>) {
+  const direct = onlyDigits(readString(row, 'cnae_fiscal', 'cnae'));
+  if (direct.length >= 7) return direct.slice(0, 7);
+
+  const activities = row.atividade_principal;
+  if (!Array.isArray(activities) || !activities[0] || typeof activities[0] !== 'object') {
+    return null;
+  }
+  const code = onlyDigits(
+    readString(activities[0] as Record<string, unknown>, 'code', 'codigo'),
+  );
+  return code.length >= 7 ? code.slice(0, 7) : null;
+}
+
+function readPhone(row: Record<string, unknown>) {
+  const digits = onlyDigits(readString(row, 'ddd_telefone_1', 'telefone'));
+  if (digits.length < 8) return null;
+  return digits.slice(0, 14);
 }
 
 function ibgeCode(row: Record<string, unknown>) {
@@ -246,6 +269,9 @@ export async function lookupCnpj(params: { tenantId: string; cnpj: string }): Pr
 
     const birthDate = parseActivityDate(readString(raw, 'data_inicio_atividade', 'abertura')) || null;
     const nfeEmail = emptyToNull(normalizeEmail(readString(raw, 'email')));
+    const tradeName = clip(readString(raw, 'nome_fantasia', 'fantasia'), 60);
+    const phone = readPhone(raw);
+    const cnae = readCnae(raw);
     const cityName = clip(readString(raw, 'municipio'), 60);
     const uf = readString(raw, 'uf').toUpperCase().slice(0, 2);
     const city = await resolveCity({
@@ -274,8 +300,11 @@ export async function lookupCnpj(params: { tenantId: string; cnpj: string }): Pr
     mapped = {
       taxId,
       name,
+      tradeName,
       birthDate: birthDate && /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? birthDate : null,
       nfeEmail: nfeEmail && nfeEmail.includes('@') ? nfeEmail.slice(0, 60) : null,
+      phone,
+      cnae,
       stateRegistration,
       address: hasAddress
         ? {

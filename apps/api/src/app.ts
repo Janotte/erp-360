@@ -24,6 +24,7 @@ import { planAccountsRoutes } from './modules/plan-accounts/plan-accounts.ts';
 import { dashboardRoutes } from './modules/dashboard/dashboard.ts';
 import { payablesRoutes } from './modules/titles/payables.ts';
 import { receivablesRoutes } from './modules/titles/receivables.ts';
+import { emitterRoutes } from './modules/tenants/emitter.ts';
 import { treasuryRoutes } from './modules/treasury/treasury.ts';
 
 export function buildApp(options?: { logger?: boolean }) {
@@ -67,6 +68,7 @@ export function buildApp(options?: { logger?: boolean }) {
   fastify.register(receivablesRoutes, { prefix: '/receivables' });
   fastify.register(financialCatalogRoutes, { prefix: '/financial' });
   fastify.register(treasuryRoutes, { prefix: '/financial' });
+  fastify.register(emitterRoutes, { prefix: '/settings' });
   fastify.register(planAccountsRoutes, { prefix: '/plan-accounts' });
   fastify.register(categoryRoutes, { prefix: '/catalog/categories' });
   fastify.register(itemRoutes, { prefix: '/catalog/items' });

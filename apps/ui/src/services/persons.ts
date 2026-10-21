@@ -79,8 +79,11 @@ export interface CepLookupResult {
 export interface CnpjLookupResult {
   taxId: string;
   name: string;
+  tradeName?: string | null;
   birthDate: string | null;
   nfeEmail: string | null;
+  phone?: string | null;
+  cnae?: string | null;
   stateRegistration: string | null;
   address: CnpjLookupAddress | null;
   existingPersonId: string | null;

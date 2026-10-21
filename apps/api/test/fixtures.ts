@@ -34,7 +34,11 @@ function cnpj() {
 export async function createCompany(label: string) {
   const [tenant] = await db
     .insert(tenants)
-    .values({ name: `${label} ${randomUUID()}`, cnpj: cnpj() })
+    .values({
+      name: `${label} ${randomUUID()}`.slice(0, 60),
+      tradeName: label.slice(0, 60),
+      cnpj: cnpj(),
+    })
     .returning({ id: tenants.id });
   const [user] = await db
     .insert(users)

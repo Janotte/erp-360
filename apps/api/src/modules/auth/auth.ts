@@ -146,7 +146,11 @@ export const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const created = await db.transaction(async (tx) => {
         const [novoTenant] = await tx
           .insert(tenants)
-          .values({ name: toTitleCasePtBr(companyName), cnpj: normalizedCnpj })
+          .values({
+            name: toTitleCasePtBr(companyName).slice(0, 60),
+            tradeName: toTitleCasePtBr(companyName).slice(0, 60),
+            cnpj: normalizedCnpj,
+          })
           .returning();
 
         const [novoUsuario] = await tx

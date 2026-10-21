@@ -26,7 +26,7 @@ import { IncomeStatementView } from './components/Financial/IncomeStatement/Inco
 import { PayableList } from './components/Financial/Payables/PayableList';
 import { ListPlanAccounts } from './components/Financial/PlanAccounts/ListPlanAccounts';
 import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
-import { FinancialSettingsForm } from './components/Financial/Settings/FinancialSettingsForm';
+import { SettingsPage } from './components/Settings/SettingsPage';
 import { Navbar } from './components/Navbar';
 import { ListPersons } from './components/Persons/ListPersons';
 import { setUnauthorizedHandler } from './services/apiClient';
@@ -234,7 +234,7 @@ function App() {
               path="/settings"
               element={
                 <Pagina>
-                  <FinancialSettingsForm />
+                  <SettingsPage />
                 </Pagina>
               }
             />

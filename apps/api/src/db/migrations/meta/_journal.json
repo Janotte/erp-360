@@ -253,6 +253,13 @@
       "when": 1792293706496,
       "tag": "0035_item_sku",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792591551294,
+      "tag": "0036_bizarre_tenebrous",
+      "breakpoints": true
     }
   ]
 }
