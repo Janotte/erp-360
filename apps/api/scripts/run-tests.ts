@@ -24,6 +24,7 @@ const child = spawn(
     '--import',
     'tsx',
     '--test',
+    'test/dashboard-period.test.ts',
     'test/settlement-math.test.ts',
     'test/settlement.integration.test.ts',
   ],

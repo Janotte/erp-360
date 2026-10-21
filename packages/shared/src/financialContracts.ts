@@ -180,6 +180,58 @@ export const settlementPreviewSchema = z.object({
 
 export type SettlementPreview = z.infer<typeof settlementPreviewSchema>;
 
+const dashboardFlowSchema = z.object({
+  total: z.number().int(),
+  settled: z.number().int(),
+});
+
+const dashboardMonthFlowSchema = dashboardFlowSchema.extend({
+  overdue: z.number().int(),
+});
+
+const dashboardAccountSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  balance: z.number().int(),
+});
+
+const dashboardPaymentSliceSchema = z.object({
+  paymentMethodId: z.string().uuid().nullable(),
+  description: z.string(),
+  amount: z.number().int(),
+});
+
+export const dashboardSchema = z.object({
+  asOf: z.string(),
+  monthFrom: z.string(),
+  monthTo: z.string(),
+  receivables: z.object({
+    day: dashboardFlowSchema,
+    month: dashboardMonthFlowSchema,
+    delinquency: z.number().int(),
+  }),
+  payables: z.object({
+    day: dashboardFlowSchema,
+    month: dashboardMonthFlowSchema,
+    delinquency: z.number().int(),
+  }),
+  sales: z.object({
+    day: z.number().int(),
+    month: z.number().int(),
+    byPaymentMethod: z.object({
+      day: z.array(dashboardPaymentSliceSchema),
+      month: z.array(dashboardPaymentSliceSchema),
+    }),
+  }),
+  treasury: z.object({
+    cashBalance: z.number().int(),
+    operating: z.array(dashboardAccountSchema),
+    investments: z.array(dashboardAccountSchema),
+  }),
+});
+
+export type DashboardSummary = z.infer<typeof dashboardSchema>;
+
 const apiFailureSchema = z.object({
   message: z.string().optional(),
   error: z.string().optional(),
