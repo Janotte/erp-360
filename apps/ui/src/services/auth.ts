@@ -1,4 +1,8 @@
-import { type RegisterResponse, RegisterResponseSchema } from '@erp-360/shared';
+import {
+  type CertificateWarning,
+  type RegisterResponse,
+  RegisterResponseSchema,
+} from '@erp-360/shared';
 
 import { apiFetch } from './apiClient';
 
@@ -10,6 +14,7 @@ export interface LoginResponse {
     email: string;
     tenantId: string;
   };
+  certificateWarnings?: CertificateWarning[];
 }
 
 export interface RegisterInput {

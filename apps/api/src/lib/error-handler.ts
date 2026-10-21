@@ -22,6 +22,8 @@ const uniqueMessages: Record<string, string> = {
     'Já existe uma categoria com este nome neste nível.',
   catalog_items_tenant_code_unique: 'Já existe um item com este código.',
   catalog_items_tenant_sku_unique: 'Já existe um item com este SKU.',
+  tenant_certificates_one_active_per_environment:
+    'Já existe um certificado ativo neste ambiente.',
   catalog_items_tenant_barcode_unique: 'Já existe um item com este código de barras.',
 };
 

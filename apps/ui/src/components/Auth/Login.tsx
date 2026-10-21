@@ -1,6 +1,8 @@
+import { formatRawDate } from '@erp-360/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -31,6 +33,20 @@ export function Login() {
       queryClient.clear();
       markSessionActive();
       authStorage.setToken(data.token);
+      for (const warning of data.certificateWarnings ?? []) {
+        const when = formatRawDate(warning.validUntil);
+        const scope = warning.environment === 'production' ? 'produção' : 'homologação';
+        const name = warning.label ? ` ${warning.label}` : '';
+        if (warning.expired) {
+          toast.error(`O certificado de ${scope}${name} venceu em ${when}.`);
+        } else if (warning.daysLeft === 0) {
+          toast.warning(`O certificado de ${scope}${name} vence hoje.`);
+        } else {
+          toast.warning(
+            `O certificado de ${scope}${name} vence em ${warning.daysLeft} dias (${when}).`,
+          );
+        }
+      }
       navigate('/dashboard');
     },
   });

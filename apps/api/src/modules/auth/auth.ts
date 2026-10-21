@@ -15,6 +15,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.js';
+import { listCertificateWarnings } from '../certificates/certificates.ts';
 import {
   clearLoginFailures,
   isLoginBlocked,
@@ -95,6 +96,7 @@ export const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
       }
 
       clearLoginFailures(normalizedEmail);
+      const certificateWarnings = await listCertificateWarnings(user.tenantId);
 
       const token = fastify.jwt.sign({
         userId: user.id,
@@ -109,6 +111,7 @@ export const authRoutes: FastifyPluginAsyncZod = async (fastify) => {
           email: user.email,
           tenantId: user.tenantId,
         },
+        certificateWarnings,
       });
     },
   );
