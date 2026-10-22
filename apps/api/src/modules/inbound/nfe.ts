@@ -8,6 +8,7 @@ export interface ParsedInboundLine {
   supplierCode: string;
   description: string;
   ncmCode: string | null;
+  cestCode: string | null;
   barcode: string | null;
   xmlCfop: string;
   commercialQty: string;
@@ -152,6 +153,7 @@ export function parseNfeXml(xml: string): ParsedNfe {
         throw new InboundError(400, `O item ${index + 1} está sem CFOP.`);
       }
       const barcode = text(prod.cEAN);
+      const cest = text(prod.CEST).replace(/\D/g, '');
       const tax = (det.imposto ?? {}) as Record<string, unknown>;
       const ipi = tax.IPI as Record<string, unknown> | undefined;
       const ipiValue = moneyToCents(
@@ -162,6 +164,7 @@ export function parseNfeXml(xml: string): ParsedNfe {
         supplierCode: text(prod.cProd).slice(0, 60),
         description: text(prod.xProd).slice(0, 120) || 'Item sem descrição',
         ncmCode: text(prod.NCM).replace(/\D/g, '').slice(0, 8) || null,
+        cestCode: /^[0-9]{7}$/.test(cest) ? cest : null,
         barcode: barcode && barcode.toUpperCase() !== 'SEM GTIN' ? barcode.slice(0, 14) : null,
         xmlCfop: cfop,
         commercialQty: decimal(prod.qCom, 4),

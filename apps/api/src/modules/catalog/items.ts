@@ -291,6 +291,7 @@ const itemColumns = {
   listPrice: catalogItems.listPrice,
   grossMargin: catalogItems.grossMargin,
   averageCost: stockBalances.averageCost,
+  quantity: stockBalances.quantity,
   ncmCode: catalogItems.ncmCode,
   ncmDescription: ncms.description,
   cestCode: catalogItems.cestCode,

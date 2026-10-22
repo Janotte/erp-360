@@ -28,6 +28,12 @@ import { deleteInboundDocument, postInboundDocument, reverseInboundDocument } fr
 import { cfopScope, ensureInboundSetup } from './setup.ts';
 
 const draftStatuses = new Set(['pre_note', 'divergent', 'pending']);
+const cestRead = new Set<string>();
+
+function cestOrNull(value: string | null | undefined) {
+  const digits = (value ?? '').replace(/\D/g, '');
+  return /^[0-9]{7}$/.test(digits) ? digits : null;
+}
 
 const lineInput = z.object({
   lineNumber: z.number().int().positive(),
@@ -42,6 +48,7 @@ const lineInput = z.object({
   itemId: z.string().uuid().nullable().optional(),
   barcode: z.string().max(14).nullable().optional(),
   ncmCode: z.string().max(8).nullable().optional(),
+  cestCode: z.string().max(7).nullable().optional(),
   freightAmount: z.number().int().nonnegative().optional(),
   insuranceAmount: z.number().int().nonnegative().optional(),
   otherAmount: z.number().int().nonnegative().optional(),
@@ -81,6 +88,7 @@ function lineRecord(
     supplierCode: line.supplierCode,
     description: line.description,
     ncmCode: line.ncmCode ?? null,
+    cestCode: cestOrNull(line.cestCode),
     barcode: line.barcode ?? null,
     xmlCfop: line.xmlCfop,
     entryCfop: line.entryCfop ?? (['1', '2', '3'].includes(line.xmlCfop[0]) ? line.xmlCfop : null),
@@ -159,6 +167,52 @@ async function rememberLink(
     });
 }
 
+async function fillCestFromFile(
+  tenantId: string,
+  documentId: string,
+  lines: { lineNumber: number; cestCode: string | null }[],
+) {
+  if (cestRead.has(documentId) || lines.every((line) => line.cestCode)) {
+    cestRead.add(documentId);
+    return;
+  }
+  cestRead.add(documentId);
+  const [file] = await db
+    .select({ content: inboundDocumentFiles.content })
+    .from(inboundDocumentFiles)
+    .where(
+      and(
+        eq(inboundDocumentFiles.documentId, documentId),
+        eq(inboundDocumentFiles.tenantId, tenantId),
+      ),
+    )
+    .limit(1);
+  if (!file) return;
+  const xml = Buffer.isBuffer(file.content) ? file.content.toString('utf8') : String(file.content);
+  let parsed: ReturnType<typeof parseNfeXml>;
+  try {
+    parsed = parseNfeXml(xml);
+  } catch {
+    return;
+  }
+  for (const line of lines) {
+    if (line.cestCode) continue;
+    const cest = parsed.lines.find((item) => item.lineNumber === line.lineNumber)?.cestCode;
+    if (!cest) continue;
+    line.cestCode = cest;
+    await db
+      .update(inboundDocumentLines)
+      .set({ cestCode: cest })
+      .where(
+        and(
+          eq(inboundDocumentLines.documentId, documentId),
+          eq(inboundDocumentLines.tenantId, tenantId),
+          eq(inboundDocumentLines.lineNumber, line.lineNumber),
+        ),
+      );
+  }
+}
+
 async function loadDocument(tenantId: string, documentId: string) {
   const [document] = await db
     .select({
@@ -194,6 +248,7 @@ async function loadDocument(tenantId: string, documentId: string) {
       supplierCode: inboundDocumentLines.supplierCode,
       description: inboundDocumentLines.description,
       ncmCode: inboundDocumentLines.ncmCode,
+      cestCode: inboundDocumentLines.cestCode,
       barcode: inboundDocumentLines.barcode,
       xmlCfop: inboundDocumentLines.xmlCfop,
       entryCfop: inboundDocumentLines.entryCfop,
@@ -216,6 +271,8 @@ async function loadDocument(tenantId: string, documentId: string) {
       ),
     )
     .orderBy(asc(inboundDocumentLines.lineNumber));
+
+  if (document.accessKey) await fillCestFromFile(tenantId, documentId, lines);
 
   const installments = await db
     .select({

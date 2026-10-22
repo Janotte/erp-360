@@ -22,6 +22,7 @@ export interface InboundLine {
   supplierCode: string;
   description: string;
   ncmCode: string | null;
+  cestCode: string | null;
   barcode: string | null;
   xmlCfop: string;
   entryCfop: string | null;
@@ -90,6 +91,7 @@ export interface InboundDraftLine {
   itemId?: string | null;
   barcode?: string | null;
   ncmCode?: string | null;
+  cestCode?: string | null;
 }
 
 export interface InboundDraft {

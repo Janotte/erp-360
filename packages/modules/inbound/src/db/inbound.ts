@@ -222,6 +222,8 @@ export const inboundDocumentLines = pgTable(
     supplierCode: varchar('supplier_code', { length: 60 }).notNull(),
     description: varchar('description', { length: 120 }).notNull(),
     ncmCode: varchar('ncm_code', { length: 8 }),
+    /** CEST da NF-e, 7 dígitos, quando o item tiver. */
+    cestCode: varchar('cest_code', { length: 7 }),
     barcode: varchar('barcode', { length: 14 }),
     xmlCfop: varchar('xml_cfop', { length: 4 }).notNull(),
     entryCfop: varchar('entry_cfop', { length: 4 }),
@@ -262,6 +264,10 @@ export const inboundDocumentLines = pgTable(
     check(
       'inbound_document_lines_cfop_digits',
       sql`${table.xmlCfop} ~ '^[0-9]{4}$' and (${table.entryCfop} is null or ${table.entryCfop} ~ '^[0-9]{4}$')`,
+    ),
+    check(
+      'inbound_document_lines_cest_check',
+      sql`${table.cestCode} is null or ${table.cestCode} ~ '^[0-9]{7}$'`,
     ),
   ],
 );

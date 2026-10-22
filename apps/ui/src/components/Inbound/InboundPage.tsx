@@ -1,9 +1,18 @@
 import { civilDate, formatCurrency, formatRawDate } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { FormItem } from '@/components/Catalog/Items/FormItem';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -14,14 +23,34 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { itemsService } from '@/services/items';
-import { personsService } from '@/services/persons';
 import {
   type InboundDocument,
   type InboundDraft,
   inboundService,
   inboundStatusLabel,
 } from '@/services/inbound';
+import { itemsService } from '@/services/items';
+import { personsService } from '@/services/persons';
+
+function digitsOf(value: string | null | undefined) {
+  return (value ?? '').replace(/\D/g, '');
+}
+
+function ncmForCatalog(value: string | null | undefined) {
+  const digits = digitsOf(value);
+  if (digits.length !== 8) return '';
+  return `${digits.slice(0, 4)}.${digits.slice(4, 6)}.${digits.slice(6)}`;
+}
+
+function barcodeForCatalog(value: string | null | undefined) {
+  const digits = digitsOf(value);
+  return /^[0-9]{8}$|^[0-9]{12,14}$/.test(digits) ? digits : '';
+}
+
+function cestForCatalog(value: string | null | undefined) {
+  const digits = digitsOf(value);
+  return /^[0-9]{7}$/.test(digits) ? digits : '';
+}
 
 function draftFrom(document: InboundDocument): InboundDraft {
   return {
@@ -43,6 +72,7 @@ function draftFrom(document: InboundDocument): InboundDraft {
       itemId: line.itemId,
       barcode: line.barcode,
       ncmCode: line.ncmCode,
+      cestCode: line.cestCode,
     })),
     installments: document.installments.map((installment) => ({
       number: installment.number,
@@ -58,6 +88,10 @@ export function InboundPage() {
   const [draft, setDraft] = useState<InboundDraft | null>(null);
   const [itemSearch, setItemSearch] = useState<Record<number, string>>({});
   const [supplierSearch, setSupplierSearch] = useState('');
+  const [newItemLine, setNewItemLine] = useState<number | null>(null);
+  const [linkedItems, setLinkedItems] = useState<
+    Record<number, { id: string; code: string; name: string }>
+  >({});
 
   const natures = useQuery({
     queryKey: ['inbound', 'natures'],
@@ -172,6 +206,17 @@ export function InboundPage() {
 
   const document = detail.data;
   const locked = document ? !['pre_note', 'divergent', 'pending'].includes(document.status) : true;
+  const newItem = draft?.lines.find((line) => line.lineNumber === newItemLine) ?? null;
+
+  const linkedLabel = (lineNumber: number, itemId: string) => {
+    const saved = document?.lines.find((item) => item.lineNumber === lineNumber);
+    if (saved?.itemId === itemId && saved.itemCode) {
+      return `${saved.itemCode} ${saved.itemName ?? ''}`.trim();
+    }
+    const local = linkedItems[lineNumber];
+    if (local?.id === itemId) return `${local.code} ${local.name}`;
+    return 'Item selecionado';
+  };
   const suppliers = useQuery({
     queryKey: ['inbound', 'suppliers', supplierSearch],
     queryFn: () =>
@@ -428,21 +473,32 @@ export function InboundPage() {
                       setDraft({ ...draft, lines });
                     }}
                   />
-                  <Input
-                    value={itemSearch[line.lineNumber] ?? ''}
-                    disabled={locked}
-                    placeholder="Buscar item do catálogo"
-                    onChange={(event) =>
-                      setItemSearch({ ...itemSearch, [line.lineNumber]: event.target.value })
-                    }
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      className="min-w-0 flex-1"
+                      value={itemSearch[line.lineNumber] ?? ''}
+                      disabled={locked}
+                      placeholder="Buscar item do catálogo"
+                      onChange={(event) =>
+                        setItemSearch({ ...itemSearch, [line.lineNumber]: event.target.value })
+                      }
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0"
+                      disabled={locked}
+                      title="Cadastrar item com os dados da nota"
+                      aria-label="Cadastrar item com os dados da nota"
+                      onClick={() => setNewItemLine(line.lineNumber)}
+                    >
+                      <Plus />
+                    </Button>
+                  </div>
                 </div>
                 {line.itemId ? (
-                  <p className="mt-1 text-zinc-600">
-                    Vinculado:{' '}
-                    {document.lines.find((item) => item.lineNumber === line.lineNumber)?.itemCode}{' '}
-                    {document.lines.find((item) => item.lineNumber === line.lineNumber)?.itemName}
-                  </p>
+                  <p className="mt-1 text-zinc-600">Vinculado: {linkedLabel(line.lineNumber, line.itemId)}</p>
                 ) : (
                   <p className="mt-1 text-amber-700">Sem vínculo</p>
                 )}
@@ -456,10 +512,17 @@ export function InboundPage() {
                           const lines = [...draft.lines];
                           lines[index] = { ...line, itemId: item.id };
                           setDraft({ ...draft, lines });
+                          setLinkedItems((current) => ({
+                            ...current,
+                            [line.lineNumber]: { id: item.id, code: item.code, name: item.name },
+                          }));
                           setItemSearch({ ...itemSearch, [line.lineNumber]: '' });
                         }}
                       >
                         {item.code} · {item.name}
+                        {item.tracksStock
+                          ? ` · disponível ${Number(item.quantity ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}`
+                          : ''}
                       </button>
                     </li>
                   ))}
@@ -513,6 +576,54 @@ export function InboundPage() {
           </div>
         </form>
       ) : null}
+
+      <Dialog
+        open={newItemLine != null}
+        onOpenChange={(open) => {
+          if (!open) setNewItemLine(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Novo item</DialogTitle>
+            <DialogDescription>
+              Código de barras, descrição, NCM e CEST vieram da nota. Escolha a unidade de medida
+              para concluir o cadastro.
+            </DialogDescription>
+          </DialogHeader>
+          {newItem ? (
+            <FormItem
+              key={newItem.lineNumber}
+              seed={{
+                name: newItem.description,
+                description: newItem.description,
+                barcode: barcodeForCatalog(newItem.barcode),
+                ncmCode: ncmForCatalog(newItem.ncmCode),
+                cestCode: cestForCatalog(newItem.cestCode),
+              }}
+              onSuccess={(item) => {
+                const lineNumber = newItem.lineNumber;
+                setDraft((current) =>
+                  current
+                    ? {
+                        ...current,
+                        lines: current.lines.map((line) =>
+                          line.lineNumber === lineNumber ? { ...line, itemId: item.id } : line,
+                        ),
+                      }
+                    : current,
+                );
+                setLinkedItems((current) => ({
+                  ...current,
+                  [lineNumber]: { id: item.id, code: item.code, name: item.name },
+                }));
+                setItemSearch((current) => ({ ...current, [lineNumber]: '' }));
+                setNewItemLine(null);
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

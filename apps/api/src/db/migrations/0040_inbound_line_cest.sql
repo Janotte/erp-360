@@ -1,0 +1,2 @@
+ALTER TABLE "inbound_document_lines" ADD COLUMN "cest_code" varchar(7);--> statement-breakpoint
+ALTER TABLE "inbound_document_lines" ADD CONSTRAINT "inbound_document_lines_cest_check" CHECK ("inbound_document_lines"."cest_code" is null or "inbound_document_lines"."cest_code" ~ '^[0-9]{7}$');

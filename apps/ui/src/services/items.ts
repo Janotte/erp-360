@@ -20,6 +20,7 @@ export interface CatalogItem {
   listPrice: string | null;
   grossMargin: string | null;
   averageCost: string | null;
+  quantity: string | null;
   ncmCode: string | null;
   ncmDescription: string | null;
   cestCode: string | null;

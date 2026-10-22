@@ -1,11 +1,11 @@
 import {
-  formatRawDate,
   type CatalogItemType,
   catalogItemTypeLabels,
   catalogItemTypes,
   type FiscalItemType,
   fiscalItemTypeLabels,
   fiscalItemTypes,
+  formatRawDate,
   productFiscalItemTypes,
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -100,17 +100,26 @@ function parseFiscalType(value: string): FiscalItemType {
     : 'resale';
 }
 
-interface FormItemProps {
-  itemToUpdate?: CatalogItem | null;
-  onSuccess?: () => void;
+export interface CatalogItemSeed {
+  name?: string;
+  description?: string;
+  barcode?: string;
+  ncmCode?: string;
+  cestCode?: string;
 }
 
-export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
+interface FormItemProps {
+  itemToUpdate?: CatalogItem | null;
+  seed?: CatalogItemSeed | null;
+  onSuccess?: (item: CatalogItem) => void;
+}
+
+export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
   const queryClient = useQueryClient();
   const [itemId, setItemId] = useState(itemToUpdate?.id);
   const [code, setCode] = useState(itemToUpdate?.code ?? '');
   const [sku, setSku] = useState(itemToUpdate?.sku ?? '');
-  const [name, setName] = useState(itemToUpdate?.name ?? '');
+  const [name, setName] = useState(itemToUpdate?.name ?? seed?.name ?? '');
   const [type, setType] = useState<CatalogItemType>(itemToUpdate?.type ?? 'product');
   const [fiscalItemType, setFiscalItemType] = useState<FiscalItemType>(
     itemToUpdate?.fiscalItemType ?? 'resale',
@@ -118,16 +127,18 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
   const [tracksStock, setTracksStock] = useState(itemToUpdate?.tracksStock !== false);
   const [categoryId, setCategoryId] = useState(itemToUpdate?.categoryId ?? '');
   const [measureId, setMeasureId] = useState(itemToUpdate?.measureId ?? '');
-  const [description, setDescription] = useState(itemToUpdate?.description ?? '');
-  const [barcode, setBarcode] = useState(itemToUpdate?.barcode ?? '');
+  const [description, setDescription] = useState(
+    itemToUpdate?.description ?? seed?.description ?? '',
+  );
+  const [barcode, setBarcode] = useState(itemToUpdate?.barcode ?? seed?.barcode ?? '');
   const [listPrice, setListPrice] = useState(formatListPrice(itemToUpdate?.listPrice));
   const [grossMargin, setGrossMargin] = useState(formatPercent(itemToUpdate?.grossMargin));
-  const [ncmCode, setNcmCode] = useState(itemToUpdate?.ncmCode ?? '');
+  const [ncmCode, setNcmCode] = useState(itemToUpdate?.ncmCode ?? seed?.ncmCode ?? '');
   const [ncmDescription, setNcmDescription] = useState(
     itemToUpdate?.ncmDescription ?? '',
   );
   const [ncmOpen, setNcmOpen] = useState(false);
-  const [cestCode, setCestCode] = useState(itemToUpdate?.cestCode ?? '');
+  const [cestCode, setCestCode] = useState(itemToUpdate?.cestCode ?? seed?.cestCode ?? '');
   const [netWeightKg, setNetWeightKg] = useState(itemToUpdate?.netWeightKg ?? '');
   const [grossWeightKg, setGrossWeightKg] = useState(itemToUpdate?.grossWeightKg ?? '');
   const [lengthCm, setLengthCm] = useState(itemToUpdate?.lengthCm ?? '');
@@ -220,7 +231,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
       setItemId(saved.id);
       queryClient.setQueryData(['item', saved.id], saved);
       queryClient.invalidateQueries({ queryKey: ['listaItems'] });
-      onSuccess?.();
+      onSuccess?.(saved);
       toast.success(
         created ? 'Item cadastrado com sucesso!' : 'Item atualizado com sucesso!',
       );

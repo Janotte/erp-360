@@ -18,6 +18,13 @@ function formatPercent(value: string | null) {
   if (!Number.isFinite(number)) return '—';
   return `${number.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
+
+function formatAvailable(item: { tracksStock: boolean; quantity: string | null }) {
+  if (!item.tracksStock) return '—';
+  const number = Number(item.quantity ?? 0);
+  if (!Number.isFinite(number)) return '—';
+  return number.toLocaleString('pt-BR', { maximumFractionDigits: 4 });
+}
 import {
   keepPreviousData,
   useMutation,
@@ -194,6 +201,7 @@ export function ListItems() {
               </TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Medida</TableHead>
+              <TableHead>Disponível</TableHead>
               <TableHead>Situação</TableHead>
               <TableHead>Custo médio</TableHead>
               <TableHead>Margem</TableHead>
@@ -209,6 +217,7 @@ export function ListItems() {
                 <TableCell>{item.name}</TableCell>
                 <TableCell>{catalogItemTypeLabels[item.type]}</TableCell>
                 <TableCell>{item.measureAbbreviation}</TableCell>
+                <TableCell>{formatAvailable(item)}</TableCell>
                 <TableCell>{item.isActive ? 'Ativo' : 'Inativo'}</TableCell>
                 <TableCell>{formatMoney4(item.averageCost)}</TableCell>
                 <TableCell>{formatPercent(item.grossMargin)}</TableCell>
@@ -246,7 +255,7 @@ export function ListItems() {
             ))}
             {rows && rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="py-4 text-center text-zinc-500">
+                <TableCell colSpan={11} className="py-4 text-center text-zinc-500">
                   Nenhum item encontrado.
                 </TableCell>
               </TableRow>
