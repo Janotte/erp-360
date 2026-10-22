@@ -26,6 +26,7 @@ import { IncomeStatementView } from './components/Financial/IncomeStatement/Inco
 import { PayableList } from './components/Financial/Payables/PayableList';
 import { ListPlanAccounts } from './components/Financial/PlanAccounts/ListPlanAccounts';
 import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
+import { InboundPage } from './components/Inbound/InboundPage';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { Navbar } from './components/Navbar';
 import { ListPersons } from './components/Persons/ListPersons';
@@ -227,6 +228,14 @@ function App() {
               element={
                 <Pagina>
                   <IncomeStatementView />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/inbound"
+              element={
+                <Pagina>
+                  <InboundPage />
                 </Pagina>
               }
             />

@@ -1,4 +1,23 @@
-import { catalogItemTypeLabels } from '@erp-360/shared';
+import { catalogItemTypeLabels, formatRawDate } from '@erp-360/shared';
+
+function formatMoney4(value: string | null) {
+  if (!value) return '—';
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '—';
+  return number.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+  });
+}
+
+function formatPercent(value: string | null) {
+  if (!value) return '—';
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '—';
+  return `${number.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+}
 import {
   keepPreviousData,
   useMutation,
@@ -176,6 +195,9 @@ export function ListItems() {
               <TableHead>Tipo</TableHead>
               <TableHead>Medida</TableHead>
               <TableHead>Situação</TableHead>
+              <TableHead>Custo médio</TableHead>
+              <TableHead>Margem</TableHead>
+              <TableHead>Última entrada</TableHead>
               <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
@@ -188,6 +210,9 @@ export function ListItems() {
                 <TableCell>{catalogItemTypeLabels[item.type]}</TableCell>
                 <TableCell>{item.measureAbbreviation}</TableCell>
                 <TableCell>{item.isActive ? 'Ativo' : 'Inativo'}</TableCell>
+                <TableCell>{formatMoney4(item.averageCost)}</TableCell>
+                <TableCell>{formatPercent(item.grossMargin)}</TableCell>
+                <TableCell>{formatRawDate(item.lastInboundOn) || '—'}</TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -221,7 +246,7 @@ export function ListItems() {
             ))}
             {rows && rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-4 text-center text-zinc-500">
+                <TableCell colSpan={10} className="py-4 text-center text-zinc-500">
                   Nenhum item encontrado.
                 </TableCell>
               </TableRow>

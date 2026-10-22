@@ -1,4 +1,5 @@
 import {
+  formatRawDate,
   type CatalogItemType,
   catalogItemTypeLabels,
   catalogItemTypes,
@@ -60,6 +61,35 @@ function listPriceForApi(value: string) {
   return trimmed.replace(/\./g, '').replace(',', '.');
 }
 
+function maskPercent(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 6);
+  if (!digits) return '';
+  const padded = digits.padStart(3, '0');
+  const fraction = padded.slice(-2);
+  const integers = padded.slice(0, -2).replace(/^0+(?=\d)/, '') || '0';
+  return `${integers},${fraction}`;
+}
+
+function formatPercent(value: string | null | undefined) {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return '';
+  const number = Number(trimmed);
+  if (!Number.isFinite(number)) return '';
+  return maskPercent(String(Math.round(number * 100)));
+}
+
+function formatMoney4(value: string | null | undefined) {
+  if (!value) return '—';
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '—';
+  return number.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+  });
+}
+
 function parseItemType(value: string): CatalogItemType {
   return value === 'service' ? 'service' : 'product';
 }
@@ -91,6 +121,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
   const [description, setDescription] = useState(itemToUpdate?.description ?? '');
   const [barcode, setBarcode] = useState(itemToUpdate?.barcode ?? '');
   const [listPrice, setListPrice] = useState(formatListPrice(itemToUpdate?.listPrice));
+  const [grossMargin, setGrossMargin] = useState(formatPercent(itemToUpdate?.grossMargin));
   const [ncmCode, setNcmCode] = useState(itemToUpdate?.ncmCode ?? '');
   const [ncmDescription, setNcmDescription] = useState(
     itemToUpdate?.ncmDescription ?? '',
@@ -147,6 +178,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
     setDescription(item.description ?? '');
     setBarcode(item.barcode ?? '');
     setListPrice(formatListPrice(item.listPrice));
+    setGrossMargin(formatPercent(item.grossMargin));
     setNcmCode(item.ncmCode ?? '');
     setNcmDescription(item.ncmDescription ?? '');
     setCestCode(item.cestCode ?? '');
@@ -227,6 +259,7 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
       description,
       barcode,
       listPrice: listPriceForApi(listPrice),
+      grossMargin: listPriceForApi(grossMargin),
       ncmCode,
       cestCode,
       netWeightKg,
@@ -391,6 +424,32 @@ export function FormItem({ itemToUpdate, onSuccess }: FormItemProps) {
             placeholder="0,0000"
             onChange={(event) => setListPrice(maskListPrice(event.target.value))}
           />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="itemMargin">Margem bruta (%)</Label>
+          <Input
+            id="itemMargin"
+            data-item-field
+            value={grossMargin}
+            inputMode="decimal"
+            placeholder="0,00"
+            onChange={(event) => setGrossMargin(maskPercent(event.target.value))}
+          />
+          <p className="text-sm text-zinc-500">
+            Na compra para revenda, o preço sugerido é o custo da nota vezes um mais esta margem.
+          </p>
+        </div>
+        <div className="space-y-1">
+          <Label>Custo médio</Label>
+          <p className="text-sm text-zinc-700">{formatMoney4(itemToUpdate?.averageCost)}</p>
+        </div>
+        <div className="space-y-1">
+          <Label>Última entrada</Label>
+          <p className="text-sm text-zinc-700">
+            {itemToUpdate?.lastInboundOn
+              ? formatRawDate(itemToUpdate.lastInboundOn)
+              : 'Ainda não houve entrada confirmada.'}
+          </p>
         </div>
       </div>
 

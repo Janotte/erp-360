@@ -18,6 +18,8 @@ export interface CatalogItem {
   description: string | null;
   barcode: string | null;
   listPrice: string | null;
+  grossMargin: string | null;
+  averageCost: string | null;
   ncmCode: string | null;
   ncmDescription: string | null;
   cestCode: string | null;
@@ -27,6 +29,7 @@ export interface CatalogItem {
   widthCm: string | null;
   heightCm: string | null;
   isActive: boolean;
+  lastInboundOn: string | null;
 }
 
 export interface CatalogItemInput {
@@ -40,6 +43,7 @@ export interface CatalogItemInput {
   description?: string | null;
   barcode?: string | null;
   listPrice?: string | null;
+  grossMargin?: string | null;
   ncmCode?: string | null;
   cestCode?: string | null;
   netWeightKg?: string | null;

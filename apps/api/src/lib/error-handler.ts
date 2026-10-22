@@ -24,6 +24,7 @@ const uniqueMessages: Record<string, string> = {
   catalog_items_tenant_sku_unique: 'Já existe um item com este SKU.',
   tenant_certificates_one_active_per_environment:
     'Já existe um certificado ativo neste ambiente.',
+  inbound_documents_tenant_access_key_unique: 'Esta nota já está na entrada.',
   catalog_items_tenant_barcode_unique: 'Já existe um item com este código de barras.',
 };
 

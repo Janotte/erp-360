@@ -7,6 +7,7 @@ import {
   measures,
   ncms,
 } from '@erp-360/mod-catalog';
+import { stockBalances } from '@erp-360/mod-inbound';
 import {
   type CatalogItemType,
   catalogItemTypes,
@@ -33,6 +34,7 @@ const itemBodySchema = z
     description: z.string().max(2000).nullable().optional(),
     barcode: z.string().max(20).nullable().optional(),
     listPrice: z.string().max(20).nullable().optional(),
+    grossMargin: z.string().max(20).nullable().optional(),
     ncmCode: z.string().max(12).nullable().optional(),
     cestCode: z.string().max(10).nullable().optional(),
     netWeightKg: z.string().max(20).nullable().optional(),
@@ -148,6 +150,10 @@ function buildItemValues(
   if (!listPrice.ok) {
     return { message: 'Informe o preço de tabela com até 4 casas decimais.' };
   }
+  const grossMargin = parseDecimal(data.grossMargin, 4, 8);
+  if (!grossMargin.ok) {
+    return { message: 'Informe a margem bruta com até 4 casas decimais.' };
+  }
   const netWeightKg = parseDecimal(data.netWeightKg, 3, 12);
   if (!netWeightKg.ok) {
     return { message: 'Informe o peso líquido com até 3 casas decimais.' };
@@ -179,6 +185,7 @@ function buildItemValues(
       description: description || null,
       barcode: barcode || null,
       listPrice: listPrice.value,
+      grossMargin: grossMargin.value,
       ncmCode: normalizeNcm(data.ncmCode),
       cestCode: cestCode || null,
       netWeightKg: netWeightKg.value,
@@ -202,6 +209,7 @@ function itemValues(values: {
   description: string | null;
   barcode: string | null;
   listPrice: string | null;
+  grossMargin: string | null;
   ncmCode: string | null;
   cestCode: string | null;
   netWeightKg: string | null;
@@ -281,6 +289,8 @@ const itemColumns = {
   description: catalogItems.description,
   barcode: catalogItems.barcode,
   listPrice: catalogItems.listPrice,
+  grossMargin: catalogItems.grossMargin,
+  averageCost: stockBalances.averageCost,
   ncmCode: catalogItems.ncmCode,
   ncmDescription: ncms.description,
   cestCode: catalogItems.cestCode,
@@ -290,6 +300,7 @@ const itemColumns = {
   widthCm: catalogItems.widthCm,
   heightCm: catalogItems.heightCm,
   isActive: catalogItems.isActive,
+  lastInboundOn: catalogItems.lastInboundOn,
 };
 
 function itemQuery() {
@@ -310,7 +321,14 @@ function itemQuery() {
         eq(catalogCategories.tenantId, catalogItems.tenantId),
       ),
     )
-    .leftJoin(ncms, eq(ncms.code, catalogItems.ncmCode));
+    .leftJoin(ncms, eq(ncms.code, catalogItems.ncmCode))
+    .leftJoin(
+      stockBalances,
+      and(
+        eq(stockBalances.itemId, catalogItems.id),
+        eq(stockBalances.tenantId, catalogItems.tenantId),
+      ),
+    );
 }
 
 async function loadItem(tenantId: string, id: string) {

@@ -25,6 +25,8 @@ const child = spawn(
     'tsx',
     '--test',
     'test/certificate.test.ts',
+    'test/inbound-cost.test.ts',
+    'test/inbound-post.integration.test.ts',
     'test/certificate-connection.test.ts',
     'test/dashboard-period.test.ts',
     'test/settlement-math.test.ts',

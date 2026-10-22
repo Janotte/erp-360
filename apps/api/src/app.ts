@@ -22,6 +22,7 @@ import { personsRoutes } from './modules/persons/persons.ts';
 import { financialCatalogRoutes } from './modules/plan-accounts/financial-catalogs.ts';
 import { planAccountsRoutes } from './modules/plan-accounts/plan-accounts.ts';
 import { certificateRoutes } from './modules/certificates/certificates.ts';
+import { inboundRoutes } from './modules/inbound/inbound.ts';
 import { dashboardRoutes } from './modules/dashboard/dashboard.ts';
 import { payablesRoutes } from './modules/titles/payables.ts';
 import { receivablesRoutes } from './modules/titles/receivables.ts';
@@ -63,6 +64,7 @@ export function buildApp(options?: { logger?: boolean }) {
 
   fastify.register(dashboardRoutes, { prefix: '/dashboard' });
   fastify.register(certificateRoutes, { prefix: '/certificates' });
+  fastify.register(inboundRoutes, { prefix: '/inbound' });
   fastify.register(authRoutes, { prefix: '/auth' });
   fastify.register(personsRoutes, { prefix: '/persons' });
   fastify.register(locationsRoutes, { prefix: '/locations' });

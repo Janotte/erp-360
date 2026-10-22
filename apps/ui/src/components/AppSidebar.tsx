@@ -5,6 +5,7 @@ import {
   ChevronRight,
   CreditCard,
   FileText,
+  PackagePlus,
   FolderTree,
   Landmark,
   LayoutDashboard,
@@ -72,6 +73,7 @@ const itensMenu: ItemMenu[] = [
       { title: 'Plano de Contas', icon: BookOpen, url: '/plan-accounts' },
     ],
   },
+  { title: 'Entradas', icon: PackagePlus, url: '/inbound' },
   { title: 'Configurações', icon: Settings, url: '/settings' },
 ];
 

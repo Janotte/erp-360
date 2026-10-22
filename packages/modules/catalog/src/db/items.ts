@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -74,6 +75,13 @@ export const catalogItems = pgTable(
     widthCm: numeric('width_cm', { precision: 8, scale: 2 }),
     heightCm: numeric('height_cm', { precision: 8, scale: 2 }),
     isActive: boolean('is_active').default(true).notNull(),
+    /**
+     * Percentual sobre o custo. O lançamento sugere o preço de tabela
+     * como custo unitário × (1 + margem / 100). Vazio não altera o preço.
+     */
+    grossMargin: numeric('gross_margin', { precision: 8, scale: 4 }),
+    /** Data civil da última entrada confirmada. O cadastro não edita este campo. */
+    lastInboundOn: date('last_inbound_on'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => [
@@ -118,6 +126,10 @@ export const catalogItems = pgTable(
     check(
       'catalog_items_list_price_check',
       sql`${table.listPrice} is null or ${table.listPrice} >= 0`,
+    ),
+    check(
+      'catalog_items_gross_margin_check',
+      sql`${table.grossMargin} is null or ${table.grossMargin} >= 0`,
     ),
     check(
       'catalog_items_measures_check',

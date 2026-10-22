@@ -267,6 +267,20 @@
       "when": 1792623370938,
       "tag": "0037_marvelous_scarlet_witch",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792629352490,
+      "tag": "0038_bored_tigra",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792632773699,
+      "tag": "0039_sparkling_thundra",
+      "breakpoints": true
     }
   ]
 }

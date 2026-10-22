@@ -1,0 +1,2 @@
+ALTER TABLE "catalog_items" ADD COLUMN "gross_margin" numeric(8, 4);--> statement-breakpoint
+ALTER TABLE "catalog_items" ADD CONSTRAINT "catalog_items_gross_margin_check" CHECK ("catalog_items"."gross_margin" is null or "catalog_items"."gross_margin" >= 0);
