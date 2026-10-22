@@ -25,6 +25,8 @@ const uniqueMessages: Record<string, string> = {
   tenant_certificates_one_active_per_environment:
     'Já existe um certificado ativo neste ambiente.',
   inbound_documents_tenant_access_key_unique: 'Esta nota já está na entrada.',
+  operation_natures_tenant_code_unique: 'Já existe uma natureza com este código.',
+  cfop_entry_rules_identity_unique: 'Já existe uma regra para este CFOP e esta finalidade.',
   catalog_items_tenant_barcode_unique: 'Já existe um item com este código de barras.',
 };
 
@@ -61,6 +63,12 @@ function foreignKeyMessage(error: unknown): string | null {
       : 'A categoria informada não existe.';
   }
   if (haystack.includes('ncm_code')) return 'A NCM informada não existe.';
+  if (haystack.includes('operation_natures_plan_account')) {
+    return 'A conta informada não existe.';
+  }
+  if (haystack.includes('inbound_documents_nature')) {
+    return 'Não é possível excluir esta natureza porque ela está em uma nota.';
+  }
   if (haystack.includes('catalog_categories_parent')) {
     if (haystack.includes('still referenced')) {
       return 'Não é possível excluir esta categoria porque ela possui subcategorias.';
@@ -108,6 +116,7 @@ function checkMessage(error: unknown): string | null {
     return 'O código do item precisa ter 6 dígitos.';
   }
   if (name.includes('catalog_items_name')) return 'Informe o nome.';
+  if (name.includes('cfop_entry_rules_digits')) return 'O CFOP precisa ter 4 dígitos.';
   return null;
 }
 

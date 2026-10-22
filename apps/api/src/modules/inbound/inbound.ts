@@ -344,7 +344,13 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
         movesStock: operationNatures.movesStock,
       })
       .from(operationNatures)
-      .where(and(eq(operationNatures.tenantId, tenantId), eq(operationNatures.isActive, true)))
+      .where(
+        and(
+          eq(operationNatures.tenantId, tenantId),
+          eq(operationNatures.direction, 'in'),
+          eq(operationNatures.isActive, true),
+        ),
+      )
       .orderBy(asc(operationNatures.name));
   });
 

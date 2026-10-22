@@ -17,16 +17,17 @@ import { categoryRoutes } from './modules/catalog/categories.ts';
 import { itemRoutes } from './modules/catalog/items.ts';
 import { measureRoutes } from './modules/catalog/measures.ts';
 import { ncmRoutes } from './modules/catalog/ncms.ts';
+import { certificateRoutes } from './modules/certificates/certificates.ts';
+import { dashboardRoutes } from './modules/dashboard/dashboard.ts';
+import { inboundRoutes } from './modules/inbound/inbound.ts';
+import { inboundMaintenanceRoutes } from './modules/inbound/maintenance.ts';
 import { locationsRoutes } from './modules/persons/locations.ts';
 import { personsRoutes } from './modules/persons/persons.ts';
 import { financialCatalogRoutes } from './modules/plan-accounts/financial-catalogs.ts';
 import { planAccountsRoutes } from './modules/plan-accounts/plan-accounts.ts';
-import { certificateRoutes } from './modules/certificates/certificates.ts';
-import { inboundRoutes } from './modules/inbound/inbound.ts';
-import { dashboardRoutes } from './modules/dashboard/dashboard.ts';
+import { emitterRoutes } from './modules/tenants/emitter.ts';
 import { payablesRoutes } from './modules/titles/payables.ts';
 import { receivablesRoutes } from './modules/titles/receivables.ts';
-import { emitterRoutes } from './modules/tenants/emitter.ts';
 import { treasuryRoutes } from './modules/treasury/treasury.ts';
 
 export function buildApp(options?: { logger?: boolean }) {
@@ -64,6 +65,7 @@ export function buildApp(options?: { logger?: boolean }) {
 
   fastify.register(dashboardRoutes, { prefix: '/dashboard' });
   fastify.register(certificateRoutes, { prefix: '/certificates' });
+  fastify.register(inboundMaintenanceRoutes, { prefix: '/inbound' });
   fastify.register(inboundRoutes, { prefix: '/inbound' });
   fastify.register(authRoutes, { prefix: '/auth' });
   fastify.register(personsRoutes, { prefix: '/persons' });

@@ -27,9 +27,10 @@ import { PayableList } from './components/Financial/Payables/PayableList';
 import { ListPlanAccounts } from './components/Financial/PlanAccounts/ListPlanAccounts';
 import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
 import { InboundPage } from './components/Inbound/InboundPage';
-import { SettingsPage } from './components/Settings/SettingsPage';
+import { InboundSetupPage } from './components/Inbound/Setup/InboundSetupPage';
 import { Navbar } from './components/Navbar';
 import { ListPersons } from './components/Persons/ListPersons';
+import { SettingsPage } from './components/Settings/SettingsPage';
 import { setUnauthorizedHandler } from './services/apiClient';
 import { authStorage } from './utils/auth';
 
@@ -46,6 +47,8 @@ const rotasPorHash: Record<string, string> = {
   '#bank-accounts': '/bank-accounts',
   '#cash-flow': '/cash-flow',
   '#income-statement': '/income-statement',
+  '#inbound': '/inbound',
+  '#inbound-setup': '/inbound/setup',
   '#settings': '/settings',
 };
 
@@ -236,6 +239,14 @@ function App() {
               element={
                 <Pagina>
                   <InboundPage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/inbound/setup"
+              element={
+                <Pagina>
+                  <InboundSetupPage />
                 </Pagina>
               }
             />

@@ -1,16 +1,17 @@
 import {
+  ArrowLeftRight,
   ArrowUpRight,
   BookOpen,
   Box,
   ChevronRight,
   CreditCard,
   FileText,
-  PackagePlus,
   FolderTree,
   Landmark,
   LayoutDashboard,
   type LucideIcon,
   Package,
+  PackagePlus,
   Ruler,
   Settings,
   Users,
@@ -73,7 +74,14 @@ const itensMenu: ItemMenu[] = [
       { title: 'Plano de Contas', icon: BookOpen, url: '/plan-accounts' },
     ],
   },
-  { title: 'Entradas', icon: PackagePlus, url: '/inbound' },
+  {
+    title: 'Entradas',
+    icon: PackagePlus,
+    filhos: [
+      { title: 'Notas', icon: PackagePlus, url: '/inbound' },
+      { title: 'Naturezas e CFOP', icon: ArrowLeftRight, url: '/inbound/setup' },
+    ],
+  },
   { title: 'Configurações', icon: Settings, url: '/settings' },
 ];
 
