@@ -12,6 +12,7 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
 import { db, type DbClient } from '../../db/index.ts';
 import { getOrCreateFinancialSettings } from '../treasury/financial-settings.ts';
+import { compareStatementChronological } from '../treasury/statement-order.ts';
 import {
   addDays,
   computeDueAmount,
@@ -590,16 +591,16 @@ export async function recalcCashBalances(tx: Queryable, tenantId: string) {
   const rows = await tx
     .select({
       id: cashEntries.id,
+      occurredOn: cashEntries.occurredOn,
+      openingBalance: cashEntries.openingBalance,
+      createdAt: cashEntries.createdAt,
+      description: cashEntries.description,
       inflowAmount: cashEntries.inflowAmount,
       outflowAmount: cashEntries.outflowAmount,
     })
     .from(cashEntries)
-    .where(eq(cashEntries.tenantId, tenantId))
-    .orderBy(
-      asc(cashEntries.occurredOn),
-      desc(cashEntries.openingBalance),
-      asc(cashEntries.createdAt),
-    );
+    .where(eq(cashEntries.tenantId, tenantId));
+  rows.sort(compareStatementChronological);
 
   let balance = 0;
   for (const row of rows) {
@@ -617,6 +618,10 @@ export async function recalcBankBalances(
   const rows = await tx
     .select({
       id: bankEntries.id,
+      occurredOn: bankEntries.occurredOn,
+      openingBalance: bankEntries.openingBalance,
+      createdAt: bankEntries.createdAt,
+      description: bankEntries.description,
       inflowAmount: bankEntries.inflowAmount,
       outflowAmount: bankEntries.outflowAmount,
     })
@@ -626,12 +631,8 @@ export async function recalcBankBalances(
         eq(bankEntries.tenantId, tenantId),
         eq(bankEntries.bankAccountId, bankAccountId),
       ),
-    )
-    .orderBy(
-      asc(bankEntries.occurredOn),
-      desc(bankEntries.openingBalance),
-      asc(bankEntries.createdAt),
     );
+  rows.sort(compareStatementChronological);
 
   let balance = 0;
   for (const row of rows) {
@@ -657,6 +658,8 @@ export async function listCashFlow(tenantId: string, days = 60) {
       desc(cashEntries.occurredOn),
       asc(cashEntries.openingBalance),
       desc(cashEntries.createdAt),
+      desc(cashEntries.description),
+      desc(cashEntries.id),
     )
     .limit(1);
 

@@ -109,6 +109,8 @@ export async function loadDashboard(tenantId: string, today = civilDate()) {
         desc(cashEntries.occurredOn),
         asc(cashEntries.openingBalance),
         desc(cashEntries.createdAt),
+        desc(cashEntries.description),
+        desc(cashEntries.id),
       )
       .limit(1)
       .then((rows) => rows[0]),

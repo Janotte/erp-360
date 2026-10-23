@@ -6,7 +6,7 @@ import {
   cashEntries,
   financialSettings,
 } from '@erp-360/mod-financial';
-import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -20,6 +20,7 @@ import {
   syncBankOpening,
   syncCashOpening,
 } from './opening-balance.ts';
+import { compareStatementNewestFirst } from './statement-order.ts';
 import {
   createTreasuryTransfer,
   reverseTreasuryTransfer,
@@ -151,15 +152,12 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (fastify) => {
       if (query.from) conditions.push(gte(cashEntries.occurredOn, query.from));
       if (query.to) conditions.push(lte(cashEntries.occurredOn, query.to));
 
-      return db
+      const entries = await db
         .select()
         .from(cashEntries)
-        .where(and(...conditions))
-        .orderBy(
-          desc(cashEntries.occurredOn),
-          asc(cashEntries.openingBalance),
-          desc(cashEntries.createdAt),
-        );
+        .where(and(...conditions));
+      entries.sort(compareStatementNewestFirst);
+      return entries;
     },
   );
 
@@ -293,12 +291,8 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const entries = await db
         .select()
         .from(bankEntries)
-        .where(and(eq(bankEntries.tenantId, tenantId), eq(bankEntries.bankAccountId, id)))
-        .orderBy(
-          desc(bankEntries.occurredOn),
-          asc(bankEntries.openingBalance),
-          desc(bankEntries.createdAt),
-        );
+        .where(and(eq(bankEntries.tenantId, tenantId), eq(bankEntries.bankAccountId, id)));
+      entries.sort(compareStatementNewestFirst);
       return { account, entries };
     },
   );

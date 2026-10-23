@@ -31,6 +31,7 @@ const child = spawn(
     'test/dashboard-period.test.ts',
     'test/settlement-math.test.ts',
     'test/title-list-status.test.ts',
+    'test/statement-order.test.ts',
     'test/settlement.integration.test.ts',
   ],
   {
