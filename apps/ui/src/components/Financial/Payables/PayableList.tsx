@@ -16,6 +16,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  Printer,
   RotateCcw,
   Search,
   Trash2,
@@ -34,12 +35,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,6 +64,7 @@ import {
   type TitleSortField,
 } from '@/services/financials';
 
+import { openTitleReport } from '../titleReport';
 import { titleRowTextClass } from '../titleRowTone';
 import { PayableForm } from './PayableForm';
 import { PayModal } from './PayModal';
@@ -95,6 +92,7 @@ export function PayableList() {
   const [page, setPage] = useState(1);
   const [sortField, setSortField] = useState<TitleSortField>('dueOn');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [reportPending, setReportPending] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -173,6 +171,27 @@ export function PayableList() {
     onError: (error: Error) => setActionError(error.message),
   });
 
+  const openReport = async () => {
+    setReportPending(true);
+    try {
+      await openTitleReport({
+        kind: 'payable',
+        status,
+        search: search || undefined,
+        dueFrom: dueFrom || undefined,
+        dueTo: dueTo || undefined,
+        issueFrom: issueFrom || undefined,
+        issueTo: issueTo || undefined,
+        sortField,
+        sortOrder,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Falha ao gerar o relatório.');
+    } finally {
+      setReportPending(false);
+    }
+  };
+
   const openCreate = () => {
     setSelectedAccount(null);
     setFormReadOnly(false);
@@ -205,8 +224,7 @@ export function PayableList() {
   if (isLoading && !response)
     return <p className="text-sm text-zinc-500">Carregando contas a pagar...</p>;
 
-  const confirmPending =
-    deleteMutation.isPending || reverseMutation.isPending;
+  const confirmPending = deleteMutation.isPending || reverseMutation.isPending;
 
   return (
     <div className="space-y-4">
@@ -215,9 +233,21 @@ export function PayableList() {
           <h3 className="text-lg font-bold text-zinc-900">Contas a Pagar</h3>
           <p className="text-sm text-zinc-500">Gerencie contas a pagar.</p>
         </div>
-        <Button size="sm" className="gap-2" onClick={openCreate}>
-          <Plus className="h-4 w-4" /> Novo Pagar
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => void openReport()}
+            disabled={reportPending}
+          >
+            <Printer className="h-4 w-4" />
+            {reportPending ? 'Gerando...' : 'Relatório'}
+          </Button>
+          <Button size="sm" className="gap-2" onClick={openCreate}>
+            <Plus className="h-4 w-4" /> Novo Pagar
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 bg-white p-4 rounded-lg border border-zinc-200">
@@ -368,7 +398,10 @@ export function PayableList() {
               </TableRow>
             ) : accounts?.length ? (
               accounts.map((acc) => (
-                <TableRow key={acc.id} className={titleRowTextClass(acc.status, acc.dueOn)}>
+                <TableRow
+                  key={acc.id}
+                  className={titleRowTextClass(acc.status, acc.dueOn)}
+                >
                   <TableCell>{acc.documentNumber || '-'}</TableCell>
                   <TableCell>{acc.personName || '-'}</TableCell>
                   <TableCell className="font-medium">{acc.description}</TableCell>
@@ -570,7 +603,9 @@ export function PayableList() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirmAction === 'delete' ? 'Excluir conta a pagar' : 'Estornar pagamento'}
+              {confirmAction === 'delete'
+                ? 'Excluir conta a pagar'
+                : 'Estornar pagamento'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {actionError ??

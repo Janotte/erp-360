@@ -16,6 +16,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  Printer,
   RotateCcw,
   Search,
   Trash2,
@@ -34,12 +35,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,8 +64,9 @@ import {
   type TitleSortField,
 } from '@/services/financials';
 
-import { titleRowTextClass } from '../titleRowTone';
 import { PayModal } from '../Payables/PayModal';
+import { openTitleReport } from '../titleReport';
+import { titleRowTextClass } from '../titleRowTone';
 import { ReceivableForm } from './ReceivableForm';
 import { ReplicateReceivableDialog } from './ReplicateReceivableDialog';
 
@@ -95,6 +92,7 @@ export function ReceivableList() {
   const [page, setPage] = useState(1);
   const [sortField, setSortField] = useState<TitleSortField>('dueOn');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [reportPending, setReportPending] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -173,6 +171,27 @@ export function ReceivableList() {
     onError: (error: Error) => setActionError(error.message),
   });
 
+  const openReport = async () => {
+    setReportPending(true);
+    try {
+      await openTitleReport({
+        kind: 'receivable',
+        status,
+        search: search || undefined,
+        dueFrom: dueFrom || undefined,
+        dueTo: dueTo || undefined,
+        issueFrom: issueFrom || undefined,
+        issueTo: issueTo || undefined,
+        sortField,
+        sortOrder,
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Falha ao gerar o relatório.');
+    } finally {
+      setReportPending(false);
+    }
+  };
+
   const openCreate = () => {
     setSelectedAccount(null);
     setFormReadOnly(false);
@@ -205,8 +224,7 @@ export function ReceivableList() {
   if (isLoading && !response)
     return <p className="text-sm text-zinc-500">Carregando contas a receber...</p>;
 
-  const confirmPending =
-    deleteMutation.isPending || reverseMutation.isPending;
+  const confirmPending = deleteMutation.isPending || reverseMutation.isPending;
 
   return (
     <div className="space-y-4">
@@ -215,9 +233,21 @@ export function ReceivableList() {
           <h3 className="text-lg font-bold text-zinc-900">Contas a Receber</h3>
           <p className="text-sm text-zinc-500">Gerencie contas a receber.</p>
         </div>
-        <Button size="sm" className="gap-2" onClick={openCreate}>
-          <Plus className="h-4 w-4" /> Novo Receber
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => void openReport()}
+            disabled={reportPending}
+          >
+            <Printer className="h-4 w-4" />
+            {reportPending ? 'Gerando...' : 'Relatório'}
+          </Button>
+          <Button size="sm" className="gap-2" onClick={openCreate}>
+            <Plus className="h-4 w-4" /> Novo Receber
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 bg-white p-4 rounded-lg border border-zinc-200">
@@ -368,7 +398,10 @@ export function ReceivableList() {
               </TableRow>
             ) : accounts?.length ? (
               accounts.map((acc) => (
-                <TableRow key={acc.id} className={titleRowTextClass(acc.status, acc.dueOn)}>
+                <TableRow
+                  key={acc.id}
+                  className={titleRowTextClass(acc.status, acc.dueOn)}
+                >
                   <TableCell>{acc.documentNumber || '-'}</TableCell>
                   <TableCell>{acc.personName || '-'}</TableCell>
                   <TableCell className="font-medium">{acc.description}</TableCell>
