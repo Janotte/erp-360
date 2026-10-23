@@ -24,6 +24,7 @@ import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -43,6 +44,10 @@ import {
 import { InvestmentEntryModal } from './InvestmentEntryModal';
 import { TransferModal, type TransferMode } from './TransferModal';
 
+function accountKind(account: Pick<BankAccount, 'kind'>): BankAccountKind {
+  return account.kind === 'investment' ? 'investment' : 'operating';
+}
+
 function canDeleteInvestmentEntry(entry: TreasuryEntry) {
   return (
     !entry.openingBalance &&
@@ -56,6 +61,7 @@ function canDeleteInvestmentEntry(entry: TreasuryEntry) {
 
 export function ListBankAccounts() {
   const queryClient = useQueryClient();
+  const [accountTab, setAccountTab] = useState<BankAccountKind>('operating');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [openForm, setOpenForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -84,6 +90,7 @@ export function ListBankAccounts() {
 
   const openCreate = () => {
     resetForm();
+    setKind(accountTab);
     setOpenForm(true);
   };
 
@@ -116,6 +123,10 @@ export function ListBankAccounts() {
     queryFn: treasuryService.bankAccounts,
   });
 
+  const selected: BankAccount | undefined = accounts.find((item) => item.id === selectedId);
+  const selectedOnTab =
+    selected && accountKind(selected) === accountTab ? selected : undefined;
+
   const { data: bankPlanAccounts = [] } = useQuery({
     queryKey: ['financial', 'plan-accounts', 'treasury'],
     queryFn: () =>
@@ -123,9 +134,9 @@ export function ListBankAccounts() {
   });
 
   const { data: statement } = useQuery({
-    queryKey: ['treasury', 'bank-entries', selectedId],
-    queryFn: () => treasuryService.bankEntries(selectedId!),
-    enabled: Boolean(selectedId),
+    queryKey: ['treasury', 'bank-entries', selectedOnTab?.id],
+    queryFn: () => treasuryService.bankEntries(selectedOnTab!.id),
+    enabled: Boolean(selectedOnTab),
   });
 
   const saveMutation = useMutation({
@@ -137,6 +148,7 @@ export function ListBankAccounts() {
       queryClient.invalidateQueries({ queryKey: ['treasury'] });
       setOpenForm(false);
       resetForm();
+      setAccountTab(accountKind(account));
       setSelectedId(account.id);
       toast.success(editingId ? 'Conta bancária atualizada.' : 'Conta bancária cadastrada.');
     },
@@ -174,13 +186,8 @@ export function ListBankAccounts() {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const selected: BankAccount | undefined = accounts.find((item) => item.id === selectedId);
-  const operatingBalance = accounts
-    .filter((item) => (item.kind ?? 'operating') === 'operating')
-    .reduce((sum, item) => sum + (item.balance ?? 0), 0);
-  const investmentBalance = accounts
-    .filter((item) => item.kind === 'investment')
-    .reduce((sum, item) => sum + (item.balance ?? 0), 0);
+  const visibleAccounts = accounts.filter((item) => accountKind(item) === accountTab);
+  const tabBalance = visibleAccounts.reduce((sum, item) => sum + (item.balance ?? 0), 0);
 
   return (
     <div className="space-y-4">
@@ -188,12 +195,11 @@ export function ListBankAccounts() {
         <div>
           <h3 className="text-lg font-bold text-zinc-900">Contas bancárias</h3>
           <p className="text-sm text-zinc-500">
-            Extrato, saldo e conciliação. Investimento não entra no fluxo de caixa.
+            {accountTab === 'investment'
+              ? 'Aplicações fora do fluxo de caixa.'
+              : 'Contas que entram no fluxo de caixa.'}
           </p>
-          <p className="mt-1 text-xs text-zinc-500">
-            Operacional {formatCurrency(operatingBalance)} · Investimento{' '}
-            {formatCurrency(investmentBalance)}
-          </p>
+          <p className="mt-1 text-xs text-zinc-500">Saldo {formatCurrency(tabBalance)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => setTransferMode('transfer')}>
@@ -211,12 +217,22 @@ export function ListBankAccounts() {
         </div>
       </div>
 
+      <Tabs
+        value={accountTab}
+        onValueChange={(value) => setAccountTab(value as BankAccountKind)}
+      >
+        <TabsList>
+          <TabsTrigger value="operating">Contas corrente</TabsTrigger>
+          <TabsTrigger value="investment">Investimentos</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <div className="rounded-md border bg-white">
           {isLoading ? (
             <p className="p-4 text-sm text-zinc-500">Carregando contas...</p>
-          ) : accounts.length ? (
-            accounts.map((account) => (
+          ) : visibleAccounts.length ? (
+            visibleAccounts.map((account) => (
               <button
                 key={account.id}
                 type="button"
@@ -226,27 +242,28 @@ export function ListBankAccounts() {
                 onClick={() => setSelectedId(account.id)}
               >
                 <span className="font-medium">{account.name}</span>
-                <span className="text-xs text-zinc-400">
-                  {account.kind === 'investment' ? 'Investimento' : 'Operacional'}
-                </span>
                 <span className="text-sm tabular-nums text-zinc-500">
                   {formatCurrency(account.balance ?? 0)}
                 </span>
               </button>
             ))
           ) : (
-            <p className="p-4 text-sm text-zinc-500">Nenhuma conta bancária cadastrada.</p>
+            <p className="p-4 text-sm text-zinc-500">
+              {accountTab === 'investment'
+                ? 'Nenhuma conta de investimento cadastrada.'
+                : 'Nenhuma conta corrente cadastrada.'}
+            </p>
           )}
         </div>
 
         <div className="rounded-md border bg-white">
-          {selected && statement ? (
+          {selectedOnTab && statement?.account.id === selectedOnTab.id ? (
             <>
               <div className="flex items-center justify-between border-b px-4 py-3">
                 <div>
                   <p className="font-medium">{statement.account.name}</p>
                   <p className="text-sm text-zinc-500">
-                    {statement.account.kind === 'investment' ? 'Investimento' : 'Operacional'} ·
+                    {statement.account.kind === 'investment' ? 'Investimento' : 'Conta corrente'} ·
                     Saldo {formatCurrency(statement.account.balance ?? 0)}
                   </p>
                 </div>
@@ -256,7 +273,7 @@ export function ListBankAccounts() {
                       Lançar
                     </Button>
                   ) : null}
-                  <Button variant="outline" size="sm" onClick={() => openEdit(selected)}>
+                  <Button variant="outline" size="sm" onClick={() => openEdit(selectedOnTab)}>
                     Editar
                   </Button>
                 </div>
@@ -476,7 +493,7 @@ export function ListBankAccounts() {
                 onChange={(e) => setKind(e.target.value as BankAccountKind)}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
               >
-                <option value="operating">Operacional (entra no fluxo de caixa)</option>
+                <option value="operating">Conta corrente (entra no fluxo de caixa)</option>
                 <option value="investment">Investimento (fora do fluxo de caixa)</option>
               </select>
             </div>
