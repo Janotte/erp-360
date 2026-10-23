@@ -10,7 +10,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'), // Mapeia o alias @ para a pasta src
+      '@': path.resolve(import.meta.dirname, './src'), // Mapeia o alias @ para a pasta src
     },
   },
 });
