@@ -69,6 +69,62 @@ function decimal(value: unknown, scale: number) {
   return parsed.toFixed(scale);
 }
 
+function installmentNumber(value: string, fallback: string) {
+  const digits = value.replace(/\D/g, '').slice(-3);
+  return (digits || fallback).padStart(3, '0').slice(-3);
+}
+
+/** Duplicatas da NF-e. Sem duplicata, a fatura vira uma parcela; sem fatura, vale o pagamento. */
+export function billingInstallments(
+  cobr: Record<string, unknown> | null | undefined,
+  pag: Record<string, unknown> | null | undefined,
+  issueOn: string,
+): ParsedInboundInstallment[] {
+  const duplicates = asArray(
+    cobr?.dup as Record<string, unknown> | Record<string, unknown>[],
+  )
+    .map((dup, index) => ({
+      number: installmentNumber(text(dup.nDup), String(index + 1)),
+      dueOn: civilFromDateTime(text(dup.dVenc) || issueOn),
+      amount: moneyToCents(dup.vDup as string),
+    }))
+    .filter((dup) => dup.amount > 0);
+  if (duplicates.length > 0) return duplicates;
+
+  const invoice = asArray(
+    cobr?.fat as Record<string, unknown> | Record<string, unknown>[],
+  )[0];
+  if (invoice) {
+    const liquid = moneyToCents(invoice.vLiq as string);
+    const amount =
+      liquid > 0
+        ? liquid
+        : Math.max(
+            0,
+            moneyToCents(invoice.vOrig as string) - moneyToCents(invoice.vDesc as string),
+          );
+    if (amount > 0) {
+      return [
+        {
+          number: installmentNumber(text(invoice.nFat), '001'),
+          dueOn: issueOn,
+          amount,
+        },
+      ];
+    }
+  }
+
+  return asArray(pag?.detPag as Record<string, unknown> | Record<string, unknown>[])
+    .filter((payment) => text(payment.tPag) !== '90')
+    .map((payment) => moneyToCents(payment.vPag as string))
+    .filter((amount) => amount > 0)
+    .map((amount, index) => ({
+      number: String(index + 1).padStart(3, '0'),
+      dueOn: issueOn,
+      amount,
+    }));
+}
+
 function civilFromDateTime(value: string) {
   const match = value.match(/^(\d{4}-\d{2}-\d{2})/);
   if (!match) {
@@ -141,65 +197,65 @@ export function parseNfeXml(xml: string): ParsedNfe {
 
   const total = ((inf.total as Record<string, unknown> | undefined)?.ICMSTot ??
     {}) as Record<string, unknown>;
-  const lines = asArray(inf.det as Record<string, unknown> | Record<string, unknown>[]).map(
-    (det, index) => {
-      const prod = (det.prod ?? {}) as Record<string, unknown>;
-      const qty = Number(text(prod.qCom).replace(',', '.'));
-      if (!Number.isFinite(qty) || qty <= 0) {
-        throw new InboundError(400, `O item ${index + 1} está com quantidade inválida.`);
-      }
-      const cfop = text(prod.CFOP);
-      if (!/^[0-9]{4}$/.test(cfop)) {
-        throw new InboundError(400, `O item ${index + 1} está sem CFOP.`);
-      }
-      const barcode = text(prod.cEAN);
-      const cest = text(prod.CEST).replace(/\D/g, '');
-      const tax = (det.imposto ?? {}) as Record<string, unknown>;
-      const ipi = tax.IPI as Record<string, unknown> | undefined;
-      const ipiValue = moneyToCents(
-        (ipi?.IPITrib as Record<string, unknown> | undefined)?.vIPI as string,
-      );
-      return {
-        lineNumber: index + 1,
-        supplierCode: text(prod.cProd).slice(0, 60),
-        description: text(prod.xProd).slice(0, 120) || 'Item sem descrição',
-        ncmCode: text(prod.NCM).replace(/\D/g, '').slice(0, 8) || null,
-        cestCode: /^[0-9]{7}$/.test(cest) ? cest : null,
-        barcode: barcode && barcode.toUpperCase() !== 'SEM GTIN' ? barcode.slice(0, 14) : null,
-        xmlCfop: cfop,
-        commercialQty: decimal(prod.qCom, 4),
-        commercialUnit: text(prod.uCom).slice(0, 6) || 'UN',
-        unitPrice: decimal(prod.vUnCom, 4),
-        lineAmount: moneyToCents(prod.vProd as string),
-        freightAmount: moneyToCents(prod.vFrete as string),
-        insuranceAmount: moneyToCents(prod.vSeg as string),
-        otherAmount: moneyToCents(prod.vOutro as string),
-        discountAmount: moneyToCents(prod.vDesc as string),
-        ipiAmount: ipiValue,
-        stAmount: taxAmount(tax.ICMS, 'vICMSST'),
-        icmsAmount: taxAmount(tax.ICMS, 'vICMS'),
-      } satisfies ParsedInboundLine;
-    },
-  );
+  const lines = asArray(
+    inf.det as Record<string, unknown> | Record<string, unknown>[],
+  ).map((det, index) => {
+    const prod = (det.prod ?? {}) as Record<string, unknown>;
+    const qty = Number(text(prod.qCom).replace(',', '.'));
+    if (!Number.isFinite(qty) || qty <= 0) {
+      throw new InboundError(400, `O item ${index + 1} está com quantidade inválida.`);
+    }
+    const cfop = text(prod.CFOP);
+    if (!/^[0-9]{4}$/.test(cfop)) {
+      throw new InboundError(400, `O item ${index + 1} está sem CFOP.`);
+    }
+    const barcode = text(prod.cEAN);
+    const cest = text(prod.CEST).replace(/\D/g, '');
+    const tax = (det.imposto ?? {}) as Record<string, unknown>;
+    const ipi = tax.IPI as Record<string, unknown> | undefined;
+    const ipiValue = moneyToCents(
+      (ipi?.IPITrib as Record<string, unknown> | undefined)?.vIPI as string,
+    );
+    return {
+      lineNumber: index + 1,
+      supplierCode: text(prod.cProd).slice(0, 60),
+      description: text(prod.xProd).slice(0, 120) || 'Item sem descrição',
+      ncmCode: text(prod.NCM).replace(/\D/g, '').slice(0, 8) || null,
+      cestCode: /^[0-9]{7}$/.test(cest) ? cest : null,
+      barcode:
+        barcode && barcode.toUpperCase() !== 'SEM GTIN' ? barcode.slice(0, 14) : null,
+      xmlCfop: cfop,
+      commercialQty: decimal(prod.qCom, 4),
+      commercialUnit: text(prod.uCom).slice(0, 6) || 'UN',
+      unitPrice: decimal(prod.vUnCom, 4),
+      lineAmount: moneyToCents(prod.vProd as string),
+      freightAmount: moneyToCents(prod.vFrete as string),
+      insuranceAmount: moneyToCents(prod.vSeg as string),
+      otherAmount: moneyToCents(prod.vOutro as string),
+      discountAmount: moneyToCents(prod.vDesc as string),
+      ipiAmount: ipiValue,
+      stAmount: taxAmount(tax.ICMS, 'vICMSST'),
+      icmsAmount: taxAmount(tax.ICMS, 'vICMS'),
+    } satisfies ParsedInboundLine;
+  });
   if (lines.length === 0) {
     throw new InboundError(400, 'A NF-e não tem itens.');
   }
 
-  const cobr = (inf.cobr ?? {}) as Record<string, unknown>;
-  const installments = asArray(cobr.dup as Record<string, unknown> | Record<string, unknown>[])
-    .map((dup, index) => ({
-      number: text(dup.nDup).slice(0, 3) || String(index + 1).padStart(3, '0'),
-      dueOn: civilFromDateTime(text(dup.dVenc) || text(ide.dhEmi) || text(ide.dEmi)),
-      amount: moneyToCents(dup.vDup as string),
-    }))
-    .filter((dup) => dup.amount > 0);
-
   const issueSource = text(ide.dhEmi) || text(ide.dEmi);
+  const issueOn = civilFromDateTime(issueSource);
+  const installments = billingInstallments(
+    (inf.cobr ?? null) as Record<string, unknown> | null,
+    (inf.pag ?? null) as Record<string, unknown> | null,
+    issueOn,
+  );
   return {
     accessKey: rawId,
-    number: text(ide.nNF).replace(/\D/g, '').slice(0, 9) || rawId.slice(25, 34).replace(/^0+/, ''),
+    number:
+      text(ide.nNF).replace(/\D/g, '').slice(0, 9) ||
+      rawId.slice(25, 34).replace(/^0+/, ''),
     series: text(ide.serie).replace(/\D/g, '').slice(0, 3) || '0',
-    issueOn: civilFromDateTime(issueSource),
+    issueOn,
     supplierTaxId,
     supplierName: text(emit.xNome).slice(0, 120),
     stateRegistration: text(emit.IE) || null,

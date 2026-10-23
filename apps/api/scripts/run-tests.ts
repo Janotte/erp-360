@@ -27,6 +27,7 @@ const child = spawn(
     'test/cash-flow.test.ts',
     'test/certificate.test.ts',
     'test/inbound-cost.test.ts',
+    'test/nfe-billing.test.ts',
     'test/inbound-post.integration.test.ts',
     'test/certificate-connection.test.ts',
     'test/dashboard-period.test.ts',

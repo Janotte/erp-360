@@ -1,4 +1,5 @@
 import { catalogItems } from '@erp-360/mod-catalog';
+import { payables } from '@erp-360/mod-financial';
 import {
   inboundDocumentInstallments,
   inboundDocumentLines,
@@ -7,7 +8,6 @@ import {
   stockBalances,
   stockMovements,
 } from '@erp-360/mod-inbound';
-import { payables } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
 import { civilDate } from '@erp-360/shared';
 import { and, eq, inArray, isNull, lte, or } from 'drizzle-orm';
@@ -31,7 +31,9 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
     const [document] = await tx
       .select()
       .from(inboundDocuments)
-      .where(and(eq(inboundDocuments.id, documentId), eq(inboundDocuments.tenantId, tenantId)))
+      .where(
+        and(eq(inboundDocuments.id, documentId), eq(inboundDocuments.tenantId, tenantId)),
+      )
       .for('update');
     if (!document) throw new InboundError(404, 'Nota não encontrada.');
     if (document.status === 'posted') {
@@ -60,7 +62,10 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
       .select()
       .from(operationNatures)
       .where(
-        and(eq(operationNatures.id, document.natureId), eq(operationNatures.tenantId, tenantId)),
+        and(
+          eq(operationNatures.id, document.natureId),
+          eq(operationNatures.tenantId, tenantId),
+        ),
       )
       .limit(1);
     if (!nature) throw new InboundError(400, 'Natureza de operação não encontrada.');
@@ -87,15 +92,27 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
     if (lines.length === 0) throw new InboundError(400, 'A nota não tem itens.');
     for (const line of lines) {
       if (!line.itemId) {
-        throw new InboundError(400, `O item ${line.lineNumber} ainda não está vinculado.`);
+        throw new InboundError(
+          400,
+          `O item ${line.lineNumber} ainda não está vinculado.`,
+        );
       }
       if (!line.entryCfop) {
-        throw new InboundError(400, `O item ${line.lineNumber} está sem CFOP de entrada.`);
+        throw new InboundError(
+          400,
+          `O item ${line.lineNumber} está sem CFOP de entrada.`,
+        );
       }
     }
     if (nature.createsPayable && (document.totalAmount > 0 || installments.length > 0)) {
-      const sum = installments.reduce((total, installment) => total + installment.amount, 0);
-      if (installments.length === 0 || Math.abs(sum - document.totalAmount) > 1) {
+      const sum = installments.reduce(
+        (total, installment) => total + installment.amount,
+        0,
+      );
+      if (installments.length === 0) {
+        throw new InboundError(400, 'A nota não tem parcelas.');
+      }
+      if (Math.abs(sum - document.totalAmount) > 1) {
         throw new InboundError(400, 'A soma das parcelas não fecha com o total da nota.');
       }
     }
@@ -120,12 +137,14 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
 
       const stockQty = round4(money(line.commercialQty) * money(line.factor));
       if (stockQty <= 0) {
-        throw new InboundError(400, `O item ${line.lineNumber} ficou com quantidade zero.`);
+        throw new InboundError(
+          400,
+          `O item ${line.lineNumber} ficou com quantidade zero.`,
+        );
       }
 
       let unitCost: string | null = null;
-      const moves =
-        nature.movesStock && nature.updatesAverageCost && item.tracksStock;
+      const moves = nature.movesStock && nature.updatesAverageCost && item.tracksStock;
       if (moves) {
         const cost = lineUnitCost(
           {
@@ -149,18 +168,28 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
         const [balance] = await tx
           .select()
           .from(stockBalances)
-          .where(and(eq(stockBalances.itemId, itemId), eq(stockBalances.tenantId, tenantId)))
+          .where(
+            and(eq(stockBalances.itemId, itemId), eq(stockBalances.tenantId, tenantId)),
+          )
           .for('update');
-        if (!balance) throw new InboundError(500, 'Não foi possível ler o saldo do item.');
+        if (!balance)
+          throw new InboundError(500, 'Não foi possível ler o saldo do item.');
         const currentQty = money(balance.quantity);
-        const average = nextAverage(currentQty, money(balance.averageCost), stockQty, cost);
+        const average = nextAverage(
+          currentQty,
+          money(balance.averageCost),
+          stockQty,
+          cost,
+        );
         await tx
           .update(stockBalances)
           .set({
             quantity: round4(currentQty + stockQty).toFixed(4),
             averageCost: average.toFixed(4),
           })
-          .where(and(eq(stockBalances.itemId, itemId), eq(stockBalances.tenantId, tenantId)));
+          .where(
+            and(eq(stockBalances.itemId, itemId), eq(stockBalances.tenantId, tenantId)),
+          );
         await tx.insert(stockMovements).values({
           tenantId,
           itemId,
@@ -188,7 +217,10 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
           and(
             eq(catalogItems.id, itemId),
             eq(catalogItems.tenantId, tenantId),
-            or(isNull(catalogItems.lastInboundOn), lte(catalogItems.lastInboundOn, inboundOn)),
+            or(
+              isNull(catalogItems.lastInboundOn),
+              lte(catalogItems.lastInboundOn, inboundOn),
+            ),
           ),
         );
       if (suggestedPrice) {
@@ -207,7 +239,8 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
             tenantId,
             creditorId: document.supplierId,
             documentNumber: payableDocumentNumber(document.number, document.series),
-            description: `Entrada NF ${document.number} parcela ${installment.number}`.slice(0, 255),
+            description:
+              `Entrada NF ${document.number} parcela ${installment.number}`.slice(0, 255),
             issueOn: document.issueOn,
             dueOn: installment.dueOn,
             installmentAmount: installment.amount,
@@ -241,7 +274,9 @@ export async function reverseInboundDocument(tenantId: string, documentId: strin
     const [document] = await tx
       .select()
       .from(inboundDocuments)
-      .where(and(eq(inboundDocuments.id, documentId), eq(inboundDocuments.tenantId, tenantId)))
+      .where(
+        and(eq(inboundDocuments.id, documentId), eq(inboundDocuments.tenantId, tenantId)),
+      )
       .for('update');
     if (!document) throw new InboundError(404, 'Nota não encontrada.');
     if (document.status !== 'posted') {
@@ -262,8 +297,15 @@ export async function reverseInboundDocument(tenantId: string, documentId: strin
           eq(inboundDocumentInstallments.tenantId, tenantId),
         ),
       );
-    if (installments.some((installment) => installment.payableId && installment.status !== 'pendente')) {
-      throw new InboundError(400, 'Estorne a baixa dos títulos antes de estornar a nota.');
+    if (
+      installments.some(
+        (installment) => installment.payableId && installment.status !== 'pendente',
+      )
+    ) {
+      throw new InboundError(
+        400,
+        'Estorne a baixa dos títulos antes de estornar a nota.',
+      );
     }
 
     const movements = await tx
@@ -284,13 +326,18 @@ export async function reverseInboundDocument(tenantId: string, documentId: strin
       await tx
         .select({ id: catalogItems.id })
         .from(catalogItems)
-        .where(and(eq(catalogItems.id, movement.itemId), eq(catalogItems.tenantId, tenantId)))
+        .where(
+          and(eq(catalogItems.id, movement.itemId), eq(catalogItems.tenantId, tenantId)),
+        )
         .for('update');
       const [balance] = await tx
         .select()
         .from(stockBalances)
         .where(
-          and(eq(stockBalances.itemId, movement.itemId), eq(stockBalances.tenantId, tenantId)),
+          and(
+            eq(stockBalances.itemId, movement.itemId),
+            eq(stockBalances.tenantId, tenantId),
+          ),
         )
         .for('update');
       if (!balance) throw new InboundError(400, 'O saldo do item não foi encontrado.');
@@ -310,7 +357,10 @@ export async function reverseInboundDocument(tenantId: string, documentId: strin
           averageCost: next.averageCost.toFixed(4),
         })
         .where(
-          and(eq(stockBalances.itemId, movement.itemId), eq(stockBalances.tenantId, tenantId)),
+          and(
+            eq(stockBalances.itemId, movement.itemId),
+            eq(stockBalances.tenantId, tenantId),
+          ),
         );
       await tx.insert(stockMovements).values({
         tenantId,
@@ -354,7 +404,9 @@ export async function deleteInboundDocument(tenantId: string, documentId: string
     const [document] = await tx
       .select()
       .from(inboundDocuments)
-      .where(and(eq(inboundDocuments.id, documentId), eq(inboundDocuments.tenantId, tenantId)))
+      .where(
+        and(eq(inboundDocuments.id, documentId), eq(inboundDocuments.tenantId, tenantId)),
+      )
       .for('update');
     if (!document) throw new InboundError(404, 'Nota não encontrada.');
     if (document.status === 'posted') {
@@ -399,10 +451,15 @@ export async function deleteInboundDocument(tenantId: string, documentId: string
     await tx
       .delete(stockMovements)
       .where(
-        and(eq(stockMovements.documentId, documentId), eq(stockMovements.tenantId, tenantId)),
+        and(
+          eq(stockMovements.documentId, documentId),
+          eq(stockMovements.tenantId, tenantId),
+        ),
       );
     await tx
       .delete(inboundDocuments)
-      .where(and(eq(inboundDocuments.id, documentId), eq(inboundDocuments.tenantId, tenantId)));
+      .where(
+        and(eq(inboundDocuments.id, documentId), eq(inboundDocuments.tenantId, tenantId)),
+      );
   });
 }

@@ -24,7 +24,11 @@ import { uniqueViolation } from '../../lib/postgres-errors.ts';
 import { moneyToCents } from './cost.ts';
 import { InboundError } from './errors.ts';
 import { parseNfeXml } from './nfe.ts';
-import { deleteInboundDocument, postInboundDocument, reverseInboundDocument } from './post.ts';
+import {
+  deleteInboundDocument,
+  postInboundDocument,
+  reverseInboundDocument,
+} from './post.ts';
 import { cfopScope, ensureInboundSetup } from './setup.ts';
 
 const draftStatuses = new Set(['pre_note', 'divergent', 'pending']);
@@ -44,7 +48,11 @@ const lineInput = z.object({
   commercialUnit: z.string().trim().min(1).max(6),
   unitPrice: z.number().nonnegative(),
   factor: z.number().positive().default(1),
-  entryCfop: z.string().regex(/^[0-9]{4}$/).nullable().optional(),
+  entryCfop: z
+    .string()
+    .regex(/^[0-9]{4}$/)
+    .nullable()
+    .optional(),
   itemId: z.string().uuid().nullable().optional(),
   barcode: z.string().max(14).nullable().optional(),
   ncmCode: z.string().max(8).nullable().optional(),
@@ -91,7 +99,8 @@ function lineRecord(
     cestCode: cestOrNull(line.cestCode),
     barcode: line.barcode ?? null,
     xmlCfop: line.xmlCfop,
-    entryCfop: line.entryCfop ?? (['1', '2', '3'].includes(line.xmlCfop[0]) ? line.xmlCfop : null),
+    entryCfop:
+      line.entryCfop ?? (['1', '2', '3'].includes(line.xmlCfop[0]) ? line.xmlCfop : null),
     commercialQty: line.commercialQty.toFixed(4),
     commercialUnit: line.commercialUnit,
     factor: line.factor.toFixed(6),
@@ -129,7 +138,8 @@ async function entryCfopFor(
         eq(cfopEntryRules.scope, scope),
         eq(
           cfopEntryRules.fiscalPurpose,
-          purpose as 'resale' | 'industrialization' | 'consumption' | 'fixed_asset' | 'service',
+          purpose as
+            'resale' | 'industrialization' | 'consumption' | 'fixed_asset' | 'service',
         ),
       ),
     )
@@ -140,7 +150,12 @@ async function entryCfopFor(
 async function rememberLink(
   tenantId: string,
   supplierId: string | null,
-  line: { supplierCode: string; itemId: string | null; commercialUnit: string; factor: string },
+  line: {
+    supplierCode: string;
+    itemId: string | null;
+    commercialUnit: string;
+    factor: string;
+  },
 ) {
   if (!supplierId || !line.itemId) return;
   await db
@@ -188,7 +203,9 @@ async function fillCestFromFile(
     )
     .limit(1);
   if (!file) return;
-  const xml = Buffer.isBuffer(file.content) ? file.content.toString('utf8') : String(file.content);
+  const xml = Buffer.isBuffer(file.content)
+    ? file.content.toString('utf8')
+    : String(file.content);
   let parsed: ReturnType<typeof parseNfeXml>;
   try {
     parsed = parseNfeXml(xml);
@@ -197,7 +214,9 @@ async function fillCestFromFile(
   }
   for (const line of lines) {
     if (line.cestCode) continue;
-    const cest = parsed.lines.find((item) => item.lineNumber === line.lineNumber)?.cestCode;
+    const cest = parsed.lines.find(
+      (item) => item.lineNumber === line.lineNumber,
+    )?.cestCode;
     if (!cest) continue;
     line.cestCode = cest;
     await db
@@ -210,6 +229,67 @@ async function fillCestFromFile(
           eq(inboundDocumentLines.lineNumber, line.lineNumber),
         ),
       );
+  }
+}
+
+async function fillInstallmentsFromFile(tenantId: string, documentId: string) {
+  const [file] = await db
+    .select({ content: inboundDocumentFiles.content })
+    .from(inboundDocumentFiles)
+    .where(
+      and(
+        eq(inboundDocumentFiles.documentId, documentId),
+        eq(inboundDocumentFiles.tenantId, tenantId),
+      ),
+    )
+    .limit(1);
+  const empty: { id: string; number: string; dueOn: string; amount: number }[] = [];
+  if (!file) return empty;
+  const xml = Buffer.isBuffer(file.content)
+    ? file.content.toString('utf8')
+    : String(file.content);
+  let parsed: ReturnType<typeof parseNfeXml>;
+  try {
+    parsed = parseNfeXml(xml);
+  } catch {
+    return empty;
+  }
+  if (parsed.installments.length === 0) return empty;
+  try {
+    return await db
+      .insert(inboundDocumentInstallments)
+      .values(
+        parsed.installments.map((installment) => ({
+          tenantId,
+          documentId,
+          number: installment.number,
+          dueOn: installment.dueOn,
+          amount: installment.amount,
+        })),
+      )
+      .returning({
+        id: inboundDocumentInstallments.id,
+        number: inboundDocumentInstallments.number,
+        dueOn: inboundDocumentInstallments.dueOn,
+        amount: inboundDocumentInstallments.amount,
+      });
+  } catch (error) {
+    if (!uniqueViolation(error)) throw error;
+    return db
+      .select({
+        id: inboundDocumentInstallments.id,
+        number: inboundDocumentInstallments.number,
+        dueOn: inboundDocumentInstallments.dueOn,
+        amount: inboundDocumentInstallments.amount,
+      })
+      .from(inboundDocumentInstallments)
+      .where(
+        and(
+          eq(inboundDocumentInstallments.documentId, documentId),
+          eq(inboundDocumentInstallments.tenantId, tenantId),
+        ),
+      )
+      .orderBy(asc(inboundDocumentInstallments.number));
   }
 }
 
@@ -237,7 +317,9 @@ async function loadDocument(tenantId: string, documentId: string) {
     .from(inboundDocuments)
     .leftJoin(persons, eq(persons.id, inboundDocuments.supplierId))
     .leftJoin(operationNatures, eq(operationNatures.id, inboundDocuments.natureId))
-    .where(and(eq(inboundDocuments.id, documentId), eq(inboundDocuments.tenantId, tenantId)))
+    .where(
+      and(eq(inboundDocuments.id, documentId), eq(inboundDocuments.tenantId, tenantId)),
+    )
     .limit(1);
   if (!document) throw new InboundError(404, 'Nota não encontrada.');
 
@@ -274,7 +356,7 @@ async function loadDocument(tenantId: string, documentId: string) {
 
   if (document.accessKey) await fillCestFromFile(tenantId, documentId, lines);
 
-  const installments = await db
+  let installments = await db
     .select({
       id: inboundDocumentInstallments.id,
       number: inboundDocumentInstallments.number,
@@ -289,6 +371,13 @@ async function loadDocument(tenantId: string, documentId: string) {
       ),
     )
     .orderBy(asc(inboundDocumentInstallments.number));
+  if (
+    installments.length === 0 &&
+    document.accessKey &&
+    draftStatuses.has(document.status)
+  ) {
+    installments = await fillInstallmentsFromFile(tenantId, documentId);
+  }
 
   const blockers: string[] = [];
   if (draftStatuses.has(document.status)) {
@@ -300,15 +389,19 @@ async function loadDocument(tenantId: string, documentId: string) {
     if (!document.natureId) blockers.push('Informe a natureza de operação.');
     if (lines.length === 0) blockers.push('A nota não tem itens.');
     for (const line of lines) {
-      if (!line.itemId) blockers.push(`Item ${line.lineNumber} sem vínculo com o catálogo.`);
+      if (!line.itemId)
+        blockers.push(`Item ${line.lineNumber} sem vínculo com o catálogo.`);
       if (!line.entryCfop) blockers.push(`Item ${line.lineNumber} sem CFOP de entrada.`);
-      if (Number(line.factor) <= 0) blockers.push(`Item ${line.lineNumber} sem fator de conversão.`);
+      if (Number(line.factor) <= 0)
+        blockers.push(`Item ${line.lineNumber} sem fator de conversão.`);
     }
-    const sum = installments.reduce((total, installment) => total + installment.amount, 0);
-    if (
-      document.totalAmount > 0 &&
-      (installments.length === 0 || Math.abs(sum - document.totalAmount) > 1)
-    ) {
+    const sum = installments.reduce(
+      (total, installment) => total + installment.amount,
+      0,
+    );
+    if (document.totalAmount > 0 && installments.length === 0) {
+      blockers.push('A nota não tem parcelas.');
+    } else if (document.totalAmount > 0 && Math.abs(sum - document.totalAmount) > 1) {
       blockers.push('A soma das parcelas não fecha com o total da nota.');
     }
   }
@@ -377,7 +470,10 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
   });
 
   fastify.get('/:id', async (request, reply) => {
-    const id = z.string().uuid().safeParse((request.params as { id: string }).id);
+    const id = z
+      .string()
+      .uuid()
+      .safeParse((request.params as { id: string }).id);
     if (!id.success) return reply.status(400).send({ message: 'Nota inválida.' });
     return loadDocument(request.user.tenantId, id.data);
   });
@@ -413,9 +509,9 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
           totalAmount,
         })
         .returning({ id: inboundDocuments.id });
-      await tx.insert(inboundDocumentLines).values(
-        body.lines.map((line) => lineRecord(tenantId, document.id, line, true)),
-      );
+      await tx
+        .insert(inboundDocumentLines)
+        .values(body.lines.map((line) => lineRecord(tenantId, document.id, line, true)));
       if (installments[0]?.amount > 0) {
         await tx.insert(inboundDocumentInstallments).values(
           installments.map((installment) => ({
@@ -485,7 +581,9 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const [supplier] = await db
         .select({ id: persons.id, name: persons.name })
         .from(persons)
-        .where(and(eq(persons.tenantId, tenantId), eq(persons.taxId, parsed.supplierTaxId)))
+        .where(
+          and(eq(persons.tenantId, tenantId), eq(persons.taxId, parsed.supplierTaxId)),
+        )
         .limit(1);
 
       const content = Buffer.from(request.body.xml, 'utf8');
@@ -521,7 +619,10 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
           let factor = '1.000000';
           if (supplier) {
             const [link] = await tx
-              .select({ itemId: supplierItemLinks.itemId, factor: supplierItemLinks.factor })
+              .select({
+                itemId: supplierItemLinks.itemId,
+                factor: supplierItemLinks.factor,
+              })
               .from(supplierItemLinks)
               .where(
                 and(
@@ -541,12 +642,17 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
               .select({ id: catalogItems.id })
               .from(catalogItems)
               .where(
-                and(eq(catalogItems.tenantId, tenantId), eq(catalogItems.barcode, line.barcode)),
+                and(
+                  eq(catalogItems.tenantId, tenantId),
+                  eq(catalogItems.barcode, line.barcode),
+                ),
               )
               .limit(1);
             if (item) itemId = item.id;
           }
-          const entryCfop = ['1', '2', '3'].includes(line.xmlCfop[0]) ? line.xmlCfop : null;
+          const entryCfop = ['1', '2', '3'].includes(line.xmlCfop[0])
+            ? line.xmlCfop
+            : null;
           await tx.insert(inboundDocumentLines).values({
             tenantId,
             documentId: document.id,
@@ -576,7 +682,10 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
   fastify.put('/:id', { schema: { body: draftBody } }, async (request) => {
     const tenantId = request.user.tenantId;
-    const id = z.string().uuid().parse((request.params as { id: string }).id);
+    const id = z
+      .string()
+      .uuid()
+      .parse((request.params as { id: string }).id);
     const [document] = await db
       .select()
       .from(inboundDocuments)
@@ -632,7 +741,9 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
         await tx
           .delete(inboundDocumentInstallments)
           .where(eq(inboundDocumentInstallments.documentId, id));
-        await tx.delete(inboundDocumentLines).where(eq(inboundDocumentLines.documentId, id));
+        await tx
+          .delete(inboundDocumentLines)
+          .where(eq(inboundDocumentLines.documentId, id));
         await tx
           .insert(inboundDocumentLines)
           .values(body.lines.map((line) => lineRecord(tenantId, id, line, true)));
@@ -673,13 +784,13 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
     if (body.supplierId) await markSupplier(tenantId, body.supplierId);
     const purpose = body.natureId
-      ? (
+      ? ((
           await db
             .select({ fiscalPurpose: operationNatures.fiscalPurpose })
             .from(operationNatures)
             .where(eq(operationNatures.id, body.natureId))
             .limit(1)
-        )[0]?.fiscalPurpose ?? null
+        )[0]?.fiscalPurpose ?? null)
       : null;
     await alignDraft(tenantId, id, purpose);
     return loadDocument(tenantId, id);
@@ -687,7 +798,10 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
   fastify.post('/:id/supplier', async (request) => {
     const tenantId = request.user.tenantId;
-    const id = z.string().uuid().parse((request.params as { id: string }).id);
+    const id = z
+      .string()
+      .uuid()
+      .parse((request.params as { id: string }).id);
     const [document] = await db
       .select()
       .from(inboundDocuments)
@@ -699,7 +813,9 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
     const [existing] = await db
       .select({ id: persons.id })
       .from(persons)
-      .where(and(eq(persons.tenantId, tenantId), eq(persons.taxId, document.supplierTaxId)))
+      .where(
+        and(eq(persons.tenantId, tenantId), eq(persons.taxId, document.supplierTaxId)),
+      )
       .limit(1);
     let supplierId = existing?.id;
     if (!supplierId) {
@@ -737,21 +853,30 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
   fastify.post('/:id/post', async (request) => {
     const tenantId = request.user.tenantId;
-    const id = z.string().uuid().parse((request.params as { id: string }).id);
+    const id = z
+      .string()
+      .uuid()
+      .parse((request.params as { id: string }).id);
     await postInboundDocument(tenantId, id);
     return loadDocument(tenantId, id);
   });
 
   fastify.post('/:id/reverse', async (request) => {
     const tenantId = request.user.tenantId;
-    const id = z.string().uuid().parse((request.params as { id: string }).id);
+    const id = z
+      .string()
+      .uuid()
+      .parse((request.params as { id: string }).id);
     await reverseInboundDocument(tenantId, id);
     return loadDocument(tenantId, id);
   });
 
   fastify.delete('/:id', async (request, reply) => {
     const tenantId = request.user.tenantId;
-    const id = z.string().uuid().safeParse((request.params as { id: string }).id);
+    const id = z
+      .string()
+      .uuid()
+      .safeParse((request.params as { id: string }).id);
     if (!id.success) return reply.status(400).send({ message: 'Nota inválida.' });
     await deleteInboundDocument(tenantId, id.data);
     return reply.status(204).send();
@@ -777,7 +902,11 @@ async function alignDraft(tenantId: string, documentId: string, purpose: string 
       ),
     );
   const [document] = await db
-    .select({ supplierId: inboundDocuments.supplierId, accessKey: inboundDocuments.accessKey, hasProtocol: inboundDocuments.hasProtocol })
+    .select({
+      supplierId: inboundDocuments.supplierId,
+      accessKey: inboundDocuments.accessKey,
+      hasProtocol: inboundDocuments.hasProtocol,
+    })
     .from(inboundDocuments)
     .where(eq(inboundDocuments.id, documentId))
     .limit(1);
@@ -795,7 +924,11 @@ async function alignDraft(tenantId: string, documentId: string, purpose: string 
   }
 
   const view = await loadDocument(tenantId, documentId);
-  if (!draftStatuses.has(view.status) && view.status !== 'pre_note' && view.status !== 'divergent') {
+  if (
+    !draftStatuses.has(view.status) &&
+    view.status !== 'pre_note' &&
+    view.status !== 'divergent'
+  ) {
     return;
   }
   await db

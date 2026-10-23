@@ -205,7 +205,9 @@ export function InboundPage() {
   });
 
   const document = detail.data;
-  const locked = document ? !['pre_note', 'divergent', 'pending'].includes(document.status) : true;
+  const locked = document
+    ? !['pre_note', 'divergent', 'pending'].includes(document.status)
+    : true;
   const newItem = draft?.lines.find((line) => line.lineNumber === newItemLine) ?? null;
 
   const linkedLabel = (lineNumber: number, itemId: string) => {
@@ -257,8 +259,8 @@ export function InboundPage() {
         <div>
           <h2 className="text-2xl font-bold text-zinc-900">Entradas</h2>
           <p className="text-sm text-zinc-500">
-            NF-e modelo 55 e lançamento manual. A data da última entrada do item é gravada no
-            lançamento.
+            NF-e modelo 55 e lançamento manual. A data da última entrada do item é gravada
+            no lançamento.
           </p>
         </div>
         <div className="flex gap-2">
@@ -331,7 +333,9 @@ export function InboundPage() {
             <h3 className="text-lg font-bold text-zinc-900">
               Nota {document.number}/{document.series}
             </h3>
-            <span className="text-sm text-zinc-500">{inboundStatusLabel[document.status]}</span>
+            <span className="text-sm text-zinc-500">
+              {inboundStatusLabel[document.status]}
+            </span>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-1">
@@ -396,9 +400,39 @@ export function InboundPage() {
             </div>
             <div className="space-y-1">
               <Label>Total</Label>
-              <p className="text-sm text-zinc-700">{formatCurrency(document.totalAmount)}</p>
+              <p className="text-sm text-zinc-700">
+                {formatCurrency(document.totalAmount)}
+              </p>
             </div>
           </div>
+
+          {draft.installments.length > 0 ? (
+            <div className="space-y-2">
+              <Label>Parcelas</Label>
+              {draft.installments.map((installment, index) => (
+                <div
+                  key={installment.number}
+                  className="grid items-center gap-2 sm:grid-cols-3"
+                >
+                  <p className="text-sm text-zinc-700">Parcela {installment.number}</p>
+                  <Input
+                    type="date"
+                    value={installment.dueOn}
+                    disabled={locked}
+                    aria-label={`Vencimento da parcela ${installment.number}`}
+                    onChange={(event) => {
+                      const installments = [...draft.installments];
+                      installments[index] = { ...installment, dueOn: event.target.value };
+                      setDraft({ ...draft, installments });
+                    }}
+                  />
+                  <p className="text-sm tabular-nums text-zinc-700">
+                    {formatCurrency(installment.amount)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           <div className="space-y-3">
             {draft.lines.map((line, index) => (
@@ -419,11 +453,15 @@ export function InboundPage() {
                     <Input
                       value={String(line.commercialQty)}
                       onChange={(event) => {
-                        const commercialQty = Number(event.target.value.replace(',', '.'));
+                        const commercialQty = Number(
+                          event.target.value.replace(',', '.'),
+                        );
                         const lines = [...draft.lines];
                         lines[index] = {
                           ...line,
-                          commercialQty: Number.isFinite(commercialQty) ? commercialQty : 0,
+                          commercialQty: Number.isFinite(commercialQty)
+                            ? commercialQty
+                            : 0,
                         };
                         setDraft({ ...draft, lines });
                       }}
@@ -443,8 +481,8 @@ export function InboundPage() {
                   </div>
                 ) : (
                   <p className="text-zinc-500">
-                    Código {line.supplierCode} · CFOP {line.xmlCfop} · qtd {line.commercialQty}{' '}
-                    {line.commercialUnit}
+                    Código {line.supplierCode} · CFOP {line.xmlCfop} · qtd{' '}
+                    {line.commercialQty} {line.commercialUnit}
                   </p>
                 )}
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
@@ -469,7 +507,10 @@ export function InboundPage() {
                     onChange={(event) => {
                       const factor = Number(event.target.value.replace(',', '.'));
                       const lines = [...draft.lines];
-                      lines[index] = { ...line, factor: Number.isFinite(factor) ? factor : 1 };
+                      lines[index] = {
+                        ...line,
+                        factor: Number.isFinite(factor) ? factor : 1,
+                      };
                       setDraft({ ...draft, lines });
                     }}
                   />
@@ -480,7 +521,10 @@ export function InboundPage() {
                       disabled={locked}
                       placeholder="Buscar item do catálogo"
                       onChange={(event) =>
-                        setItemSearch({ ...itemSearch, [line.lineNumber]: event.target.value })
+                        setItemSearch({
+                          ...itemSearch,
+                          [line.lineNumber]: event.target.value,
+                        })
                       }
                     />
                     <Button
@@ -498,7 +542,9 @@ export function InboundPage() {
                   </div>
                 </div>
                 {line.itemId ? (
-                  <p className="mt-1 text-zinc-600">Vinculado: {linkedLabel(line.lineNumber, line.itemId)}</p>
+                  <p className="mt-1 text-zinc-600">
+                    Vinculado: {linkedLabel(line.lineNumber, line.itemId)}
+                  </p>
                 ) : (
                   <p className="mt-1 text-amber-700">Sem vínculo</p>
                 )}
@@ -514,7 +560,11 @@ export function InboundPage() {
                           setDraft({ ...draft, lines });
                           setLinkedItems((current) => ({
                             ...current,
-                            [line.lineNumber]: { id: item.id, code: item.code, name: item.name },
+                            [line.lineNumber]: {
+                              id: item.id,
+                              code: item.code,
+                              name: item.name,
+                            },
                           }));
                           setItemSearch({ ...itemSearch, [line.lineNumber]: '' });
                         }}
@@ -564,7 +614,11 @@ export function InboundPage() {
                 variant="outline"
                 disabled={removeDocument.isPending}
                 onClick={() => {
-                  if (!window.confirm('Excluir esta nota? As parcelas ligadas a ela também saem do pagar.')) {
+                  if (
+                    !window.confirm(
+                      'Excluir esta nota? As parcelas ligadas a ela também saem do pagar.',
+                    )
+                  ) {
                     return;
                   }
                   removeDocument.mutate();
@@ -587,8 +641,8 @@ export function InboundPage() {
           <DialogHeader>
             <DialogTitle>Novo item</DialogTitle>
             <DialogDescription>
-              Código de barras, descrição, NCM e CEST vieram da nota. Escolha a unidade de medida
-              para concluir o cadastro.
+              Código de barras, descrição, NCM e CEST vieram da nota. Escolha a unidade de
+              medida para concluir o cadastro.
             </DialogDescription>
           </DialogHeader>
           {newItem ? (
@@ -608,7 +662,9 @@ export function InboundPage() {
                     ? {
                         ...current,
                         lines: current.lines.map((line) =>
-                          line.lineNumber === lineNumber ? { ...line, itemId: item.id } : line,
+                          line.lineNumber === lineNumber
+                            ? { ...line, itemId: item.id }
+                            : line,
                         ),
                       }
                     : current,
