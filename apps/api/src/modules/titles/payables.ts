@@ -8,11 +8,12 @@ import {
   settlementPreviewSchema,
   titlePageSchema,
 } from '@erp-360/shared';
-import { and, asc, desc, eq, getTableColumns, gte, ilike, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, gte, ilike, lt, lte, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
+import { titleListStatus } from './listStatus.ts';
 import {
   previewSettlement,
   reverseSettlement,
@@ -65,7 +66,7 @@ const listPayablesQuery = z.object({
     ])
     .default('dueOn'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
-  status: z.enum(['pendente', 'pago', 'cancelado']).optional(),
+  status: z.enum(['pendente', 'pago', 'cancelado', 'atrasado']).optional(),
   busca: z.string().optional(),
   dueFrom: dateString.optional(),
   dueTo: dateString.optional(),
@@ -128,7 +129,13 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const offset = (page - 1) * limit;
       const conditions = [eq(payables.tenantId, tenantId)];
 
-      if (status) conditions.push(eq(payables.status, status));
+      const statusFilter = titleListStatus(status);
+      if (statusFilter) {
+        conditions.push(eq(payables.status, statusFilter.status));
+        if (statusFilter.dueBefore) {
+          conditions.push(lt(payables.dueOn, statusFilter.dueBefore));
+        }
+      }
       if (dueFrom) conditions.push(gte(payables.dueOn, dueFrom));
       if (dueTo) conditions.push(lte(payables.dueOn, dueTo));
       if (issueFrom) conditions.push(gte(payables.issueOn, issueFrom));

@@ -16,6 +16,7 @@ import {
   getTableColumns,
   gte,
   ilike,
+  lt,
   lte,
   or,
   sql,
@@ -24,6 +25,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
+import { titleListStatus } from './listStatus.ts';
 import { previewSettlement, reverseSettlement, settleTitle } from './settlement.ts';
 
 const dateString = z
@@ -94,7 +96,7 @@ const listReceivablesQuery = z.object({
     ])
     .default('dueOn'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
-  status: z.enum(['pendente', 'recebido', 'cancelado']).optional(),
+  status: z.enum(['pendente', 'recebido', 'cancelado', 'atrasado']).optional(),
   busca: z.string().optional(),
   dueFrom: dateString.optional(),
   dueTo: dateString.optional(),
@@ -170,7 +172,13 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const offset = (page - 1) * limit;
       const conditions = [eq(receivables.tenantId, tenantId)];
 
-      if (status) conditions.push(eq(receivables.status, status));
+      const statusFilter = titleListStatus(status);
+      if (statusFilter) {
+        conditions.push(eq(receivables.status, statusFilter.status));
+        if (statusFilter.dueBefore) {
+          conditions.push(lt(receivables.dueOn, statusFilter.dueBefore));
+        }
+      }
       if (dueFrom) conditions.push(gte(receivables.dueOn, dueFrom));
       if (dueTo) conditions.push(lte(receivables.dueOn, dueTo));
       if (issueFrom) conditions.push(gte(receivables.issueOn, issueFrom));

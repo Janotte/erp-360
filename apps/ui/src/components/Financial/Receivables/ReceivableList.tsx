@@ -244,6 +244,7 @@ export function ReceivableList() {
             <SelectContent>
               <SelectItem value="todos">Todos os status</SelectItem>
               <SelectItem value="pendente">Pendente</SelectItem>
+              <SelectItem value="atrasado">Atrasado</SelectItem>
               <SelectItem value="recebido">Recebido</SelectItem>
               <SelectItem value="cancelado">Cancelado</SelectItem>
             </SelectContent>
