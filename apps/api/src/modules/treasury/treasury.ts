@@ -11,20 +11,13 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
-import { listCashFlow } from '../titles/settlement.ts';
+import { loadCashFlow } from './cash-flow.ts';
 import { getOrCreateFinancialSettings } from './financial-settings.ts';
-import { createInvestmentEntry, deleteInvestmentEntry } from './investment-entry.ts';
 import { listIncomeStatement } from './income-statement.ts';
-import {
-  loadBankAccount,
-  syncBankOpening,
-  syncCashOpening,
-} from './opening-balance.ts';
+import { createInvestmentEntry, deleteInvestmentEntry } from './investment-entry.ts';
+import { loadBankAccount, syncBankOpening, syncCashOpening } from './opening-balance.ts';
 import { compareStatementNewestFirst } from './statement-order.ts';
-import {
-  createTreasuryTransfer,
-  reverseTreasuryTransfer,
-} from './treasury-transfer.ts';
+import { createTreasuryTransfer, reverseTreasuryTransfer } from './treasury-transfer.ts';
 
 const dateString = z
   .string()
@@ -166,12 +159,12 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (fastify) => {
     {
       schema: {
         querystring: z.object({
-          days: z.coerce.number().int().min(1).max(366).default(60),
+          days: z.coerce.number().int().min(1).max(366).default(61),
         }),
       },
     },
     async (request) => {
-      return listCashFlow(request.user.tenantId, request.query.days);
+      return loadCashFlow(request.user.tenantId, request.query.days);
     },
   );
 
@@ -291,7 +284,9 @@ export const treasuryRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const entries = await db
         .select()
         .from(bankEntries)
-        .where(and(eq(bankEntries.tenantId, tenantId), eq(bankEntries.bankAccountId, id)));
+        .where(
+          and(eq(bankEntries.tenantId, tenantId), eq(bankEntries.bankAccountId, id)),
+        );
       entries.sort(compareStatementNewestFirst);
       return { account, entries };
     },

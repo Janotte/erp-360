@@ -7,8 +7,7 @@ import {
   receivables,
   settlements,
 } from '@erp-360/mod-financial';
-import { civilDate } from '@erp-360/shared';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 import { db, type DbClient } from '../../db/index.ts';
 import { getOrCreateFinancialSettings } from '../treasury/financial-settings.ts';
@@ -207,7 +206,8 @@ export async function settleTitle(input: SettleInput) {
       .returning();
 
     const allocatesDifference =
-      (remainder > 0 && remainderMode === 'plan_account') || (extra > 0 && remainder <= 0);
+      (remainder > 0 && remainderMode === 'plan_account') ||
+      (extra > 0 && remainder <= 0);
     if (allocatesDifference && !title.planAccountId) {
       throw new SettlementError(
         400,
@@ -644,73 +644,4 @@ export async function recalcBankBalances(
     .update(bankAccounts)
     .set({ balance })
     .where(and(eq(bankAccounts.id, bankAccountId), eq(bankAccounts.tenantId, tenantId)));
-}
-
-export async function listCashFlow(tenantId: string, days = 60) {
-  const todayIso = civilDate();
-  const endIso = addDays(todayIso, days - 1);
-
-  const [cash] = await db
-    .select({ balance: cashEntries.balance })
-    .from(cashEntries)
-    .where(eq(cashEntries.tenantId, tenantId))
-    .orderBy(
-      desc(cashEntries.occurredOn),
-      asc(cashEntries.openingBalance),
-      desc(cashEntries.createdAt),
-      desc(cashEntries.description),
-      desc(cashEntries.id),
-    )
-    .limit(1);
-
-  const [banks] = await db
-    .select({
-      balance: sql<number>`coalesce(sum(${bankAccounts.balance}), 0)`,
-    })
-    .from(bankAccounts)
-    .where(and(eq(bankAccounts.tenantId, tenantId), eq(bankAccounts.kind, 'operating')));
-
-  const openingBalance = Number(cash?.balance ?? 0) + Number(banks?.balance ?? 0);
-
-  const pendingPayables = await db
-    .select({
-      id: payables.id,
-      description: payables.description,
-      dueOn: payables.dueOn,
-      installmentAmount: payables.installmentAmount,
-    })
-    .from(payables)
-    .where(and(eq(payables.tenantId, tenantId), eq(payables.status, 'pendente')));
-
-  const pendingReceivables = await db
-    .select({
-      id: receivables.id,
-      description: receivables.description,
-      dueOn: receivables.dueOn,
-      installmentAmount: receivables.installmentAmount,
-    })
-    .from(receivables)
-    .where(and(eq(receivables.tenantId, tenantId), eq(receivables.status, 'pendente')));
-
-  const series: Array<{
-    date: string;
-    inflows: number;
-    outflows: number;
-    balance: number;
-  }> = [];
-
-  let running = openingBalance;
-  for (let i = 0; i < days; i += 1) {
-    const date = addDays(todayIso, i);
-    const inflows = pendingReceivables
-      .filter((item) => (i === 0 ? item.dueOn <= todayIso : item.dueOn === date))
-      .reduce((sum, item) => sum + item.installmentAmount, 0);
-    const outflows = pendingPayables
-      .filter((item) => (i === 0 ? item.dueOn <= todayIso : item.dueOn === date))
-      .reduce((sum, item) => sum + item.installmentAmount, 0);
-    running += inflows - outflows;
-    series.push({ date, inflows, outflows, balance: running });
-  }
-
-  return { openingBalance, from: todayIso, to: endIso, days: series };
 }

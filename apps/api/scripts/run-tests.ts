@@ -24,6 +24,7 @@ const child = spawn(
     '--import',
     'tsx',
     '--test',
+    'test/cash-flow.test.ts',
     'test/certificate.test.ts',
     'test/inbound-cost.test.ts',
     'test/inbound-post.integration.test.ts',

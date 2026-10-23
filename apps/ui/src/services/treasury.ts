@@ -50,11 +50,38 @@ export interface FinancialSettings {
   cashOpeningAmount?: number;
 }
 
+export interface CashFlowMovement {
+  id: string;
+  documentNumber: string | null;
+  personName: string;
+  description: string;
+  amount: number;
+  phone: string | null;
+  bearerName: string | null;
+}
+
 export interface CashFlowDay {
   date: string;
+  weekday: number;
   inflows: number;
   outflows: number;
+  difference: number;
   balance: number;
+  receivables: CashFlowMovement[];
+  payables: CashFlowMovement[];
+}
+
+export interface CashFlowReport {
+  today: string;
+  from: string;
+  to: string;
+  cashBalance: number;
+  banks: { name: string; balance: number }[];
+  openingBalance: number;
+  overdueReceivables: CashFlowMovement[];
+  overduePayables: CashFlowMovement[];
+  days: CashFlowDay[];
+  totals: { inflows: number; outflows: number; difference: number };
 }
 
 export const treasuryService = {
@@ -90,11 +117,11 @@ export const treasuryService = {
     if (!parsed.success) throw new Error('Resposta da DRE inválida.');
     return parsed.data;
   },
-  cashFlow: async (): Promise<{ openingBalance: number; days: CashFlowDay[] }> => {
-    const res = await apiFetch(`/financial/cash-flow?days=60`);
+  cashFlow: async (): Promise<CashFlowReport> => {
+    const res = await apiFetch(`/financial/cash-flow?days=61`);
     const body = await parseJson(res);
     if (!res.ok) throw new Error(body.message || 'Falha ao carregar o fluxo de caixa.');
-    return body as { openingBalance: number; days: CashFlowDay[] };
+    return body as CashFlowReport;
   },
   bankAccounts: async (): Promise<BankAccount[]> => {
     const res = await apiFetch(`/financial/bank-accounts`);
@@ -200,7 +227,8 @@ export const treasuryService = {
       body: JSON.stringify(dados),
     });
     const body = await parseJson(res);
-    if (!res.ok) throw new Error(body.message || 'Falha ao lançar na conta de investimento.');
+    if (!res.ok)
+      throw new Error(body.message || 'Falha ao lançar na conta de investimento.');
     return body as TreasuryEntry;
   },
   deleteInvestmentEntry: async (id: string) => {
