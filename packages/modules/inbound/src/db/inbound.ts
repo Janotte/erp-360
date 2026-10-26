@@ -47,6 +47,21 @@ export const inboundStatusEnum = pgEnum('inbound_status', [
   'posted',
   'reversed',
   'ignored',
+  'discovered',
+]);
+
+export const recipientManifestationEnum = pgEnum('recipient_manifestation', [
+  'none',
+  'aware',
+  'confirmed',
+  'unaware',
+  'not_performed',
+]);
+
+export const nfeAuthorizationStatusEnum = pgEnum('nfe_authorization_status', [
+  'authorized',
+  'denied',
+  'cancelled',
 ]);
 
 export const stockDirectionEnum = pgEnum('stock_direction', ['in', 'out']);
@@ -160,6 +175,12 @@ export const inboundDocuments = pgTable(
     supplierName: varchar('supplier_name', { length: 120 }),
     natureId: uuid('nature_id'),
     hasProtocol: boolean('has_protocol').default(false).notNull(),
+    recipientManifestation: recipientManifestationEnum('recipient_manifestation')
+      .default('none')
+      .notNull(),
+    authorizationStatus: nfeAuthorizationStatusEnum('authorization_status')
+      .default('authorized')
+      .notNull(),
     totalAmount: integer('total_amount').notNull(),
     movesStock: boolean('moves_stock'),
     createsPayable: boolean('creates_payable'),
