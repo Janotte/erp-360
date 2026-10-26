@@ -93,4 +93,26 @@ describe('promoção do DF-e para a entrada', () => {
     assert.equal(row.status, 'pre_note');
     assert.equal(row.recipientManifestation, 'aware');
   });
+
+  it('não reautoriza a nota cancelada quando o XML não traz a situação', async () => {
+    const company = await createCompany('DF-e situação');
+    const cnpj = await tenantCnpj(company.tenantId);
+    const cancelled = `<resNFe><chNFe>${key}</chNFe><CNPJ>18371298000101</CNPJ><xNome>Fornecedor</xNome><dhEmi>2026-10-23T10:00:00-03:00</dhEmi><vNF>1358.10</vNF><cSitNFe>3</cSitNFe></resNFe>`;
+    const withoutSituation = `<resNFe><chNFe>${key}</chNFe><CNPJ>18371298000101</CNPJ><xNome>Fornecedor</xNome><dhEmi>2026-10-23T10:00:00-03:00</dhEmi><vNF>1358.10</vNF></resNFe>`;
+    await promoteDfeNotes(db, company.tenantId, 'homologation', cnpj, [
+      { kind: 'summary', accessKey: key, xml: cancelled },
+    ]);
+    await promoteDfeNotes(db, company.tenantId, 'homologation', cnpj, [
+      { kind: 'summary', accessKey: key, xml: withoutSituation },
+    ]);
+    const [row] = await db
+      .select({
+        status: inboundDocuments.status,
+        authorizationStatus: inboundDocuments.authorizationStatus,
+      })
+      .from(inboundDocuments)
+      .where(eq(inboundDocuments.tenantId, company.tenantId));
+    assert.equal(row.status, 'discovered');
+    assert.equal(row.authorizationStatus, 'cancelled');
+  });
 });

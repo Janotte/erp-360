@@ -10,6 +10,24 @@ import {
 } from './dfe-note.ts';
 
 type DfeNote = ReturnType<typeof readDfeNote>;
+type GroupedNote = { note: DfeNote; xml: string };
+
+const authorizationRank: Record<NfeAuthorizationStatus, number> = {
+  authorized: 0,
+  denied: 1,
+  cancelled: 2,
+};
+
+function statedAuthorization(items: GroupedNote[]) {
+  let best: NfeAuthorizationStatus | null = null;
+  for (const item of items) {
+    if (item.note.role !== 'nfe' || !/<cSitNFe>[123]<\/cSitNFe>/.test(item.xml)) continue;
+    if (best == null || authorizationRank[item.note.authorizationStatus] > authorizationRank[best]) {
+      best = item.note.authorizationStatus;
+    }
+  }
+  return best;
+}
 
 export async function promoteDfeNotes(
   client: DbClient,
@@ -18,12 +36,12 @@ export async function promoteDfeNotes(
   tenantCnpj: string,
   documents: { kind: string; accessKey: string | null; xml: string }[],
 ) {
-  const byKey = new Map<string, DfeNote[]>();
+  const byKey = new Map<string, GroupedNote[]>();
   for (const document of documents) {
     const note = readDfeNote(document.kind, document.xml);
     if (!note.accessKey || note.role === 'ignore') continue;
     const group = byKey.get(note.accessKey) ?? [];
-    group.push(note);
+    group.push({ note, xml: document.xml });
     byKey.set(note.accessKey, group);
   }
 
@@ -46,14 +64,16 @@ export async function promoteDfeNotes(
     for (const document of archived) {
       const note = readDfeNote(document.kind, document.xml);
       if (!note.accessKey || note.role !== 'event') continue;
-      byKey.get(note.accessKey)?.push(note);
+      byKey.get(note.accessKey)?.push({ note, xml: document.xml });
     }
   }
 
-  for (const [accessKey, notes] of byKey) {
+  for (const [accessKey, items] of byKey) {
+    const notes = items.map((item) => item.note);
     const nfes = notes.filter((note) => note.role === 'nfe');
     if (nfes.some((note) => note.emitterTaxId === tenantCnpj)) continue;
     const nfe = nfes.find((note) => note.issueOn) ?? nfes[0];
+    const authorization = statedAuthorization(items);
     const events = notes
       .filter((note) => note.role === 'event' && note.manifestation)
       .sort((left, right) => (left.eventAt ?? '').localeCompare(right.eventAt ?? ''));
@@ -85,7 +105,7 @@ export async function promoteDfeNotes(
         supplierName: nfe.emitterName?.slice(0, 120) ?? null,
         totalAmount: nfe.amount ?? 0,
         recipientManifestation: manifestation ?? 'none',
-        authorizationStatus: nfe.authorizationStatus,
+        authorizationStatus: authorization ?? 'authorized',
       });
       continue;
     }
@@ -98,7 +118,7 @@ export async function promoteDfeNotes(
     } = {};
     if (manifestation) patch.recipientManifestation = manifestation;
     if (existing.status === 'discovered' && nfe) {
-      patch.authorizationStatus = nfe.authorizationStatus;
+      if (authorization) patch.authorizationStatus = authorization;
       if (nfe.emitterName) patch.supplierName = nfe.emitterName.slice(0, 120);
       if (nfe.amount != null) patch.totalAmount = nfe.amount;
     }
