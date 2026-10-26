@@ -14,8 +14,8 @@ import {
   supplierItemLinks,
 } from '@erp-360/mod-inbound';
 import { persons } from '@erp-360/mod-persons';
-import { isValidCnpj, onlyDigits, toTitleCasePtBr } from '@erp-360/shared';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { escapeIlike, isValidCnpj, onlyDigits, toTitleCasePtBr } from '@erp-360/shared';
+import { and, asc, desc, eq, gte, ilike, like, lte, or } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -415,6 +415,90 @@ async function loadDocument(tenantId: string, documentId: string) {
   };
 }
 
+const inboundListQuery = z.object({
+  search: z.string().max(120).optional(),
+  issueFrom: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  issueTo: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  inboundFrom: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  inboundTo: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  status: z
+    .enum([
+      'pending',
+      'pre_note',
+      'divergent',
+      'posted',
+      'reversed',
+      'ignored',
+      'discovered',
+    ])
+    .optional(),
+});
+
+export async function listInboundDocuments(
+  tenantId: string,
+  query: z.infer<typeof inboundListQuery>,
+) {
+  const filters = [eq(inboundDocuments.tenantId, tenantId)];
+  if (query.status) filters.push(eq(inboundDocuments.status, query.status));
+  if (query.issueFrom) filters.push(gte(inboundDocuments.issueOn, query.issueFrom));
+  if (query.issueTo) filters.push(lte(inboundDocuments.issueOn, query.issueTo));
+  if (query.inboundFrom) filters.push(gte(inboundDocuments.inboundOn, query.inboundFrom));
+  if (query.inboundTo) filters.push(lte(inboundDocuments.inboundOn, query.inboundTo));
+
+  const search = query.search?.trim();
+  if (search) {
+    const pattern = `%${escapeIlike(search)}%`;
+    const matches = [
+      ilike(inboundDocuments.supplierName, pattern),
+      ilike(persons.name, pattern),
+    ];
+    const digits = onlyDigits(search);
+    if (digits) {
+      const digitPattern = `%${digits}%`;
+      matches.push(
+        like(inboundDocuments.number, digitPattern),
+        like(inboundDocuments.accessKey, digitPattern),
+      );
+    }
+    const match = or(...matches);
+    if (match) filters.push(match);
+  }
+
+  return db
+    .select({
+      id: inboundDocuments.id,
+      status: inboundDocuments.status,
+      number: inboundDocuments.number,
+      series: inboundDocuments.series,
+      issueOn: inboundDocuments.issueOn,
+      inboundOn: inboundDocuments.inboundOn,
+      supplierName: inboundDocuments.supplierName,
+      linkedSupplierName: persons.name,
+      totalAmount: inboundDocuments.totalAmount,
+      accessKey: inboundDocuments.accessKey,
+      natureName: operationNatures.name,
+      recipientManifestation: inboundDocuments.recipientManifestation,
+      authorizationStatus: inboundDocuments.authorizationStatus,
+    })
+    .from(inboundDocuments)
+    .leftJoin(persons, eq(persons.id, inboundDocuments.supplierId))
+    .leftJoin(operationNatures, eq(operationNatures.id, inboundDocuments.natureId))
+    .where(and(...filters))
+    .orderBy(desc(inboundDocuments.issueOn), desc(inboundDocuments.createdAt));
+}
+
 async function markSupplier(tenantId: string, supplierId: string) {
   await db
     .update(persons)
@@ -447,26 +531,10 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
       .orderBy(asc(operationNatures.name));
   });
 
-  fastify.get('/', async (request) => {
+  fastify.get('/', { schema: { querystring: inboundListQuery } }, async (request) => {
     const tenantId = request.user.tenantId;
     await ensureInboundSetup(tenantId);
-    return db
-      .select({
-        id: inboundDocuments.id,
-        status: inboundDocuments.status,
-        number: inboundDocuments.number,
-        series: inboundDocuments.series,
-        issueOn: inboundDocuments.issueOn,
-        inboundOn: inboundDocuments.inboundOn,
-        supplierName: inboundDocuments.supplierName,
-        linkedSupplierName: persons.name,
-        totalAmount: inboundDocuments.totalAmount,
-        accessKey: inboundDocuments.accessKey,
-      })
-      .from(inboundDocuments)
-      .leftJoin(persons, eq(persons.id, inboundDocuments.supplierId))
-      .where(eq(inboundDocuments.tenantId, tenantId))
-      .orderBy(desc(inboundDocuments.issueOn), desc(inboundDocuments.createdAt));
+    return listInboundDocuments(tenantId, request.query);
   });
 
   fastify.get('/:id', async (request, reply) => {

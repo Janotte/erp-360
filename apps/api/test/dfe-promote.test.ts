@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 
 import { db } from '../src/db/index.ts';
 import { promoteDfeNotes } from '../src/modules/inbound/dfe-promote.ts';
+import { listInboundDocuments } from '../src/modules/inbound/inbound.ts';
 import { createCompany } from './fixtures.ts';
 
 const key = '42261018371298000101550010000021161300002070';
@@ -114,5 +115,21 @@ describe('promoção do DF-e para a entrada', () => {
       .where(eq(inboundDocuments.tenantId, company.tenantId));
     assert.equal(row.status, 'discovered');
     assert.equal(row.authorizationStatus, 'cancelled');
+  });
+
+  it('encontra a nota pelo número, pela chave e pelo emitente', async () => {
+    const company = await createCompany('DF-e filtro');
+    const cnpj = await tenantCnpj(company.tenantId);
+    await promoteDfeNotes(db, company.tenantId, 'homologation', cnpj, [
+      { kind: 'summary', accessKey: key, xml: summary },
+    ]);
+    const byNumber = await listInboundDocuments(company.tenantId, { search: '2116' });
+    const byKey = await listInboundDocuments(company.tenantId, { search: key });
+    const byName = await listInboundDocuments(company.tenantId, { search: 'Fornecedor' });
+    const byStatus = await listInboundDocuments(company.tenantId, { status: 'posted' });
+    assert.equal(byNumber.length, 1);
+    assert.equal(byKey.length, 1);
+    assert.equal(byName[0]?.supplierName, 'Fornecedor');
+    assert.equal(byStatus.length, 0);
   });
 });
