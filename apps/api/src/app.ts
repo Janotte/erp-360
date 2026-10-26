@@ -21,6 +21,7 @@ import { certificateRoutes } from './modules/certificates/certificates.ts';
 import { dashboardRoutes } from './modules/dashboard/dashboard.ts';
 import { inboundRoutes } from './modules/inbound/inbound.ts';
 import { inboundMaintenanceRoutes } from './modules/inbound/maintenance.ts';
+import { nfeSettingsRoutes } from './modules/inbound/nfe-settings.ts';
 import { locationsRoutes } from './modules/persons/locations.ts';
 import { personsRoutes } from './modules/persons/persons.ts';
 import { financialCatalogRoutes } from './modules/plan-accounts/financial-catalogs.ts';
@@ -75,6 +76,7 @@ export function buildApp(options?: { logger?: boolean }) {
   fastify.register(financialCatalogRoutes, { prefix: '/financial' });
   fastify.register(treasuryRoutes, { prefix: '/financial' });
   fastify.register(emitterRoutes, { prefix: '/settings' });
+  fastify.register(nfeSettingsRoutes, { prefix: '/settings' });
   fastify.register(planAccountsRoutes, { prefix: '/plan-accounts' });
   fastify.register(categoryRoutes, { prefix: '/catalog/categories' });
   fastify.register(itemRoutes, { prefix: '/catalog/items' });

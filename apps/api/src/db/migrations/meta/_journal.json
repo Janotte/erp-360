@@ -288,6 +288,13 @@
       "when": 1792687024812,
       "tag": "0040_inbound_line_cest",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1793029804030,
+      "tag": "0041_nfe_settings",
+      "breakpoints": true
     }
   ]
 }
