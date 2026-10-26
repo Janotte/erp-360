@@ -6,7 +6,34 @@ export type InboundStatus =
   | 'divergent'
   | 'posted'
   | 'reversed'
-  | 'ignored';
+  | 'ignored'
+  | 'discovered';
+
+export type RecipientManifestation =
+  | 'none'
+  | 'aware'
+  | 'confirmed'
+  | 'unaware'
+  | 'not_performed';
+
+export type NfeAuthorizationStatus = 'authorized' | 'denied' | 'cancelled';
+
+export type DiscoveryAction =
+  | { kind: 'blocked'; message: string }
+  | { kind: 'import' | 'manifest' | 'download' | 'none' };
+
+export interface InboundListFilter {
+  search?: string;
+  issueFrom?: string;
+  issueTo?: string;
+  inboundFrom?: string;
+  inboundTo?: string;
+  status?: InboundStatus | '';
+}
+
+export type InboundDiscoveryResult =
+  | { outcome: 'imported' }
+  | { outcome: 'aware'; message: string };
 
 export interface InboundNature {
   id: string;
@@ -60,6 +87,9 @@ export interface InboundDocument {
   natureId: string | null;
   hasProtocol: boolean;
   totalAmount: number;
+  recipientManifestation: RecipientManifestation;
+  authorizationStatus: NfeAuthorizationStatus;
+  discoveryAction: DiscoveryAction;
   blockers: string[];
   lines: InboundLine[];
   installments: InboundInstallment[];
@@ -76,6 +106,9 @@ export interface InboundListItem {
   linkedSupplierName: string | null;
   totalAmount: number;
   accessKey: string | null;
+  natureName: string | null;
+  recipientManifestation: RecipientManifestation;
+  authorizationStatus: NfeAuthorizationStatus;
 }
 
 export interface InboundDraftLine {
@@ -119,13 +152,22 @@ export const inboundService = {
     const res = await apiFetch('/inbound/natures');
     return parse(res, 'Falha ao carregar naturezas.');
   },
-  list: async (): Promise<InboundListItem[]> => {
-    const res = await apiFetch('/inbound');
+  list: async (filter: InboundListFilter): Promise<InboundListItem[]> => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(filter)) {
+      if (value) params.set(key, value);
+    }
+    const query = params.size > 0 ? `?${params.toString()}` : '';
+    const res = await apiFetch(`/inbound${query}`);
     return parse(res, 'Falha ao carregar entradas.');
   },
   get: async (id: string): Promise<InboundDocument> => {
     const res = await apiFetch(`/inbound/${id}`);
     return parse(res, 'Falha ao carregar a nota.');
+  },
+  discover: async (id: string): Promise<InboundDiscoveryResult> => {
+    const res = await apiFetch(`/inbound/${id}/discover`, { method: 'POST' });
+    return parse(res, 'Falha ao consultar a NF-e.');
   },
   createManual: async (dados: InboundDraft): Promise<InboundDocument> => {
     const res = await apiFetch('/inbound/manual', {
@@ -175,4 +217,19 @@ export const inboundStatusLabel: Record<InboundStatus, string> = {
   posted: 'Lançada',
   reversed: 'Estornada',
   ignored: 'Ignorada',
+  discovered: 'Descoberta',
 };
+
+export const recipientManifestationLabel: Record<RecipientManifestation, string> = {
+  none: 'Sem manifesto',
+  aware: 'Ciente',
+  confirmed: 'Confirmada',
+  unaware: 'Desconhecida',
+  not_performed: 'Não realizada',
+};
+
+export const discoveryConfirm = {
+  import: 'Importar esta NF-e?',
+  manifest: 'Manifestar ciência desta NF-e e baixar o XML completo?',
+  download: 'Baixar o XML completo?',
+} as const;

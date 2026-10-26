@@ -4,6 +4,7 @@ import { catalogItems } from '@erp-360/mod-catalog';
 import { tenants } from '@erp-360/mod-core';
 import {
   cfopEntryRules,
+  dfeDocuments,
   inboundDocumentFiles,
   inboundDocumentInstallments,
   inboundDocumentLines,
@@ -23,6 +24,7 @@ import { postCertificate } from '../certificates/probe.ts';
 import { connectionTimeoutMs } from '../certificates/sefaz.ts';
 import { moneyToCents } from './cost.ts';
 import { discoverInboundDocument } from './dfe-discover.ts';
+import { discoveryAction } from './dfe-note.ts';
 import { certificateMaterial } from './dfe-sync.ts';
 import { InboundError } from './errors.ts';
 import { parseNfeXml } from './nfe.ts';
@@ -297,6 +299,23 @@ async function fillInstallmentsFromFile(tenantId: string, documentId: string) {
   }
 }
 
+async function hasCompleteXml(tenantId: string, accessKey: string) {
+  const settings = await getOrCreateNfeSettings(tenantId);
+  const [archived] = await db
+    .select({ id: dfeDocuments.id })
+    .from(dfeDocuments)
+    .where(
+      and(
+        eq(dfeDocuments.tenantId, tenantId),
+        eq(dfeDocuments.environment, settings.environment),
+        eq(dfeDocuments.accessKey, accessKey),
+        eq(dfeDocuments.kind, 'nfe'),
+      ),
+    )
+    .limit(1);
+  return Boolean(archived);
+}
+
 async function loadDocument(tenantId: string, documentId: string) {
   const [document] = await db
     .select({
@@ -314,6 +333,8 @@ async function loadDocument(tenantId: string, documentId: string) {
       natureId: inboundDocuments.natureId,
       hasProtocol: inboundDocuments.hasProtocol,
       totalAmount: inboundDocuments.totalAmount,
+      recipientManifestation: inboundDocuments.recipientManifestation,
+      authorizationStatus: inboundDocuments.authorizationStatus,
       supplierActive: persons.isActive,
       linkedSupplierName: persons.name,
       fiscalPurpose: operationNatures.fiscalPurpose,
@@ -410,12 +431,23 @@ async function loadDocument(tenantId: string, documentId: string) {
     }
   }
 
+  const completeXml =
+    document.status === 'discovered' && document.accessKey
+      ? await hasCompleteXml(tenantId, document.accessKey)
+      : false;
+
   return {
     ...document,
     supplierName: document.linkedSupplierName ?? document.supplierName,
     blockers,
     lines,
     installments,
+    discoveryAction: discoveryAction({
+      status: document.status,
+      authorizationStatus: document.authorizationStatus,
+      recipientManifestation: document.recipientManifestation,
+      hasCompleteXml: completeXml,
+    }),
   };
 }
 

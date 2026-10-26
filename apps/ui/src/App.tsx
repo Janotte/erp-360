@@ -26,7 +26,6 @@ import { IncomeStatementView } from './components/Financial/IncomeStatement/Inco
 import { PayableList } from './components/Financial/Payables/PayableList';
 import { ListPlanAccounts } from './components/Financial/PlanAccounts/ListPlanAccounts';
 import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
-import { DfePage } from './components/Inbound/DfePage';
 import { InboundPage } from './components/Inbound/InboundPage';
 import { InboundSetupPage } from './components/Inbound/Setup/InboundSetupPage';
 import { Navbar } from './components/Navbar';
@@ -49,7 +48,6 @@ const rotasPorHash: Record<string, string> = {
   '#cash-flow': '/cash-flow',
   '#income-statement': '/income-statement',
   '#inbound': '/inbound',
-  '#inbound-dfe': '/inbound/dfe',
   '#inbound-setup': '/inbound/setup',
   '#settings': '/settings',
 };
@@ -241,14 +239,6 @@ function App() {
               element={
                 <Pagina>
                   <InboundPage />
-                </Pagina>
-              }
-            />
-            <Route
-              path="/inbound/dfe"
-              element={
-                <Pagina>
-                  <DfePage />
                 </Pagina>
               }
             />

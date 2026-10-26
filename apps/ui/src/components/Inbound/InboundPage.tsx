@@ -23,11 +23,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { dfeService, type DfeSyncResult } from '@/services/dfe';
 import {
+  discoveryConfirm,
   type InboundDocument,
   type InboundDraft,
+  type InboundListFilter,
   inboundService,
   inboundStatusLabel,
+  recipientManifestationLabel,
 } from '@/services/inbound';
 import { itemsService } from '@/services/items';
 import { personsService } from '@/services/persons';
@@ -50,6 +54,31 @@ function barcodeForCatalog(value: string | null | undefined) {
 function cestForCatalog(value: string | null | undefined) {
   const digits = digitsOf(value);
   return /^[0-9]{7}$/.test(digits) ? digits : '';
+}
+
+const emptyFilter: InboundListFilter = {
+  search: '',
+  issueFrom: '',
+  issueTo: '',
+  inboundFrom: '',
+  inboundTo: '',
+  status: '',
+};
+
+function formatWhen(iso: string | null) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+}
+
+function syncMessage(result: DfeSyncResult) {
+  const until = formatWhen(result.blockedUntil);
+  if (until) return `A SEFAZ pediu espera. Próxima consulta depois de ${until}.`;
+  if (result.received === 0) return 'Nenhum documento novo.';
+  return result.received === 1
+    ? '1 documento recebido.'
+    : `${result.received} documentos recebidos.`;
 }
 
 function draftFrom(document: InboundDocument): InboundDraft {
@@ -85,6 +114,8 @@ function draftFrom(document: InboundDocument): InboundDraft {
 export function InboundPage() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filterDraft, setFilterDraft] = useState(emptyFilter);
+  const [filter, setFilter] = useState(emptyFilter);
   const [draft, setDraft] = useState<InboundDraft | null>(null);
   const [itemSearch, setItemSearch] = useState<Record<number, string>>({});
   const [supplierSearch, setSupplierSearch] = useState('');
@@ -98,8 +129,8 @@ export function InboundPage() {
     queryFn: inboundService.natures,
   });
   const list = useQuery({
-    queryKey: ['inbound', 'list'],
-    queryFn: inboundService.list,
+    queryKey: ['inbound', 'list', filter],
+    queryFn: () => inboundService.list(filter),
   });
   const detail = useQuery({
     queryKey: ['inbound', 'detail', selectedId],
@@ -108,7 +139,7 @@ export function InboundPage() {
   });
 
   useEffect(() => {
-    if (!detail.data) return;
+    if (!detail.data || detail.data.status === 'discovered') return;
     setDraft(draftFrom(detail.data));
   }, [detail.data]);
 
@@ -204,6 +235,55 @@ export function InboundPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const syncSefaz = useMutation({
+    mutationFn: () => dfeService.sync(),
+    onSuccess: async (result) => {
+      toast.success(syncMessage(result));
+      await queryClient.invalidateQueries({ queryKey: ['inbound', 'list'] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const discover = useMutation({
+    mutationFn: (id: string) => inboundService.discover(id),
+    onSuccess: async (result, id) => {
+      try {
+        if (result.outcome === 'imported') {
+          const updated = await inboundService.get(id);
+          await refresh(updated);
+          return;
+        }
+        toast.success(result.message);
+        await queryClient.invalidateQueries({ queryKey: ['inbound', 'list'] });
+        await queryClient.invalidateQueries({ queryKey: ['inbound', 'detail', id] });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Falha ao carregar a nota.');
+      }
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  async function confirmDiscovery(id: string) {
+    if (discover.isPending) return;
+    try {
+      const note = await queryClient.fetchQuery({
+        queryKey: ['inbound', 'detail', id],
+        queryFn: () => inboundService.get(id),
+      });
+      if (note.status !== 'discovered') return;
+      const action = note.discoveryAction;
+      if (action.kind === 'blocked') {
+        toast.error(action.message);
+        return;
+      }
+      if (action.kind === 'none') return;
+      if (!window.confirm(discoveryConfirm[action.kind])) return;
+      discover.mutate(id);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Falha ao carregar a nota.');
+    }
+  }
+
   const document = detail.data;
   const locked = document
     ? !['pre_note', 'divergent', 'pending'].includes(document.status)
@@ -264,6 +344,13 @@ export function InboundPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            type="button"
+            onClick={() => syncSefaz.mutate()}
+            disabled={syncSefaz.isPending}
+          >
+            Buscar na SEFAZ
+          </Button>
           <Button type="button" variant="outline" onClick={() => createManual.mutate()}>
             Nova manual
           </Button>
@@ -290,14 +377,108 @@ export function InboundPage() {
         </div>
       </div>
 
+      <form
+        className="grid items-end gap-3 rounded-lg border bg-white p-4 sm:grid-cols-2 lg:grid-cols-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setFilter({ ...filterDraft, search: filterDraft.search?.trim() ?? '' });
+        }}
+      >
+        <div className="space-y-1 sm:col-span-2 lg:col-span-4">
+          <Label htmlFor="inbound-search">Busca</Label>
+          <Input
+            id="inbound-search"
+            value={filterDraft.search ?? ''}
+            placeholder="Número, chave ou emitente"
+            onChange={(event) =>
+              setFilterDraft({ ...filterDraft, search: event.target.value })
+            }
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="inbound-issue-from">Emissão de</Label>
+          <Input
+            id="inbound-issue-from"
+            type="date"
+            value={filterDraft.issueFrom ?? ''}
+            onChange={(event) =>
+              setFilterDraft({ ...filterDraft, issueFrom: event.target.value })
+            }
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="inbound-issue-to">Emissão até</Label>
+          <Input
+            id="inbound-issue-to"
+            type="date"
+            value={filterDraft.issueTo ?? ''}
+            onChange={(event) =>
+              setFilterDraft({ ...filterDraft, issueTo: event.target.value })
+            }
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="inbound-inbound-from">Entrada de</Label>
+          <Input
+            id="inbound-inbound-from"
+            type="date"
+            value={filterDraft.inboundFrom ?? ''}
+            onChange={(event) =>
+              setFilterDraft({ ...filterDraft, inboundFrom: event.target.value })
+            }
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="inbound-inbound-to">Entrada até</Label>
+          <Input
+            id="inbound-inbound-to"
+            type="date"
+            value={filterDraft.inboundTo ?? ''}
+            onChange={(event) =>
+              setFilterDraft({ ...filterDraft, inboundTo: event.target.value })
+            }
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="inbound-status">Situação</Label>
+          <select
+            id="inbound-status"
+            className="flex h-9 w-full rounded-md border px-3 text-sm"
+            value={filterDraft.status ?? ''}
+            onChange={(event) =>
+              setFilterDraft({
+                ...filterDraft,
+                status: event.target.value as InboundListFilter['status'],
+              })
+            }
+          >
+            <option value="">Todas</option>
+            {(Object.keys(inboundStatusLabel) as (keyof typeof inboundStatusLabel)[]).map(
+              (status) => (
+                <option key={status} value={status}>
+                  {inboundStatusLabel[status]}
+                </option>
+              ),
+            )}
+          </select>
+        </div>
+        <div>
+          <Button type="submit" variant="outline">
+            Filtrar
+          </Button>
+        </div>
+      </form>
+
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Número</TableHead>
-            <TableHead>Fornecedor</TableHead>
+            <TableHead>Emitente</TableHead>
             <TableHead>Emissão</TableHead>
             <TableHead>Entrada</TableHead>
             <TableHead>Valor</TableHead>
+            <TableHead>Natureza</TableHead>
+            <TableHead>Manifesto do destinatário</TableHead>
             <TableHead>Situação</TableHead>
           </TableRow>
         </TableHeader>
@@ -307,6 +488,9 @@ export function InboundPage() {
               key={row.id}
               className="cursor-pointer"
               onClick={() => setSelectedId(row.id)}
+              onDoubleClick={() => {
+                if (row.status === 'discovered') void confirmDiscovery(row.id);
+              }}
             >
               <TableCell>
                 {row.number}/{row.series}
@@ -315,13 +499,59 @@ export function InboundPage() {
               <TableCell>{formatRawDate(row.issueOn)}</TableCell>
               <TableCell>{row.inboundOn ? formatRawDate(row.inboundOn) : '—'}</TableCell>
               <TableCell>{formatCurrency(row.totalAmount)}</TableCell>
+              <TableCell>{row.natureName || '—'}</TableCell>
+              <TableCell>
+                {recipientManifestationLabel[row.recipientManifestation]}
+              </TableCell>
               <TableCell>{inboundStatusLabel[row.status]}</TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
 
-      {document && draft ? (
+      {document?.status === 'discovered' ? (
+        <section className="space-y-4 rounded-lg border bg-white p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="text-lg font-bold text-zinc-900">
+              Nota {document.number}/{document.series}
+            </h3>
+            <span className="text-sm text-zinc-500">
+              {inboundStatusLabel[document.status]}
+            </span>
+          </div>
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1 sm:col-span-2">
+              <dt className="text-sm text-zinc-500">Chave</dt>
+              <dd className="break-all font-mono text-sm text-zinc-800">
+                {document.accessKey || '—'}
+              </dd>
+            </div>
+            <div className="space-y-1">
+              <dt className="text-sm text-zinc-500">Emitente</dt>
+              <dd className="text-sm text-zinc-800">{document.supplierName || '—'}</dd>
+            </div>
+            <div className="space-y-1">
+              <dt className="text-sm text-zinc-500">Emissão</dt>
+              <dd className="text-sm text-zinc-800">{formatRawDate(document.issueOn)}</dd>
+            </div>
+            <div className="space-y-1">
+              <dt className="text-sm text-zinc-500">Valor</dt>
+              <dd className="text-sm text-zinc-800">
+                {formatCurrency(document.totalAmount)}
+              </dd>
+            </div>
+            <div className="space-y-1">
+              <dt className="text-sm text-zinc-500">Manifesto do destinatário</dt>
+              <dd className="text-sm text-zinc-800">
+                {recipientManifestationLabel[document.recipientManifestation]}
+              </dd>
+            </div>
+          </dl>
+          {document.discoveryAction.kind === 'blocked' ? (
+            <p className="text-sm text-rose-700">{document.discoveryAction.message}</p>
+          ) : null}
+        </section>
+      ) : document && draft ? (
         <form
           className="space-y-4 rounded-lg border bg-white p-4"
           onSubmit={(event) => {

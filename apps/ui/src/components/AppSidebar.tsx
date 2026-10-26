@@ -5,7 +5,6 @@ import {
   Box,
   ChevronRight,
   CreditCard,
-  FileSearch,
   FileText,
   FolderTree,
   Landmark,
@@ -80,7 +79,6 @@ const itensMenu: ItemMenu[] = [
     icon: PackagePlus,
     filhos: [
       { title: 'Notas', icon: PackagePlus, url: '/inbound' },
-      { title: 'DF-e', icon: FileSearch, url: '/inbound/dfe' },
       { title: 'Naturezas e CFOP', icon: ArrowLeftRight, url: '/inbound/setup' },
     ],
   },
