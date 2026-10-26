@@ -9,6 +9,7 @@ import { db } from '../src/db/index.ts';
 import {
   collectDfePages,
   dfeBlockedUntil,
+  listDfeDocuments,
   runDfeSync,
   syncTenantDfe,
 } from '../src/modules/inbound/dfe-sync.ts';
@@ -186,6 +187,40 @@ describe('gravação da busca de DF-e', () => {
       .from(dfeCursors)
       .where(eq(dfeCursors.tenantId, company.tenantId));
     assert.equal(cursor.ultNsu, '000000000000001');
+  });
+
+  it('lista o que chegou e encontra pela chave ou pelo NSU', async () => {
+    const company = await createCompany('DF-e lista');
+    const key = '42261018371298000101550010000021161300002070';
+    await runDfeSync({
+      tenantId: company.tenantId,
+      environment: 'homologation',
+      cnpj,
+      cUF: '42',
+      query: { kind: 'cursor' },
+      now,
+      fetch: async () =>
+        soap(
+          '000000000000001',
+          '000000000000001',
+          '138',
+          `<resNFe><chNFe>${key}</chNFe><xNome>Fornecedor</xNome><vNF>1358.10</vNF></resNFe>`,
+        ),
+    });
+
+    const listed = await listDfeDocuments(company.tenantId);
+    assert.equal(listed.environment, 'homologation');
+    assert.equal(listed.cursor.ultNsu, '000000000000001');
+    assert.equal(listed.documents.length, 1);
+    assert.equal(listed.documents[0]?.kind, 'summary');
+    assert.equal(listed.documents[0]?.partyName, 'Fornecedor');
+    assert.equal(listed.documents[0]?.amount, 135810);
+    assert.equal((await listDfeDocuments(company.tenantId, '2116')).documents.length, 1);
+    assert.equal(
+      (await listDfeDocuments(company.tenantId, '000000000000001')).documents[0]?.accessKey,
+      key,
+    );
+    assert.equal((await listDfeDocuments(company.tenantId, '9999')).documents.length, 0);
   });
 
   it('exige o certificado do ambiente antes de consultar a SEFAZ', async () => {

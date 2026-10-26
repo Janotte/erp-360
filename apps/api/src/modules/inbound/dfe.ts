@@ -18,6 +18,18 @@ export type DfeQuery =
   | { kind: 'nsu'; nsu: string }
   | { kind: 'accessKey'; accessKey: string };
 
+export function describeDfeDocument(xml: string) {
+  const partyName = xml.match(/<xNome>([^<]*)<\/xNome>/)?.[1]?.trim() || null;
+  const amountText = xml.match(/<vNF>([^<]*)<\/vNF>/)?.[1];
+  const parsedAmount = amountText == null ? Number.NaN : Number(amountText);
+  const eventType = xml.match(/<tpEvento>([^<]*)<\/tpEvento>/)?.[1]?.trim() || null;
+  return {
+    partyName,
+    amount: Number.isFinite(parsedAmount) ? Math.round(parsedAmount * 100) : null,
+    eventType,
+  };
+}
+
 export function dfeDistributionUrl(environment: CertificateEnvironment) {
   return urls[environment];
 }

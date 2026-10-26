@@ -1,9 +1,10 @@
 import '../../types/fastify.ts';
 
 import { tenantCertificates, tenants } from '@erp-360/mod-core';
+import { dfeDocuments } from '@erp-360/mod-inbound';
 import { cities, states } from '@erp-360/mod-persons';
 import type { CertificateEnvironment } from '@erp-360/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, like, or } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -14,6 +15,7 @@ import { readPfxMaterial } from '../certificates/pfx.ts';
 import { postCertificate } from '../certificates/probe.ts';
 import { connectionTimeoutMs, stateCode } from '../certificates/sefaz.ts';
 import {
+  describeDfeDocument,
   type DfeDistribution,
   dfeDistributionRequest,
   type DfeQuery,
@@ -286,8 +288,65 @@ const lookupBody = z
     },
   );
 
+export async function listDfeDocuments(tenantId: string, search = '') {
+  const settings = await getOrCreateNfeSettings(tenantId);
+  const cursor = await getOrCreateDfeCursor(tenantId, settings.environment);
+  const digits = search.replace(/\D/g, '').slice(0, 44);
+  const filters = [
+    eq(dfeDocuments.tenantId, tenantId),
+    eq(dfeDocuments.environment, settings.environment),
+  ];
+  const match = digits
+    ? or(like(dfeDocuments.nsu, `%${digits}%`), like(dfeDocuments.accessKey, `%${digits}%`))
+    : undefined;
+  if (match) filters.push(match);
+  const rows = await db
+    .select({
+      id: dfeDocuments.id,
+      nsu: dfeDocuments.nsu,
+      kind: dfeDocuments.kind,
+      accessKey: dfeDocuments.accessKey,
+      xml: dfeDocuments.xml,
+      createdAt: dfeDocuments.createdAt,
+    })
+    .from(dfeDocuments)
+    .where(and(...filters))
+    .orderBy(desc(dfeDocuments.nsu))
+    .limit(200);
+
+  return {
+    environment: settings.environment,
+    cursor: {
+      ultNsu: cursor.ultNsu,
+      maxNsu: cursor.maxNsu,
+      lastStatus: cursor.lastStatus,
+      queriedAt: cursor.queriedAt?.toISOString() ?? null,
+    },
+    documents: rows.map((row) => ({
+      id: row.id,
+      nsu: row.nsu,
+      kind: row.kind,
+      accessKey: row.accessKey,
+      ...describeDfeDocument(row.xml),
+      receivedAt: row.createdAt.toISOString(),
+    })),
+  };
+}
+
 export const dfeSyncRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
+
+  fastify.get(
+    '/dfe',
+    {
+      schema: {
+        querystring: z.object({
+          search: z.string().max(44).optional(),
+        }),
+      },
+    },
+    async (request) => listDfeDocuments(request.user.tenantId, request.query.search ?? ''),
+  );
 
   fastify.post('/dfe/sync', async (request) => {
     return syncTenantDfe(request.user.tenantId, { kind: 'cursor' });

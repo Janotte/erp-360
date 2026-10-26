@@ -3,12 +3,29 @@ import { describe, it } from 'node:test';
 import { gzipSync } from 'node:zlib';
 
 import {
+  describeDfeDocument,
   dfeDistributionRequest,
   dfeDistributionUrl,
   parseDfeDistribution,
 } from '../src/modules/inbound/dfe.ts';
 
 const cnpj = '18371298000101';
+
+describe('resumo do documento de DF-e', () => {
+  it('lê o nome, o valor e o tipo do evento', () => {
+    assert.deepEqual(
+      describeDfeDocument(
+        '<resNFe><xNome>Fornecedor</xNome><vNF>1358.10</vNF></resNFe>',
+      ),
+      { partyName: 'Fornecedor', amount: 135810, eventType: null },
+    );
+    assert.equal(
+      describeDfeDocument('<procEventoNFe><tpEvento>210210</tpEvento></procEventoNFe>')
+        .eventType,
+      '210210',
+    );
+  });
+});
 
 describe('pedido da distribuição de DF-e', () => {
   it('monta a consulta pelo último NSU em SOAP 1.2', () => {
