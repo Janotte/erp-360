@@ -172,7 +172,7 @@ export async function runDfeSync(input: {
   };
 }
 
-async function emitterStateCode(tenantId: string) {
+export async function emitterStateCode(tenantId: string) {
   const [row] = await db
     .select({ abbreviation: states.abbreviation, cnpj: tenants.cnpj })
     .from(tenants)
@@ -186,7 +186,7 @@ async function emitterStateCode(tenantId: string) {
   };
 }
 
-async function certificateMaterial(
+export async function certificateMaterial(
   tenantId: string,
   environment: CertificateEnvironment,
 ) {

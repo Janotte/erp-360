@@ -1,7 +1,5 @@
 import '../../types/fastify.ts';
 
-import { createHash } from 'node:crypto';
-
 import { catalogItems } from '@erp-360/mod-catalog';
 import { tenants } from '@erp-360/mod-core';
 import {
@@ -21,9 +19,15 @@ import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
 import { uniqueViolation } from '../../lib/postgres-errors.ts';
+import { postCertificate } from '../certificates/probe.ts';
+import { connectionTimeoutMs } from '../certificates/sefaz.ts';
 import { moneyToCents } from './cost.ts';
+import { discoverInboundDocument } from './dfe-discover.ts';
+import { certificateMaterial } from './dfe-sync.ts';
 import { InboundError } from './errors.ts';
 import { parseNfeXml } from './nfe.ts';
+import { getOrCreateNfeSettings } from './nfe-settings.ts';
+import { persistParsedNfe } from './persist-nfe.ts';
 import {
   deleteInboundDocument,
   postInboundDocument,
@@ -646,104 +650,18 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
         );
       }
 
-      const [supplier] = await db
-        .select({ id: persons.id, name: persons.name })
-        .from(persons)
-        .where(
-          and(eq(persons.tenantId, tenantId), eq(persons.taxId, parsed.supplierTaxId)),
-        )
-        .limit(1);
-
       const content = Buffer.from(request.body.xml, 'utf8');
-      const created = await db.transaction(async (tx) => {
-        const [document] = await tx
-          .insert(inboundDocuments)
-          .values({
-            tenantId,
-            status: parsed.hasProtocol ? 'pre_note' : 'divergent',
-            model: '55',
-            accessKey: parsed.accessKey,
-            number: parsed.number || '0',
-            series: parsed.series || '0',
-            issueOn: parsed.issueOn,
-            supplierId: supplier?.id ?? null,
-            supplierTaxId: parsed.supplierTaxId,
-            supplierName: parsed.supplierName,
-            hasProtocol: parsed.hasProtocol,
-            totalAmount: parsed.totalAmount,
-          })
-          .returning({ id: inboundDocuments.id });
-
-        await tx.insert(inboundDocumentFiles).values({
+      const created = await db.transaction((tx) =>
+        persistParsedNfe(
+          tx,
           tenantId,
-          documentId: document.id,
+          parsed,
           content,
-          sha256: createHash('sha256').update(content).digest('hex'),
-          fileName: request.body.fileName?.slice(0, 255) || 'nfe.xml',
-        });
+          request.body.fileName?.slice(0, 255) || 'nfe.xml',
+        ),
+      );
 
-        for (const line of parsed.lines) {
-          let itemId: string | null = null;
-          let factor = '1.000000';
-          if (supplier) {
-            const [link] = await tx
-              .select({
-                itemId: supplierItemLinks.itemId,
-                factor: supplierItemLinks.factor,
-              })
-              .from(supplierItemLinks)
-              .where(
-                and(
-                  eq(supplierItemLinks.tenantId, tenantId),
-                  eq(supplierItemLinks.supplierId, supplier.id),
-                  eq(supplierItemLinks.supplierCode, line.supplierCode),
-                ),
-              )
-              .limit(1);
-            if (link) {
-              itemId = link.itemId;
-              factor = link.factor;
-            }
-          }
-          if (!itemId && line.barcode) {
-            const [item] = await tx
-              .select({ id: catalogItems.id })
-              .from(catalogItems)
-              .where(
-                and(
-                  eq(catalogItems.tenantId, tenantId),
-                  eq(catalogItems.barcode, line.barcode),
-                ),
-              )
-              .limit(1);
-            if (item) itemId = item.id;
-          }
-          const entryCfop = ['1', '2', '3'].includes(line.xmlCfop[0])
-            ? line.xmlCfop
-            : null;
-          await tx.insert(inboundDocumentLines).values({
-            tenantId,
-            documentId: document.id,
-            ...line,
-            factor,
-            itemId,
-            entryCfop,
-          });
-        }
-
-        if (parsed.installments.length > 0) {
-          await tx.insert(inboundDocumentInstallments).values(
-            parsed.installments.map((installment) => ({
-              tenantId,
-              documentId: document.id,
-              ...installment,
-            })),
-          );
-        }
-        return document;
-      });
-
-      if (supplier) await markSupplier(tenantId, supplier.id);
+      if (created.supplierId) await markSupplier(tenantId, created.supplierId);
       return reply.status(201).send(await loadDocument(tenantId, created.id));
     },
   );
@@ -917,6 +835,37 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
       .where(eq(inboundDocuments.id, id));
     await alignDraft(tenantId, id, null);
     return loadDocument(tenantId, id);
+  });
+
+  fastify.post('/:id/discover', async (request) => {
+    const tenantId = request.user.tenantId;
+    const id = z
+      .string()
+      .uuid()
+      .parse((request.params as { id: string }).id);
+    return discoverInboundDocument(tenantId, id, async (payload) => {
+      const settings = await getOrCreateNfeSettings(tenantId);
+      const material = await certificateMaterial(tenantId, settings.environment);
+      let response: { statusCode: number | null; body: string };
+      try {
+        response = await postCertificate({
+          endpoint: payload.endpoint,
+          body: payload.body,
+          headers: payload.headers,
+          timeoutMs: connectionTimeoutMs,
+          certificatePem: material.certificatePem,
+          privateKeyPem: material.privateKeyPem,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Falha ao consultar a SEFAZ.';
+        throw new InboundError(502, message);
+      }
+      if (response.statusCode === null || response.statusCode >= 400) {
+        throw new InboundError(502, 'A SEFAZ não respondeu a consulta de DF-e.');
+      }
+      return response.body;
+    });
   });
 
   fastify.post('/:id/post', async (request) => {
