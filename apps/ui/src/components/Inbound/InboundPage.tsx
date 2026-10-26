@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { FormItem } from '@/components/Catalog/Items/FormItem';
+import { InboundNoteMenu } from '@/components/Inbound/InboundNoteMenu';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -41,6 +42,7 @@ import {
   type InboundDocument,
   type InboundDraft,
   type InboundListFilter,
+  type InboundListItem,
   inboundService,
   type InboundStatus,
   inboundStatusLabel,
@@ -132,6 +134,11 @@ export function InboundPage() {
   const [linkedItems, setLinkedItems] = useState<
     Record<number, { id: string; code: string; name: string }>
   >({});
+  const [noteMenu, setNoteMenu] = useState<{
+    row: InboundListItem;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const natures = useQuery({
     queryKey: ['inbound', 'natures'],
@@ -363,7 +370,8 @@ export function InboundPage() {
           <h2 className="text-2xl font-bold text-zinc-900">Entradas</h2>
           <p className="text-sm text-zinc-500">
             NF-e modelo 55 e lançamento manual. A data da última entrada do item é gravada
-            no lançamento.
+            no lançamento. O botão direito na linha abre o DANFE, a manifestação e os
+            eventos.
           </p>
         </div>
         <div className="flex gap-2">
@@ -491,6 +499,10 @@ export function InboundPage() {
               onClick={() => setSelectedId(row.id)}
               onDoubleClick={() => {
                 if (row.status === 'discovered') void confirmDiscovery(row.id);
+              }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setNoteMenu({ row, x: event.clientX, y: event.clientY });
               }}
             >
               <TableCell>
@@ -911,6 +923,14 @@ export function InboundPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+      <InboundNoteMenu
+        cursor={noteMenu}
+        onClose={() => setNoteMenu(null)}
+        onManifested={() => {
+          void queryClient.invalidateQueries({ queryKey: ['inbound', 'list'] });
+          void queryClient.invalidateQueries({ queryKey: ['inbound', 'detail'] });
+        }}
+      />
     </div>
   );
 }

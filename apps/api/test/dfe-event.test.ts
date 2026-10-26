@@ -8,6 +8,8 @@ import {
   awarenessEventRequest,
   nfeEventTimestamp,
   parseAwarenessEvent,
+  recipientEventRequest,
+  recipientManifestDocument,
 } from '../src/modules/inbound/dfe-event.ts';
 
 const key = '42261018371298000101550010000021161300002070';
@@ -81,5 +83,48 @@ describe('ciência da operação', () => {
     );
     assert.equal(refused.accepted, false);
     assert.equal(refused.reason, 'Rejeicao');
+  });
+
+  it('assina confirmação, desconhecimento e operação não realizada', () => {
+    const keys = material();
+    const base = {
+      environment: 'production' as const,
+      cnpj: '18371298000101',
+      accessKey: key,
+      at: '2026-10-26T14:00:00-03:00',
+      privateKeyPem: keys.privateKeyPem,
+      certificatePem: keys.certificatePem,
+    };
+    const confirmed = recipientEventRequest({ ...base, kind: 'confirmed' });
+    assert.match(confirmed.body, /<tpEvento>210200<\/tpEvento>/);
+    assert.match(confirmed.body, /<descEvento>Confirmacao da Operacao<\/descEvento>/);
+    assert.equal(confirmed.body.includes('<xJust>'), false);
+    assert.equal(confirmed.endpoint.includes('www1.nfe.fazenda.gov.br'), true);
+    const unaware = recipientEventRequest({ ...base, kind: 'unaware' });
+    assert.match(unaware.body, /<tpEvento>210220<\/tpEvento>/);
+    assert.match(unaware.body, new RegExp(`Id="ID210220${key}01"`));
+    assert.throws(
+      () =>
+        recipientEventRequest({ ...base, kind: 'not_performed', justification: 'curta' }),
+      /justificativa/,
+    );
+    const skipped = recipientEventRequest({
+      ...base,
+      kind: 'not_performed',
+      justification: 'Mercadoria não entregue & recusada',
+    });
+    assert.match(skipped.body, /<tpEvento>210240<\/tpEvento>/);
+    assert.match(skipped.body, /<descEvento>Operacao nao Realizada<\/descEvento>/);
+    assert.match(skipped.body, /<xJust>Mercadoria não entregue &amp; recusada<\/xJust>/);
+  });
+
+  it('guarda o evento assinado junto com o retorno da SEFAZ', () => {
+    const request = `<envEvento><evento versao="1.00"><infEvento><tpEvento>210210</tpEvento></infEvento></evento></envEvento>`;
+    const response =
+      '<retEnvEvento><retEvento versao="1.00"><infEvento><cStat>135</cStat><nProt>999</nProt></infEvento></retEvento></retEnvEvento>';
+    const xml = recipientManifestDocument(request, response);
+    assert.match(xml, /^<procEventoNFe /);
+    assert.match(xml, /<tpEvento>210210<\/tpEvento>/);
+    assert.match(xml, /<nProt>999<\/nProt>/);
   });
 });

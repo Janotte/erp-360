@@ -14,7 +14,7 @@ import {
 } from '@erp-360/mod-inbound';
 import { persons } from '@erp-360/mod-persons';
 import { escapeIlike, isValidCnpj, onlyDigits, toTitleCasePtBr } from '@erp-360/shared';
-import { and, asc, desc, eq, gte, ilike, like, lte, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, like, lte, ne, or } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -24,6 +24,13 @@ import { postCertificate } from '../certificates/probe.ts';
 import { connectionTimeoutMs } from '../certificates/sefaz.ts';
 import { moneyToCents } from './cost.ts';
 import { discoverInboundDocument } from './dfe-discover.ts';
+import {
+  listInboundEvents,
+  loadInboundDanfe,
+  loadManifestationXml,
+  manifestationFileName,
+  manifestInboundDocument,
+} from './dfe-manifest.ts';
 import { discoveryAction } from './dfe-note.ts';
 import { certificateMaterial } from './dfe-sync.ts';
 import { InboundError } from './errors.ts';
@@ -76,6 +83,11 @@ const installmentInput = z.object({
   number: z.string().trim().min(1).max(3),
   dueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   amount: z.number().int().positive(),
+});
+
+const manifestBody = z.object({
+  kind: z.enum(['aware', 'confirmed', 'unaware', 'not_performed']),
+  justification: z.string().trim().max(255).optional(),
 });
 
 const draftBody = z.object({
@@ -205,6 +217,7 @@ async function fillCestFromFile(
       and(
         eq(inboundDocumentFiles.documentId, documentId),
         eq(inboundDocumentFiles.tenantId, tenantId),
+        ne(inboundDocumentFiles.fileName, manifestationFileName),
       ),
     )
     .limit(1);
@@ -246,6 +259,7 @@ async function fillInstallmentsFromFile(tenantId: string, documentId: string) {
       and(
         eq(inboundDocumentFiles.documentId, documentId),
         eq(inboundDocumentFiles.tenantId, tenantId),
+        ne(inboundDocumentFiles.fileName, manifestationFileName),
       ),
     )
     .limit(1);
@@ -540,6 +554,40 @@ async function markSupplier(tenantId: string, supplierId: string) {
     .update(persons)
     .set({ isSupplier: true })
     .where(and(eq(persons.id, supplierId), eq(persons.tenantId, tenantId)));
+}
+
+async function sefazPost(
+  tenantId: string,
+  payload: { endpoint: string; body: string; headers: Record<string, string> },
+) {
+  const settings = await getOrCreateNfeSettings(tenantId);
+  const material = await certificateMaterial(tenantId, settings.environment);
+  let response: { statusCode: number | null; body: string };
+  try {
+    response = await postCertificate({
+      endpoint: payload.endpoint,
+      body: payload.body,
+      headers: payload.headers,
+      timeoutMs: connectionTimeoutMs,
+      certificatePem: material.certificatePem,
+      privateKeyPem: material.privateKeyPem,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Falha ao consultar a SEFAZ.';
+    throw new InboundError(502, message);
+  }
+  if (response.statusCode === null || response.statusCode >= 400) {
+    throw new InboundError(502, 'A SEFAZ não respondeu a consulta de DF-e.');
+  }
+  return response.body;
+}
+
+function documentId(params: unknown) {
+  return z
+    .string()
+    .uuid()
+    .parse((params as { id: string }).id);
 }
 
 export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
@@ -871,33 +919,37 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
   fastify.post('/:id/discover', async (request) => {
     const tenantId = request.user.tenantId;
-    const id = z
-      .string()
-      .uuid()
-      .parse((request.params as { id: string }).id);
-    return discoverInboundDocument(tenantId, id, async (payload) => {
-      const settings = await getOrCreateNfeSettings(tenantId);
-      const material = await certificateMaterial(tenantId, settings.environment);
-      let response: { statusCode: number | null; body: string };
-      try {
-        response = await postCertificate({
-          endpoint: payload.endpoint,
-          body: payload.body,
-          headers: payload.headers,
-          timeoutMs: connectionTimeoutMs,
-          certificatePem: material.certificatePem,
-          privateKeyPem: material.privateKeyPem,
-        });
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Falha ao consultar a SEFAZ.';
-        throw new InboundError(502, message);
-      }
-      if (response.statusCode === null || response.statusCode >= 400) {
-        throw new InboundError(502, 'A SEFAZ não respondeu a consulta de DF-e.');
-      }
-      return response.body;
-    });
+    const id = documentId(request.params);
+    return discoverInboundDocument(tenantId, id, (payload) =>
+      sefazPost(tenantId, payload),
+    );
+  });
+
+  fastify.get('/:id/events', async (request) => {
+    const tenantId = request.user.tenantId;
+    const events = await listInboundEvents(tenantId, documentId(request.params));
+    return { events };
+  });
+
+  fastify.get('/:id/manifestation', async (request) => {
+    const tenantId = request.user.tenantId;
+    const xml = await loadManifestationXml(tenantId, documentId(request.params));
+    return { xml };
+  });
+
+  fastify.get('/:id/danfe', async (request) => {
+    const tenantId = request.user.tenantId;
+    return loadInboundDanfe(tenantId, documentId(request.params));
+  });
+
+  fastify.post('/:id/manifest', { schema: { body: manifestBody } }, async (request) => {
+    const tenantId = request.user.tenantId;
+    return manifestInboundDocument(
+      tenantId,
+      documentId(request.params),
+      request.body,
+      (payload) => sefazPost(tenantId, payload),
+    );
   });
 
   fastify.post('/:id/post', async (request) => {

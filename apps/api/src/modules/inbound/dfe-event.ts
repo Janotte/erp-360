@@ -59,17 +59,61 @@ function tagValue(xml: string, name: string) {
   return xml.match(new RegExp(`<${name}>([^<]*)</${name}>`))?.[1]?.trim() ?? '';
 }
 
-/** Ciência da operação no Ambiente Nacional. O serviço exige SOAP 1.2, mesmo no .asmx. */
-export function awarenessEventRequest(input: {
+export const recipientManifestKinds = [
+  'aware',
+  'confirmed',
+  'unaware',
+  'not_performed',
+] as const;
+
+export type RecipientManifestKind = (typeof recipientManifestKinds)[number];
+
+const recipientManifestSpec = {
+  aware: { code: '210210', description: 'Ciencia da Operacao' },
+  confirmed: { code: '210200', description: 'Confirmacao da Operacao' },
+  unaware: { code: '210220', description: 'Desconhecimento da Operacao' },
+  not_performed: { code: '210240', description: 'Operacao nao Realizada' },
+} as const;
+
+function escapeXml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
+
+/** Manifestação do destinatário no Ambiente Nacional. O serviço exige SOAP 1.2. */
+export function recipientEventRequest(input: {
   environment: CertificateEnvironment;
   cnpj: string;
   accessKey: string;
   at: string;
+  kind: RecipientManifestKind;
+  justification?: string;
   privateKeyPem: string;
   certificatePem: string;
 }) {
+  const spec = recipientManifestSpec[input.kind];
+  const justification =
+    input.kind === 'not_performed' ? (input.justification ?? '').trim() : '';
+  if (
+    input.kind === 'not_performed' &&
+    (justification.length < 15 || justification.length > 255)
+  ) {
+    throw new Error(
+      'A justificativa da operação não realizada precisa ter entre 15 e 255 caracteres.',
+    );
+  }
   const tpAmb = input.environment === 'production' ? '1' : '2';
-  const eventId = `ID210210${input.accessKey}01`;
+  const eventId = `ID${spec.code}${input.accessKey}01`;
+  const detail = [
+    '<detEvento versao="1.00">',
+    `<descEvento>${spec.description}</descEvento>`,
+    ...(justification ? [`<xJust>${escapeXml(justification)}</xJust>`] : []),
+    '</detEvento>',
+  ].join('');
   const infEvento = [
     `<infEvento xmlns="${portal}" Id="${eventId}">`,
     '<cOrgao>91</cOrgao>',
@@ -77,12 +121,10 @@ export function awarenessEventRequest(input: {
     `<CNPJ>${input.cnpj}</CNPJ>`,
     `<chNFe>${input.accessKey}</chNFe>`,
     `<dhEvento>${input.at}</dhEvento>`,
-    '<tpEvento>210210</tpEvento>',
+    `<tpEvento>${spec.code}</tpEvento>`,
     '<nSeqEvento>1</nSeqEvento>',
     '<verEvento>1.00</verEvento>',
-    '<detEvento versao="1.00">',
-    '<descEvento>Ciencia da Operacao</descEvento>',
-    '</detEvento>',
+    detail,
     '</infEvento>',
   ].join('');
   const digest = createHash('sha1').update(infEvento).digest('base64');
@@ -131,6 +173,23 @@ export function awarenessEventRequest(input: {
       'Content-Type': `application/soap+xml; charset=utf-8; action="${service}/nfeRecepcaoEvento"`,
     },
   };
+}
+
+export function awarenessEventRequest(
+  input: Omit<Parameters<typeof recipientEventRequest>[0], 'kind' | 'justification'>,
+) {
+  return recipientEventRequest({ ...input, kind: 'aware' });
+}
+
+/** Junta o evento assinado com o retorno da SEFAZ para guardar o procEventoNFe. */
+export function recipientManifestDocument(requestBody: string, responseBody: string) {
+  const evento = requestBody.match(/<evento\b[^>]*>[\s\S]*?<\/evento>/)?.[0] ?? '';
+  const retEvento =
+    responseBody.match(/<retEvento\b[^>]*>[\s\S]*?<\/retEvento>/)?.[0] ?? '';
+  if (evento && retEvento) {
+    return `<procEventoNFe xmlns="${portal}" versao="1.00">${evento}${retEvento}</procEventoNFe>`;
+  }
+  return evento || responseBody;
 }
 
 export function parseAwarenessEvent(body: string): AwarenessEventResult {

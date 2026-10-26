@@ -8,7 +8,9 @@ import {
   awarenessEventRequest,
   nfeEventTimestamp,
   parseAwarenessEvent,
+  recipientManifestDocument,
 } from './dfe-event.ts';
+import { recordRecipientManifestation } from './dfe-manifest.ts';
 import { discoveryAction } from './dfe-note.ts';
 import { saveDfeDistribution } from './dfe-store.ts';
 import { certificateMaterial, emitterStateCode } from './dfe-sync.ts';
@@ -125,23 +127,23 @@ export async function discoverInboundDocument(
     deps,
   );
   if (action.kind === 'manifest') {
-    const event = parseAwarenessEvent(
-      await post(
-        awarenessEventRequest({
-          environment: settings.environment,
-          cnpj: emitter.cnpj,
-          accessKey: document.accessKey,
-          at: nfeEventTimestamp(new Date()),
-          privateKeyPem: material.privateKeyPem,
-          certificatePem: material.certificatePem,
-        }),
-      ),
-    );
+    const request = awarenessEventRequest({
+      environment: settings.environment,
+      cnpj: emitter.cnpj,
+      accessKey: document.accessKey,
+      at: nfeEventTimestamp(new Date()),
+      privateKeyPem: material.privateKeyPem,
+      certificatePem: material.certificatePem,
+    });
+    const body = await post(request);
+    const event = parseAwarenessEvent(body);
     if (!event.accepted) throw new InboundError(502, event.reason);
-    await db
-      .update(inboundDocuments)
-      .set({ recipientManifestation: 'aware' })
-      .where(eq(inboundDocuments.id, document.id));
+    await recordRecipientManifestation(
+      tenantId,
+      document.id,
+      'aware',
+      recipientManifestDocument(request.body, body),
+    );
   }
 
   const distribution = parseDfeDistribution(

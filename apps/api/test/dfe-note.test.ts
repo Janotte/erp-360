@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { discoveryAction, readDfeNote } from '../src/modules/inbound/dfe-note.ts';
+import {
+  discoveryAction,
+  readDfeNote,
+  readInboundEvent,
+} from '../src/modules/inbound/dfe-note.ts';
 
 const key = '42261018371298000101550010000021161300002070';
 
@@ -28,13 +32,17 @@ describe('nota descoberta a partir do DF-e', () => {
 
   it('lê cancelada, denegada e o evento de ciência', () => {
     assert.equal(
-      readDfeNote('summary', `<resNFe><chNFe>${key}</chNFe><CNPJ>18371298000101</CNPJ><cSitNFe>3</cSitNFe></resNFe>`)
-        .authorizationStatus,
+      readDfeNote(
+        'summary',
+        `<resNFe><chNFe>${key}</chNFe><CNPJ>18371298000101</CNPJ><cSitNFe>3</cSitNFe></resNFe>`,
+      ).authorizationStatus,
       'cancelled',
     );
     assert.equal(
-      readDfeNote('summary', `<resNFe><chNFe>${key}</chNFe><CNPJ>18371298000101</CNPJ><cSitNFe>2</cSitNFe></resNFe>`)
-        .authorizationStatus,
+      readDfeNote(
+        'summary',
+        `<resNFe><chNFe>${key}</chNFe><CNPJ>18371298000101</CNPJ><cSitNFe>2</cSitNFe></resNFe>`,
+      ).authorizationStatus,
       'denied',
     );
     const event = readDfeNote(
@@ -92,5 +100,20 @@ describe('nota descoberta a partir do DF-e', () => {
       }).kind,
       'none',
     );
+  });
+
+  it('nomeia o evento de manifestação para a consulta', () => {
+    const event = readInboundEvent(
+      `<procEventoNFe><evento><infEvento><tpEvento>210240</tpEvento><dhEvento>2026-10-26T14:00:00-03:00</dhEvento></infEvento></evento><retEvento><infEvento><cStat>135</cStat><xMotivo>Evento registrado</xMotivo><nProt>123</nProt></infEvento></retEvento></procEventoNFe>`,
+    );
+    assert.deepEqual(event, {
+      code: '210240',
+      label: 'Operação não realizada',
+      at: '2026-10-26T14:00:00-03:00',
+      protocol: '123',
+      status: '135',
+      reason: 'Evento registrado',
+    });
+    assert.equal(readInboundEvent('<resNFe></resNFe>'), null);
   });
 });

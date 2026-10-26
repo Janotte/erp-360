@@ -5,9 +5,17 @@ import { before, describe, it } from 'node:test';
 import { isValidCnpj } from '@erp-360/shared';
 import forge from 'node-forge';
 
-import { decryptPassword, encryptPassword } from '../src/modules/certificates/cipher.ts';
+import {
+  certificateReadMessage,
+  decryptPassword,
+  encryptPassword,
+} from '../src/modules/certificates/cipher.ts';
 import { CertificateError } from '../src/modules/certificates/errors.ts';
-import { extractCertificateTaxId, readPfx, readPfxMaterial } from '../src/modules/certificates/pfx.ts';
+import {
+  extractCertificateTaxId,
+  readPfx,
+  readPfxMaterial,
+} from '../src/modules/certificates/pfx.ts';
 import { subjectStateAbbreviation } from '../src/modules/certificates/sefaz.ts';
 import {
   certificateDaysLeft,
@@ -39,7 +47,11 @@ function buildPfx(options: {
   certificate.setSubject(attributes);
   certificate.setIssuer(attributes);
   certificate.sign(keys.privateKey);
-  const asn1 = forge.pkcs12.toPkcs12Asn1(keys.privateKey, [certificate], options.passphrase ?? password);
+  const asn1 = forge.pkcs12.toPkcs12Asn1(
+    keys.privateKey,
+    [certificate],
+    options.passphrase ?? password,
+  );
   return Buffer.from(forge.asn1.toDer(asn1).getBytes(), 'binary');
 }
 
@@ -75,9 +87,37 @@ describe('certificado digital', () => {
   it('considera vigente só dentro do intervalo', () => {
     const from = new Date('2026-01-01T00:00:00Z');
     const until = new Date('2026-12-31T00:00:00Z');
-    assert.equal(certificateIsCurrent(from, until, new Date('2026-06-01T00:00:00Z')), true);
-    assert.equal(certificateIsCurrent(from, until, new Date('2025-12-31T00:00:00Z')), false);
-    assert.equal(certificateIsCurrent(from, until, new Date('2027-01-01T00:00:00Z')), false);
+    assert.equal(
+      certificateIsCurrent(from, until, new Date('2026-06-01T00:00:00Z')),
+      true,
+    );
+    assert.equal(
+      certificateIsCurrent(from, until, new Date('2025-12-31T00:00:00Z')),
+      false,
+    );
+    assert.equal(
+      certificateIsCurrent(from, until, new Date('2027-01-01T00:00:00Z')),
+      false,
+    );
+  });
+
+  it('explica quando a senha salva do certificado não abre', () => {
+    assert.equal(
+      certificateReadMessage(
+        new Error('Unsupported state or unable to authenticate data'),
+      ),
+      'saved-password',
+    );
+    assert.equal(
+      certificateReadMessage(
+        new CertificateError(
+          400,
+          'Não foi possível abrir o certificado. Confira o arquivo e a senha.',
+        ),
+      ),
+      'Não foi possível abrir o certificado. Confira o arquivo e a senha.',
+    );
+    assert.equal(certificateReadMessage(new Error('sem chave')), 'unreadable');
   });
 
   it('cifra a senha e recupera o mesmo texto', () => {
@@ -99,21 +139,32 @@ describe('certificado digital', () => {
     const parsed = readPfx(currentPfx, password);
     assert.equal(parsed.taxId, cnpj);
     assert.equal(parsed.serialNumber, '0A1B');
-    assert.equal(parsed.thumbprintSha256, createHash('sha256').update(
-      Buffer.from(
-        forge.asn1
-          .toDer(
-            forge.pki.certificateToAsn1(
-              forge.pkcs12.pkcs12FromAsn1(
-                forge.asn1.fromDer(forge.util.createBuffer(currentPfx.toString('binary'))),
-                password,
-              ).getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag]![0]!.cert!,
-            ),
-          )
-          .getBytes(),
-        'binary',
-      ),
-    ).digest('hex'));
+    assert.equal(
+      parsed.thumbprintSha256,
+      createHash('sha256')
+        .update(
+          Buffer.from(
+            forge.asn1
+              .toDer(
+                forge.pki.certificateToAsn1(
+                  forge.pkcs12
+                    .pkcs12FromAsn1(
+                      forge.asn1.fromDer(
+                        forge.util.createBuffer(currentPfx.toString('binary')),
+                      ),
+                      password,
+                    )
+                    .getBags({ bagType: forge.pki.oids.certBag })[
+                    forge.pki.oids.certBag
+                  ]![0]!.cert!,
+                ),
+              )
+              .getBytes(),
+            'binary',
+          ),
+        )
+        .digest('hex'),
+    );
     assert.match(parsed.subjectName, /EMPRESA TESTE/);
 
     assert.throws(() => readPfx(currentPfx, 'outra-senha'), CertificateError);
@@ -124,7 +175,10 @@ describe('certificado digital', () => {
       notAfter: new Date('2021-01-01T00:00:00Z'),
     });
     const expiredParsed = readPfx(expired, password);
-    assert.equal(certificateIsCurrent(expiredParsed.validFrom, expiredParsed.validUntil, new Date()), false);
+    assert.equal(
+      certificateIsCurrent(expiredParsed.validFrom, expiredParsed.validUntil, new Date()),
+      false,
+    );
 
     const withoutTaxId = buildPfx({
       commonName: 'SEM CNPJ',

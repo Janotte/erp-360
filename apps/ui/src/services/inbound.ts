@@ -1,20 +1,10 @@
 import { apiFetch } from './apiClient';
 
 export type InboundStatus =
-  | 'pending'
-  | 'pre_note'
-  | 'divergent'
-  | 'posted'
-  | 'reversed'
-  | 'ignored'
-  | 'discovered';
+  'pending' | 'pre_note' | 'divergent' | 'posted' | 'reversed' | 'ignored' | 'discovered';
 
 export type RecipientManifestation =
-  | 'none'
-  | 'aware'
-  | 'confirmed'
-  | 'unaware'
-  | 'not_performed';
+  'none' | 'aware' | 'confirmed' | 'unaware' | 'not_performed';
 
 export type NfeAuthorizationStatus = 'authorized' | 'denied' | 'cancelled';
 
@@ -32,8 +22,7 @@ export interface InboundListFilter {
 }
 
 export type InboundDiscoveryResult =
-  | { outcome: 'imported' }
-  | { outcome: 'aware'; message: string };
+  { outcome: 'imported' } | { outcome: 'aware'; message: string };
 
 export interface InboundNature {
   id: string;
@@ -93,6 +82,58 @@ export interface InboundDocument {
   blockers: string[];
   lines: InboundLine[];
   installments: InboundInstallment[];
+}
+
+export type RecipientManifestKind = Exclude<RecipientManifestation, 'none'>;
+
+export interface InboundEventView {
+  code: string;
+  label: string;
+  at: string | null;
+  protocol: string | null;
+  status: string | null;
+  reason: string | null;
+}
+
+export interface DanfeParty {
+  name: string;
+  taxId: string;
+  stateRegistration: string | null;
+  address: string;
+}
+
+export interface DanfeItem {
+  number: string;
+  code: string;
+  description: string;
+  ncm: string;
+  cfop: string;
+  unit: string;
+  quantity: string;
+  unitPrice: number;
+  amount: number;
+}
+
+export interface DanfeView {
+  accessKey: string;
+  number: string;
+  series: string;
+  issuedAt: string;
+  operation: string;
+  protocol: string | null;
+  emitter: DanfeParty;
+  recipient: DanfeParty;
+  items: DanfeItem[];
+  productsAmount: number;
+  freightAmount: number;
+  discountAmount: number;
+  totalAmount: number;
+}
+
+export interface ManifestResult {
+  recipientManifestation: RecipientManifestKind;
+  status: string;
+  reason: string;
 }
 
 export interface InboundListItem {
@@ -168,6 +209,37 @@ export const inboundService = {
   discover: async (id: string): Promise<InboundDiscoveryResult> => {
     const res = await apiFetch(`/inbound/${id}/discover`, { method: 'POST' });
     return parse(res, 'Falha ao consultar a NF-e.');
+  },
+  events: async (id: string): Promise<InboundEventView[]> => {
+    const res = await apiFetch(`/inbound/${id}/events`);
+    const body = await parse<{ events: InboundEventView[] }>(
+      res,
+      'Falha ao carregar os eventos.',
+    );
+    return body.events;
+  },
+  manifestationXml: async (id: string): Promise<string> => {
+    const res = await apiFetch(`/inbound/${id}/manifestation`);
+    const body = await parse<{ xml: string }>(
+      res,
+      'Falha ao carregar o XML da manifestação.',
+    );
+    return body.xml;
+  },
+  danfe: async (id: string): Promise<DanfeView> => {
+    const res = await apiFetch(`/inbound/${id}/danfe`);
+    return parse(res, 'Falha ao carregar o DANFE.');
+  },
+  manifest: async (
+    id: string,
+    kind: RecipientManifestKind,
+    justification?: string,
+  ): Promise<ManifestResult> => {
+    const res = await apiFetch(`/inbound/${id}/manifest`, {
+      method: 'POST',
+      body: JSON.stringify({ kind, justification }),
+    });
+    return parse(res, 'Falha ao manifestar a NF-e.');
   },
   createManual: async (dados: InboundDraft): Promise<InboundDocument> => {
     const res = await apiFetch('/inbound/manual', {

@@ -1,4 +1,5 @@
-export type RecipientManifestation = 'none' | 'aware' | 'confirmed' | 'unaware' | 'not_performed';
+export type RecipientManifestation =
+  'none' | 'aware' | 'confirmed' | 'unaware' | 'not_performed';
 export type NfeAuthorizationStatus = 'authorized' | 'denied' | 'cancelled';
 
 export interface DfeNoteView {
@@ -62,6 +63,41 @@ export function readDfeNote(kind: string, xml: string): DfeNoteView {
     return { ...base, role: 'nfe' };
   }
   return { ...base, role: 'ignore' };
+}
+
+const eventLabels: Record<string, string> = {
+  '110110': 'Carta de correção',
+  '110111': 'Cancelamento',
+  '210200': 'Confirmação da operação',
+  '210210': 'Ciência da operação',
+  '210220': 'Desconhecimento da operação',
+  '210240': 'Operação não realizada',
+};
+
+export interface InboundEventView {
+  code: string;
+  label: string;
+  at: string | null;
+  protocol: string | null;
+  status: string | null;
+  reason: string | null;
+}
+
+export function readInboundEvent(xml: string): InboundEventView | null {
+  const code = tag(xml, 'tpEvento');
+  if (!code) return null;
+  return {
+    code,
+    label:
+      eventLabels[code] ||
+      tag(xml, 'descEvento') ||
+      tag(xml, 'xEvento') ||
+      `Evento ${code}`,
+    at: tag(xml, 'dhEvento') || tag(xml, 'dhRegEvento'),
+    protocol: tag(xml, 'nProt'),
+    status: tag(xml, 'cStat'),
+    reason: tag(xml, 'xMotivo'),
+  };
 }
 
 export function discoveryAction(input: {

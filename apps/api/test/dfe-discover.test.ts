@@ -5,6 +5,7 @@ import { describe, it } from 'node:test';
 import { tenants } from '@erp-360/mod-core';
 import {
   dfeDocuments,
+  inboundDocumentFiles,
   inboundDocumentLines,
   inboundDocuments,
 } from '@erp-360/mod-inbound';
@@ -13,6 +14,7 @@ import forge from 'node-forge';
 
 import { db } from '../src/db/index.ts';
 import { discoverInboundDocument } from '../src/modules/inbound/dfe-discover.ts';
+import { manifestationFileName } from '../src/modules/inbound/dfe-manifest.ts';
 import { promoteDfeNotes } from '../src/modules/inbound/dfe-promote.ts';
 import { createCompany } from './fixtures.ts';
 
@@ -171,6 +173,19 @@ describe('descoberta da NF-e na entrada', () => {
       .where(eq(inboundDocuments.id, document.id));
     assert.equal(row.recipientManifestation, 'aware');
     assert.equal(row.status, 'discovered');
+    const [file] = await db
+      .select({
+        fileName: inboundDocumentFiles.fileName,
+        content: inboundDocumentFiles.content,
+      })
+      .from(inboundDocumentFiles)
+      .where(eq(inboundDocumentFiles.documentId, document.id));
+    assert.equal(file.fileName, manifestationFileName);
+    const stored = Buffer.isBuffer(file.content)
+      ? file.content.toString('utf8')
+      : String(file.content);
+    assert.match(stored, /<tpEvento>210210<\/tpEvento>/);
+    assert.match(stored, /<nProt>|Evento registrado|cStat>135/);
   });
 
   it('não grava o manifesto quando a ciência é rejeitada', async () => {

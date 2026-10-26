@@ -1,5 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 
+import { CertificateError } from './errors.ts';
+
 function keyFromSecret(secret: string) {
   return createHash('sha256').update(secret).digest();
 }
@@ -11,6 +13,15 @@ export function encryptPassword(password: string, secret: string) {
   const encrypted = Buffer.concat([cipher.update(password, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
   return Buffer.concat([iv, tag, encrypted]);
+}
+
+export function certificateReadMessage(error: unknown) {
+  if (error instanceof CertificateError) return error.message;
+  const message = error instanceof Error ? error.message : '';
+  if (/unable to authenticate data|Unsupported state/i.test(message)) {
+    return 'saved-password';
+  }
+  return 'unreadable';
 }
 
 export function decryptPassword(payload: Buffer, secret: string) {

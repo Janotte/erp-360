@@ -10,7 +10,8 @@ import { z } from 'zod';
 
 import { env } from '../../config/index.ts';
 import { db } from '../../db/index.ts';
-import { decryptPassword } from '../certificates/cipher.ts';
+import { certificateReadMessage, decryptPassword } from '../certificates/cipher.ts';
+import { CertificateError } from '../certificates/errors.ts';
 import { readPfxMaterial } from '../certificates/pfx.ts';
 import { postCertificate } from '../certificates/probe.ts';
 import { connectionTimeoutMs, stateCode } from '../certificates/sefaz.ts';
@@ -226,7 +227,18 @@ export async function certificateMaterial(
     return { ...material, taxId: certificate.taxId };
   } catch (error) {
     if (error instanceof InboundError) throw error;
-    throw new InboundError(400, 'Não foi possível ler o certificado A1.');
+    const status = error instanceof CertificateError ? error.status : 400;
+    if (certificateReadMessage(error) === 'saved-password') {
+      throw new InboundError(
+        status,
+        `A senha salva do certificado não pode mais ser lida. Importe de novo o certificado A1 do ambiente de ${environmentLabel[environment]} da NF-e.`,
+      );
+    }
+    const readable = certificateReadMessage(error);
+    throw new InboundError(
+      status,
+      readable === 'unreadable' ? 'Não foi possível ler o certificado A1.' : readable,
+    );
   }
 }
 
@@ -297,7 +309,10 @@ export async function listDfeDocuments(tenantId: string, search = '') {
     eq(dfeDocuments.environment, settings.environment),
   ];
   const match = digits
-    ? or(like(dfeDocuments.nsu, `%${digits}%`), like(dfeDocuments.accessKey, `%${digits}%`))
+    ? or(
+        like(dfeDocuments.nsu, `%${digits}%`),
+        like(dfeDocuments.accessKey, `%${digits}%`),
+      )
     : undefined;
   if (match) filters.push(match);
   const rows = await db
@@ -345,7 +360,8 @@ export const dfeSyncRoutes: FastifyPluginAsyncZod = async (fastify) => {
         }),
       },
     },
-    async (request) => listDfeDocuments(request.user.tenantId, request.query.search ?? ''),
+    async (request) =>
+      listDfeDocuments(request.user.tenantId, request.query.search ?? ''),
   );
 
   fastify.post('/dfe/sync', async (request) => {
