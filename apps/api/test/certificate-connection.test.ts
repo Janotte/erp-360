@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { X509Certificate } from 'node:crypto';
 import { describe, it } from 'node:test';
+import tls from 'node:tls';
 
 import {
   interpretSefaz,
@@ -8,6 +10,7 @@ import {
   stateAbbreviationFromSubject,
   stateCode,
 } from '../src/modules/certificates/sefaz.ts';
+import { trustedCertificates } from '../src/modules/certificates/trust.ts';
 
 describe('conexão do certificado', () => {
   it('escolhe o autorizador da UF e o ambiente do certificado', () => {
@@ -60,10 +63,37 @@ describe('conexão do certificado', () => {
     assert.equal(available.statusMessage, 'Servico em Operacao');
     assert.equal(available.error, null);
 
-    const rejected = interpretSefaz(200, '<cStat>215</cStat><xMotivo>Falha no schema</xMotivo>');
+    const rejected = interpretSefaz(
+      200,
+      '<cStat>215</cStat><xMotivo>Falha no schema</xMotivo>',
+    );
     assert.equal(rejected.ok, false);
     assert.match(rejected.error ?? '', /cStat 215/);
     assert.equal(interpretSefaz(500, '<cStat>107</cStat>').ok, false);
+  });
+
+  it('confia na Raiz Brasileira v10 e na intermediária do e-CAC', () => {
+    const certificates = trustedCertificates().map((pem) => new X509Certificate(pem));
+    const root = certificates.find((certificate) =>
+      certificate.subject.includes('CN=Autoridade Certificadora Raiz Brasileira v10'),
+    );
+    const intermediate = certificates.find((certificate) =>
+      certificate.subject.includes('CN=AC SERPRO AR46 OV TLS CA 2025'),
+    );
+    const globalSign = certificates.find((certificate) =>
+      certificate.subject.includes('CN=GlobalSign Root R46'),
+    );
+
+    assert.ok(root);
+    assert.equal(
+      root.fingerprint256.replaceAll(':', ''),
+      '6E0BFF069A26994C15DE2C4888CC54AF84882E5495B7FBF66BE9CCFFEC7489F6',
+    );
+    assert.equal(root.verify(root.publicKey), true);
+    assert.ok(intermediate);
+    assert.ok(globalSign);
+    assert.equal(intermediate.verify(globalSign.publicKey), true);
+    assert.equal(trustedCertificates().length, tls.rootCertificates.length + 2);
   });
 
   it('lê a UF no subject do certificado', () => {

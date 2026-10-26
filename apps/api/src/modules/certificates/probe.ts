@@ -4,6 +4,7 @@ import { URL } from 'node:url';
 import type { CertificateEnvironment } from '@erp-360/shared';
 
 import { interpretSefaz, sefazStatusRequest } from './sefaz.ts';
+import { trustedCertificates } from './trust.ts';
 
 export interface RemoteProbe {
   ok: boolean;
@@ -76,6 +77,7 @@ function requestHttps(input: {
         method: input.method,
         cert: input.certificatePem,
         key: input.privateKeyPem,
+        ca: trustedCertificates(),
         rejectUnauthorized: true,
         timeout: input.timeoutMs,
         headers: input.headers,

@@ -3,14 +3,24 @@ import {
   type CertificateConnectionTarget,
   type CertificateEnvironment,
   type CertificateInspection,
-  type TenantCertificateView,
   formatCnpj,
   formatRawDate,
+  type TenantCertificateView,
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,7 +56,18 @@ function endpointHost(endpoint: string) {
 }
 
 function CertificateCard({ certificate }: { certificate: TenantCertificateView }) {
+  const queryClient = useQueryClient();
   const [result, setResult] = useState<CertificateConnection | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const remove = useMutation({
+    mutationFn: () => certificateService.remove(certificate.id),
+    onSuccess: () => {
+      setConfirming(false);
+      queryClient.invalidateQueries({ queryKey: ['certificates'] });
+      toast.success('Certificado excluído.');
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
   const connection = useMutation({
     mutationFn: (target: CertificateConnectionTarget) =>
       certificateService.testConnection(certificate.id, target),
@@ -106,6 +127,15 @@ function CertificateCard({ certificate }: { certificate: TenantCertificateView }
         >
           {pendingTarget === 'ecac' ? 'Testando...' : 'Testar e-CAC'}
         </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={remove.isPending}
+          onClick={() => setConfirming(true)}
+        >
+          Excluir
+        </Button>
       </div>
       {result ? (
         <div className="mt-3 space-y-1 rounded-md border border-zinc-200 bg-zinc-50 p-3">
@@ -115,9 +145,7 @@ function CertificateCard({ certificate }: { certificate: TenantCertificateView }
               : 'O certificado não passou na checagem local.'}
           </p>
           <p className="text-zinc-500">
-            {checks
-              .map(([label, ok]) => `${label}: ${ok ? 'sim' : 'não'}`)
-              .join(' · ')}
+            {checks.map(([label, ok]) => `${label}: ${ok ? 'sim' : 'não'}`).join(' · ')}
           </p>
           <p className={result.validRemote ? 'text-emerald-700' : 'text-rose-700'}>
             {result.validRemote
@@ -136,6 +164,32 @@ function CertificateCard({ certificate }: { certificate: TenantCertificateView }
           ) : null}
         </div>
       ) : null}
+      <AlertDialog
+        open={confirming}
+        onOpenChange={(open) => !open && setConfirming(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir certificado</AlertDialogTitle>
+            <AlertDialogDescription>
+              O certificado de {environmentLabel[certificate.environment].toLowerCase()}{' '}
+              deixa de ser usado na SEFAZ. O arquivo e a senha salva são apagados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={remove.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                remove.mutate();
+              }}
+            >
+              {remove.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </li>
   );
 }
@@ -224,7 +278,9 @@ export function CertificateSettings() {
           <select
             id="certificateEnvironment"
             value={environment}
-            onChange={(event) => setEnvironment(event.target.value as CertificateEnvironment)}
+            onChange={(event) =>
+              setEnvironment(event.target.value as CertificateEnvironment)
+            }
             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
           >
             <option value="production">Produção</option>

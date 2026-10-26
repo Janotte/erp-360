@@ -3,12 +3,12 @@ import '../../types/fastify.ts';
 import { tenantCertificates, tenants } from '@erp-360/mod-core';
 import { cities, states } from '@erp-360/mod-persons';
 import {
-  type CertificateConnectionTarget,
-  type CertificateEnvironment,
-  type CertificateWarning,
   certificateConnectionSchema,
+  type CertificateConnectionTarget,
   certificateConnectionTargets,
+  type CertificateEnvironment,
   certificateInspectionSchema,
+  type CertificateWarning,
   certificateWarningSchema,
   tenantCertificateListSchema,
   tenantCertificateSchema,
@@ -21,7 +21,12 @@ import { env } from '../../config/index.ts';
 import { db } from '../../db/index.ts';
 import { decryptPassword, encryptPassword } from './cipher.ts';
 import { CertificateError } from './errors.ts';
-import { decodePfxBase64, type ParsedCertificate, readPfx, readPfxMaterial } from './pfx.ts';
+import {
+  decodePfxBase64,
+  type ParsedCertificate,
+  readPfx,
+  readPfxMaterial,
+} from './pfx.ts';
 import { probeHttps, probeSefaz } from './probe.ts';
 import {
   connectionTimeoutMs,
@@ -30,7 +35,11 @@ import {
   stateCode,
   subjectStateAbbreviation,
 } from './sefaz.ts';
-import { certificateDaysLeft, certificateIsCurrent, certificateNotice } from './status.ts';
+import {
+  certificateDaysLeft,
+  certificateIsCurrent,
+  certificateNotice,
+} from './status.ts';
 
 const certificateBody = z.object({
   environment: z.enum(['homologation', 'production']),
@@ -124,7 +133,9 @@ function openBody(body: { pfxBase64: string; password: string }) {
   return readPfx(decodePfxBase64(body.pfxBase64), body.password);
 }
 
-export async function listCertificateWarnings(tenantId: string): Promise<CertificateWarning[]> {
+export async function listCertificateWarnings(
+  tenantId: string,
+): Promise<CertificateWarning[]> {
   const rows = await db
     .select({
       environment: tenantCertificates.environment,
@@ -133,7 +144,10 @@ export async function listCertificateWarnings(tenantId: string): Promise<Certifi
     })
     .from(tenantCertificates)
     .where(
-      and(eq(tenantCertificates.tenantId, tenantId), eq(tenantCertificates.isActive, true)),
+      and(
+        eq(tenantCertificates.tenantId, tenantId),
+        eq(tenantCertificates.isActive, true),
+      ),
     );
 
   return rows.flatMap((row) => {
@@ -149,6 +163,16 @@ export async function listCertificateWarnings(tenantId: string): Promise<Certifi
       }),
     ];
   });
+}
+
+export async function deleteCertificate(tenantId: string, id: string) {
+  const deleted = await db
+    .delete(tenantCertificates)
+    .where(and(eq(tenantCertificates.id, id), eq(tenantCertificates.tenantId, tenantId)))
+    .returning({ id: tenantCertificates.id });
+  if (deleted.length === 0) {
+    throw new CertificateError(404, 'Certificado não encontrado.');
+  }
 }
 
 export const certificateRoutes: FastifyPluginAsyncZod = async (fastify) => {
@@ -216,7 +240,10 @@ export const certificateRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const parsed = openBody(request.body);
       const inspection = inspectParsed(parsed, cnpj);
       if (!inspection.belongsToTenant || !inspection.current) {
-        throw new CertificateError(400, inspection.messages[0] ?? 'Certificado recusado.');
+        throw new CertificateError(
+          400,
+          inspection.messages[0] ?? 'Certificado recusado.',
+        );
       }
 
       const existing = await db
@@ -383,6 +410,15 @@ export const certificateRoutes: FastifyPluginAsyncZod = async (fastify) => {
         localChecks,
         remote,
       });
+    },
+  );
+
+  fastify.delete(
+    '/:id',
+    { schema: { params: z.object({ id: z.string().uuid() }) } },
+    async (request, reply) => {
+      await deleteCertificate(request.user.tenantId, request.params.id);
+      return reply.status(204).send();
     },
   );
 };

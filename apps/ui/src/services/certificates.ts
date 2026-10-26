@@ -1,14 +1,14 @@
 import {
   apiErrorMessage,
   type CertificateConnection,
+  certificateConnectionSchema,
   type CertificateConnectionTarget,
   type CertificateEnvironment,
   type CertificateInspection,
-  certificateConnectionSchema,
   certificateInspectionSchema,
-  type TenantCertificateView,
   tenantCertificateListSchema,
   tenantCertificateSchema,
+  type TenantCertificateView,
 } from '@erp-360/shared';
 
 import { apiFetch } from './apiClient';
@@ -33,7 +33,9 @@ export const certificateService = {
     if (!parsed.success) throw new Error('Resposta de certificados inválida.');
     return parsed.data;
   },
-  inspect: async (dados: Pick<CertificateInput, 'pfxBase64' | 'password'>): Promise<CertificateInspection> => {
+  inspect: async (
+    dados: Pick<CertificateInput, 'pfxBase64' | 'password'>,
+  ): Promise<CertificateInspection> => {
     const res = await apiFetch('/certificates/inspect', {
       method: 'POST',
       body: JSON.stringify(dados),
@@ -50,10 +52,17 @@ export const certificateService = {
       body: JSON.stringify(dados),
     });
     const body = await readBody(res);
-    if (!res.ok) throw new Error(apiErrorMessage(body, 'Falha ao importar o certificado.'));
+    if (!res.ok)
+      throw new Error(apiErrorMessage(body, 'Falha ao importar o certificado.'));
     const parsed = tenantCertificateSchema.safeParse(body);
     if (!parsed.success) throw new Error('Resposta da importação inválida.');
     return parsed.data;
+  },
+  remove: async (id: string): Promise<void> => {
+    const res = await apiFetch(`/certificates/${id}`, { method: 'DELETE' });
+    if (res.status === 204) return;
+    const body = await readBody(res);
+    throw new Error(apiErrorMessage(body, 'Falha ao excluir o certificado.'));
   },
   testConnection: async (
     id: string,
