@@ -1,9 +1,11 @@
+import { tenants } from '@erp-360/mod-core';
 import { dfeCursors, dfeDocuments } from '@erp-360/mod-inbound';
 import type { CertificateEnvironment } from '@erp-360/shared';
 import { and, eq, sql } from 'drizzle-orm';
 
 import { db, type DbTransaction } from '../../db/index.ts';
 import type { DfeDistribution } from './dfe.ts';
+import { promoteDfeNotes } from './dfe-promote.ts';
 
 function laterNsu(current: string, incoming: string | null) {
   if (!incoming || !/^[0-9]{15}$/.test(incoming)) return current;
@@ -80,6 +82,18 @@ export async function saveDfeDistribution(
         and(eq(dfeCursors.tenantId, tenantId), eq(dfeCursors.environment, environment)),
       )
       .returning();
+    const [tenant] = await tx
+      .select({ cnpj: tenants.cnpj })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+    await promoteDfeNotes(
+      tx,
+      tenantId,
+      environment,
+      tenant?.cnpj ?? '',
+      distribution.documents,
+    );
     return updated;
   });
 }

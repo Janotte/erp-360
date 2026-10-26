@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { gzipSync } from 'node:zlib';
 
-import { dfeCursors, dfeDocuments } from '@erp-360/mod-inbound';
+import { dfeCursors, dfeDocuments, inboundDocuments } from '@erp-360/mod-inbound';
 import { and, eq } from 'drizzle-orm';
 
 import { db } from '../src/db/index.ts';
@@ -221,6 +221,32 @@ describe('gravação da busca de DF-e', () => {
       key,
     );
     assert.equal((await listDfeDocuments(company.tenantId, '9999')).documents.length, 0);
+  });
+
+  it('abre uma entrada descoberta ao gravar o resumo', async () => {
+    const company = await createCompany('DF-e grava descoberta');
+    const key = '42261018371298000101550010000021161300002070';
+    await runDfeSync({
+      tenantId: company.tenantId,
+      environment: 'homologation',
+      cnpj,
+      cUF: '42',
+      query: { kind: 'cursor' },
+      now,
+      fetch: async () =>
+        soap(
+          '000000000000001',
+          '000000000000001',
+          '138',
+          `<resNFe><chNFe>${key}</chNFe><CNPJ>18371298000101</CNPJ><xNome>Fornecedor</xNome><dhEmi>2026-10-23T10:00:00-03:00</dhEmi><vNF>1358.10</vNF><cSitNFe>1</cSitNFe></resNFe>`,
+        ),
+    });
+    const [row] = await db
+      .select({ status: inboundDocuments.status, number: inboundDocuments.number })
+      .from(inboundDocuments)
+      .where(eq(inboundDocuments.tenantId, company.tenantId));
+    assert.equal(row.status, 'discovered');
+    assert.equal(row.number, '2116');
   });
 
   it('exige o certificado do ambiente antes de consultar a SEFAZ', async () => {
