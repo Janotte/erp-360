@@ -1,6 +1,11 @@
 import { civilDate, formatCurrency, formatRawDate } from '@erp-360/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { Plus, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -16,6 +21,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -30,6 +42,7 @@ import {
   type InboundDraft,
   type InboundListFilter,
   inboundService,
+  type InboundStatus,
   inboundStatusLabel,
   recipientManifestationLabel,
 } from '@/services/inbound';
@@ -55,15 +68,6 @@ function cestForCatalog(value: string | null | undefined) {
   const digits = digitsOf(value);
   return /^[0-9]{7}$/.test(digits) ? digits : '';
 }
-
-const emptyFilter: InboundListFilter = {
-  search: '',
-  issueFrom: '',
-  issueTo: '',
-  inboundFrom: '',
-  inboundTo: '',
-  status: '',
-};
 
 function formatWhen(iso: string | null) {
   if (!iso) return null;
@@ -114,8 +118,13 @@ function draftFrom(document: InboundDocument): InboundDraft {
 export function InboundPage() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filterDraft, setFilterDraft] = useState(emptyFilter);
-  const [filter, setFilter] = useState(emptyFilter);
+  const [searchText, setSearchText] = useState('');
+  const [search, setSearch] = useState('');
+  const [issueFrom, setIssueFrom] = useState('');
+  const [issueTo, setIssueTo] = useState('');
+  const [inboundFrom, setInboundFrom] = useState('');
+  const [inboundTo, setInboundTo] = useState('');
+  const [status, setStatus] = useState<InboundStatus | 'todos'>('todos');
   const [draft, setDraft] = useState<InboundDraft | null>(null);
   const [itemSearch, setItemSearch] = useState<Record<number, string>>({});
   const [supplierSearch, setSupplierSearch] = useState('');
@@ -128,8 +137,22 @@ export function InboundPage() {
     queryKey: ['inbound', 'natures'],
     queryFn: inboundService.natures,
   });
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchText.trim()), 500);
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  const filter: InboundListFilter = {
+    search,
+    issueFrom,
+    issueTo,
+    inboundFrom,
+    inboundTo,
+    status: status === 'todos' ? '' : status,
+  };
   const list = useQuery({
     queryKey: ['inbound', 'list', filter],
+    placeholderData: keepPreviousData,
     queryFn: () => inboundService.list(filter),
   });
   const detail = useQuery({
@@ -377,97 +400,75 @@ export function InboundPage() {
         </div>
       </div>
 
-      <form
-        className="grid items-end gap-3 rounded-lg border bg-white p-4 sm:grid-cols-2 lg:grid-cols-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setFilter({ ...filterDraft, search: filterDraft.search?.trim() ?? '' });
-        }}
-      >
-        <div className="space-y-1 sm:col-span-2 lg:col-span-4">
-          <Label htmlFor="inbound-search">Busca</Label>
-          <Input
-            id="inbound-search"
-            value={filterDraft.search ?? ''}
-            placeholder="Número, chave ou emitente"
-            onChange={(event) =>
-              setFilterDraft({ ...filterDraft, search: event.target.value })
-            }
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="inbound-issue-from">Emissão de</Label>
-          <Input
-            id="inbound-issue-from"
-            type="date"
-            value={filterDraft.issueFrom ?? ''}
-            onChange={(event) =>
-              setFilterDraft({ ...filterDraft, issueFrom: event.target.value })
-            }
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="inbound-issue-to">Emissão até</Label>
-          <Input
-            id="inbound-issue-to"
-            type="date"
-            value={filterDraft.issueTo ?? ''}
-            onChange={(event) =>
-              setFilterDraft({ ...filterDraft, issueTo: event.target.value })
-            }
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="inbound-inbound-from">Entrada de</Label>
-          <Input
-            id="inbound-inbound-from"
-            type="date"
-            value={filterDraft.inboundFrom ?? ''}
-            onChange={(event) =>
-              setFilterDraft({ ...filterDraft, inboundFrom: event.target.value })
-            }
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="inbound-inbound-to">Entrada até</Label>
-          <Input
-            id="inbound-inbound-to"
-            type="date"
-            value={filterDraft.inboundTo ?? ''}
-            onChange={(event) =>
-              setFilterDraft({ ...filterDraft, inboundTo: event.target.value })
-            }
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="inbound-status">Situação</Label>
-          <select
-            id="inbound-status"
-            className="flex h-9 w-full rounded-md border px-3 text-sm"
-            value={filterDraft.status ?? ''}
-            onChange={(event) =>
-              setFilterDraft({
-                ...filterDraft,
-                status: event.target.value as InboundListFilter['status'],
-              })
-            }
+      <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4">
+        <div className="flex flex-col items-center gap-3 sm:flex-row">
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
+            <Input
+              placeholder="Número, chave ou emitente"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Select
+            value={status}
+            onValueChange={(value) => setStatus(value as InboundStatus | 'todos')}
           >
-            <option value="">Todas</option>
-            {(Object.keys(inboundStatusLabel) as (keyof typeof inboundStatusLabel)[]).map(
-              (status) => (
-                <option key={status} value={status}>
-                  {inboundStatusLabel[status]}
-                </option>
-              ),
-            )}
-          </select>
+            <SelectTrigger className="w-full sm:w-52">
+              <SelectValue placeholder="Situação" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas as situações</SelectItem>
+              {(Object.keys(inboundStatusLabel) as InboundStatus[]).map((item) => (
+                <SelectItem key={item} value={item}>
+                  {inboundStatusLabel[item]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <div>
-          <Button type="submit" variant="outline">
-            Filtrar
-          </Button>
+        <div className="flex flex-col items-center gap-3 sm:flex-row">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <span className="shrink-0 text-sm text-zinc-500">Emissão de</span>
+            <Input
+              type="date"
+              value={issueFrom}
+              onChange={(event) => setIssueFrom(event.target.value)}
+              className="w-full sm:w-40"
+            />
+          </div>
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <span className="shrink-0 text-sm text-zinc-500">até</span>
+            <Input
+              type="date"
+              value={issueTo}
+              onChange={(event) => setIssueTo(event.target.value)}
+              className="w-full sm:w-40"
+            />
+          </div>
         </div>
-      </form>
+        <div className="flex flex-col items-center gap-3 sm:flex-row">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <span className="shrink-0 text-sm text-zinc-500">Entrada de</span>
+            <Input
+              type="date"
+              value={inboundFrom}
+              onChange={(event) => setInboundFrom(event.target.value)}
+              className="w-full sm:w-40"
+            />
+          </div>
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <span className="shrink-0 text-sm text-zinc-500">até</span>
+            <Input
+              type="date"
+              value={inboundTo}
+              onChange={(event) => setInboundTo(event.target.value)}
+              className="w-full sm:w-40"
+            />
+          </div>
+        </div>
+      </div>
 
       <Table>
         <TableHeader>
