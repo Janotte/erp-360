@@ -19,6 +19,7 @@ import { measureRoutes } from './modules/catalog/measures.ts';
 import { ncmRoutes } from './modules/catalog/ncms.ts';
 import { certificateRoutes } from './modules/certificates/certificates.ts';
 import { dashboardRoutes } from './modules/dashboard/dashboard.ts';
+import { dfeSyncRoutes } from './modules/inbound/dfe-sync.ts';
 import { inboundRoutes } from './modules/inbound/inbound.ts';
 import { inboundMaintenanceRoutes } from './modules/inbound/maintenance.ts';
 import { nfeSettingsRoutes } from './modules/inbound/nfe-settings.ts';
@@ -67,6 +68,7 @@ export function buildApp(options?: { logger?: boolean }) {
   fastify.register(dashboardRoutes, { prefix: '/dashboard' });
   fastify.register(certificateRoutes, { prefix: '/certificates' });
   fastify.register(inboundMaintenanceRoutes, { prefix: '/inbound' });
+  fastify.register(dfeSyncRoutes, { prefix: '/inbound' });
   fastify.register(inboundRoutes, { prefix: '/inbound' });
   fastify.register(authRoutes, { prefix: '/auth' });
   fastify.register(personsRoutes, { prefix: '/persons' });

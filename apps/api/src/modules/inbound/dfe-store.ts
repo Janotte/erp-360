@@ -40,6 +40,7 @@ export async function saveDfeDistribution(
   tenantId: string,
   environment: CertificateEnvironment,
   distribution: DfeDistribution,
+  queriedAt = new Date(),
 ) {
   return db.transaction(async (tx) => {
     const cursor = await ensureCursor(tx, tenantId, environment);
@@ -73,7 +74,7 @@ export async function saveDfeDistribution(
         ultNsu: laterNsu(cursor.ultNsu, distribution.ultNsu),
         maxNsu: laterNsu(cursor.maxNsu, distribution.maxNsu),
         lastStatus: distribution.cStat,
-        queriedAt: new Date(),
+        queriedAt,
       })
       .where(
         and(eq(dfeCursors.tenantId, tenantId), eq(dfeCursors.environment, environment)),

@@ -3,7 +3,7 @@ import { URL } from 'node:url';
 
 import type { CertificateEnvironment } from '@erp-360/shared';
 
-import { sefazStatusRequest, interpretSefaz } from './sefaz.ts';
+import { interpretSefaz, sefazStatusRequest } from './sefaz.ts';
 
 export interface RemoteProbe {
   ok: boolean;
@@ -29,7 +29,8 @@ function describeProbeError(error: unknown) {
   if (!(error instanceof Error)) return 'Falha ao validar a conexão.';
   if (error.message === 'Tempo esgotado ao conectar no serviço.') return error.message;
   const code = 'code' in error && typeof error.code === 'string' ? error.code : '';
-  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return 'Não foi possível localizar o serviço.';
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN')
+    return 'Não foi possível localizar o serviço.';
   if (code === 'ECONNREFUSED' || code === 'ECONNRESET' || code === 'EPROTO') {
     return 'A conexão com o serviço foi recusada.';
   }
@@ -54,58 +55,87 @@ function requestHttps(input: {
   body?: string;
 }) {
   const url = new URL(input.endpoint);
-  return new Promise<{ statusCode: number | null; statusMessage: string | null; body: string }>(
-    (resolve, reject) => {
-      let settled = false;
-      const finish = (callback: () => void) => {
-        if (settled) return;
-        settled = true;
-        callback();
-      };
+  return new Promise<{
+    statusCode: number | null;
+    statusMessage: string | null;
+    body: string;
+  }>((resolve, reject) => {
+    let settled = false;
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      callback();
+    };
 
-      const request = https.request(
-        {
-          protocol: url.protocol,
-          hostname: url.hostname,
-          port: url.port || undefined,
-          path: `${url.pathname}${url.search}`,
-          method: input.method,
-          cert: input.certificatePem,
-          key: input.privateKeyPem,
-          rejectUnauthorized: true,
-          timeout: input.timeoutMs,
-          headers: input.headers,
-        },
-        (response) => {
-          const chunks: Buffer[] = [];
-          let size = 0;
-          response.on('data', (chunk: Buffer) => {
-            if (size >= 64_000) return;
-            const piece = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-            chunks.push(piece);
-            size += piece.length;
-          });
-          response.on('end', () => {
-            finish(() =>
-              resolve({
-                statusCode: response.statusCode ?? null,
-                statusMessage: response.statusMessage ?? null,
-                body: Buffer.concat(chunks).subarray(0, 64_000).toString('utf8'),
-              }),
-            );
-          });
-        },
-      );
+    const request = https.request(
+      {
+        protocol: url.protocol,
+        hostname: url.hostname,
+        port: url.port || undefined,
+        path: `${url.pathname}${url.search}`,
+        method: input.method,
+        cert: input.certificatePem,
+        key: input.privateKeyPem,
+        rejectUnauthorized: true,
+        timeout: input.timeoutMs,
+        headers: input.headers,
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        response.on('data', (chunk: Buffer) => {
+          if (size >= 64_000) return;
+          const piece = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          chunks.push(piece);
+          size += piece.length;
+        });
+        response.on('end', () => {
+          finish(() =>
+            resolve({
+              statusCode: response.statusCode ?? null,
+              statusMessage: response.statusMessage ?? null,
+              body: Buffer.concat(chunks).subarray(0, 64_000).toString('utf8'),
+            }),
+          );
+        });
+      },
+    );
 
-      request.on('timeout', () => {
-        request.destroy();
-        finish(() => reject(new Error('Tempo esgotado ao conectar no serviço.')));
-      });
-      request.on('error', (error) => finish(() => reject(error)));
-      if (input.body) request.write(input.body);
-      request.end();
-    },
-  );
+    request.on('timeout', () => {
+      request.destroy();
+      finish(() => reject(new Error('Tempo esgotado ao conectar no serviço.')));
+    });
+    request.on('error', (error) => finish(() => reject(error)));
+    if (input.body) request.write(input.body);
+    request.end();
+  });
+}
+
+export async function postCertificate(input: {
+  endpoint: string;
+  body: string;
+  headers: Record<string, string>;
+  timeoutMs: number;
+  certificatePem: string;
+  privateKeyPem: string;
+}) {
+  if (!input.certificatePem || !input.privateKeyPem) throw new Error(missingMaterial);
+  try {
+    return await requestHttps({
+      endpoint: input.endpoint,
+      method: 'POST',
+      timeoutMs: input.timeoutMs,
+      certificatePem: input.certificatePem,
+      privateKeyPem: input.privateKeyPem,
+      headers: {
+        ...input.headers,
+        'Content-Length': String(Buffer.byteLength(input.body)),
+      },
+      body: input.body,
+    });
+  } catch (error) {
+    throw new Error(describeProbeError(error));
+  }
 }
 
 export async function probeHttps(input: {
@@ -115,7 +145,8 @@ export async function probeHttps(input: {
   privateKeyPem: string;
 }): Promise<RemoteProbe> {
   const startedAt = Date.now();
-  if (!input.certificatePem || !input.privateKeyPem) return failed(startedAt, missingMaterial);
+  if (!input.certificatePem || !input.privateKeyPem)
+    return failed(startedAt, missingMaterial);
 
   try {
     const response = await requestHttps({
@@ -148,7 +179,8 @@ export async function probeSefaz(input: {
   environment: CertificateEnvironment;
 }): Promise<RemoteProbe> {
   const startedAt = Date.now();
-  if (!input.certificatePem || !input.privateKeyPem) return failed(startedAt, missingMaterial);
+  if (!input.certificatePem || !input.privateKeyPem)
+    return failed(startedAt, missingMaterial);
 
   try {
     const soap = sefazStatusRequest({
