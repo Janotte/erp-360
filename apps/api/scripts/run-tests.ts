@@ -31,6 +31,7 @@ const child = spawn(
     'test/inbound-post.integration.test.ts',
     'test/certificate-connection.test.ts',
     'test/dfe-dist.test.ts',
+    'test/dfe-store.test.ts',
     'test/dashboard-period.test.ts',
     'test/settlement-math.test.ts',
     'test/title-list-status.test.ts',
