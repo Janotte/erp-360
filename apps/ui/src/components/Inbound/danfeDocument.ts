@@ -10,7 +10,7 @@ import type { DanfeDuplicate, DanfeItem, DanfeView } from '@/services/inbound';
 
 import template from '../../../../../doc/templates/nfe_vertical.html?raw';
 
-const htmlFields = new Set(['logo', 'duplicatas', 'itens']);
+const htmlFields = new Set(['duplicatas', 'itens']);
 
 function escapeHtml(value: string) {
   return value
@@ -137,7 +137,6 @@ export function danfeDocument(view: DanfeView) {
   const recipient = view.recipient;
   const transport = view.transport;
   const fields: Record<string, string> = {
-    logo: '',
     pagina: '1',
     total_paginas: '1',
     numero: view.number,
