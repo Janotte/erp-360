@@ -99,7 +99,15 @@ export interface DanfeParty {
   name: string;
   taxId: string;
   stateRegistration: string | null;
+  stateRegistrationSt: string | null;
+  municipalRegistration: string | null;
   address: string;
+  street: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  phone: string;
 }
 
 export interface DanfeItem {
@@ -107,11 +115,42 @@ export interface DanfeItem {
   code: string;
   description: string;
   ncm: string;
+  cst: string;
   cfop: string;
   unit: string;
   quantity: string;
   unitPrice: number;
   amount: number;
+  icmsBase: number | null;
+  icmsAmount: number | null;
+  icmsRate: string;
+  ipiAmount: number | null;
+  ipiRate: string;
+}
+
+export interface DanfeDuplicate {
+  number: string;
+  dueOn: string;
+  amount: number;
+}
+
+export interface DanfeTransport {
+  carrierName: string;
+  freightType: string;
+  anttCode: string;
+  plate: string;
+  plateState: string;
+  taxId: string;
+  address: string;
+  city: string;
+  state: string;
+  stateRegistration: string;
+  volumeQuantity: string;
+  volumeSpecies: string;
+  volumeBrand: string;
+  volumeNumber: string;
+  grossWeight: string;
+  netWeight: string;
 }
 
 export interface DanfeView {
@@ -119,15 +158,39 @@ export interface DanfeView {
   number: string;
   series: string;
   issuedAt: string;
+  entryAt: string;
+  entryTime: string;
   operation: string;
+  operationType: string;
   protocol: string | null;
+  protocolAt: string;
   emitter: DanfeParty;
   recipient: DanfeParty;
   items: DanfeItem[];
+  duplicates: DanfeDuplicate[];
+  transport: DanfeTransport;
   productsAmount: number;
   freightAmount: number;
+  insuranceAmount: number;
   discountAmount: number;
+  otherAmount: number;
+  icmsBase: number;
+  icmsAmount: number;
+  icmsStBase: number;
+  icmsStAmount: number;
+  importAmount: number;
+  icmsSenderAmount: number;
+  fcpAmount: number;
+  pisAmount: number;
+  ipiAmount: number;
+  icmsDestinationAmount: number;
+  taxAmount: number;
+  cofinsAmount: number;
   totalAmount: number;
+  servicesAmount: number;
+  issqnBase: number;
+  issqnAmount: number;
+  additionalInfo: string;
 }
 
 export interface ManifestResult {

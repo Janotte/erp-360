@@ -1,4 +1,3 @@
-import { formatCurrency } from '@erp-360/shared';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -25,11 +24,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  type DanfeView,
   type InboundListItem,
   inboundService,
   type RecipientManifestKind,
 } from '@/services/inbound';
+
+import { danfeDocument } from './danfeDocument';
 
 type Panel = 'events' | 'xml' | 'danfe' | 'justify' | null;
 
@@ -60,111 +60,6 @@ function formatAt(value: string | null) {
   return date.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
-}
-
-function formatTaxId(value: string) {
-  const digits = value.replace(/\D/g, '');
-  if (digits.length === 14) {
-    return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-  }
-  if (digits.length === 11) {
-    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-  }
-  return value || '—';
-}
-
-function groupKey(value: string) {
-  return value.replace(/(\d{4})(?=\d)/g, '$1 ') || '—';
-}
-
-function formatQty(value: string) {
-  return value.replace('.', ',') || '—';
-}
-
-function partyLines(party: DanfeView['emitter']) {
-  return [
-    escapeHtml(party.name),
-    formatTaxId(party.taxId),
-    party.stateRegistration ? `IE ${escapeHtml(party.stateRegistration)}` : '',
-    escapeHtml(party.address),
-  ]
-    .filter(Boolean)
-    .join('<br>');
-}
-
-function danfeDocument(view: DanfeView) {
-  const rows = view.items
-    .map(
-      (item) => `<tr>
-        <td>${escapeHtml(item.number)}</td>
-        <td>${escapeHtml(item.code)}</td>
-        <td>${escapeHtml(item.description)}</td>
-        <td>${escapeHtml(item.ncm)}</td>
-        <td>${escapeHtml(item.cfop)}</td>
-        <td>${escapeHtml(item.unit)}</td>
-        <td>${escapeHtml(formatQty(item.quantity))}</td>
-        <td>${escapeHtml(formatCurrency(item.unitPrice))}</td>
-        <td>${escapeHtml(formatCurrency(item.amount))}</td>
-      </tr>`,
-    )
-    .join('');
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8" />
-  <title>DANFE ${escapeHtml(view.number)}</title>
-  <style>
-    body { font-family: Arial, sans-serif; color: #111; margin: 24px; }
-    h1 { font-size: 18px; margin: 0; }
-    p { margin: 4px 0; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { border: 1px solid #ccc; padding: 4px 6px; font-size: 12px; text-align: left; }
-    .box { border: 1px solid #111; padding: 8px 12px; margin-top: 8px; }
-    .muted { color: #555; font-size: 11px; }
-    .key { font-family: Consolas, monospace; letter-spacing: 0.4px; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  </style>
-</head>
-<body>
-  <h1>DANFE</h1>
-  <p>Documento Auxiliar da Nota Fiscal Eletrônica</p>
-  <p><strong>0 - ENTRADA</strong> · NF-e nº ${escapeHtml(view.number)} · Série ${escapeHtml(view.series)}</p>
-  <p class="muted">${escapeHtml(view.operation || 'Sem natureza informada')} · ${escapeHtml(formatAt(view.issuedAt))}</p>
-  <div class="box">
-    <p class="muted">Chave de acesso</p>
-    <p class="key">${escapeHtml(groupKey(view.accessKey))}</p>
-    <p class="muted">Protocolo ${escapeHtml(view.protocol || '—')}</p>
-  </div>
-  <div class="grid">
-    <div class="box"><p class="muted">Emitente</p><p>${partyLines(view.emitter)}</p></div>
-    <div class="box"><p class="muted">Destinatário</p><p>${partyLines(view.recipient)}</p></div>
-  </div>
-  <table>
-    <thead>
-      <tr>
-        <th>Item</th><th>Código</th><th>Descrição</th><th>NCM</th><th>CFOP</th>
-        <th>Un</th><th>Qtd</th><th>Unitário</th><th>Total</th>
-      </tr>
-    </thead>
-    <tbody>${rows || '<tr><td colspan="9">Nenhum item no XML.</td></tr>'}</tbody>
-  </table>
-  <div class="box">
-    <p>Produtos: ${escapeHtml(formatCurrency(view.productsAmount))}</p>
-    <p>Frete: ${escapeHtml(formatCurrency(view.freightAmount))}</p>
-    <p>Desconto: ${escapeHtml(formatCurrency(view.discountAmount))}</p>
-    <p><strong>Total da nota: ${escapeHtml(formatCurrency(view.totalAmount))}</strong></p>
-  </div>
-  <p class="muted">Consulta gerada a partir do XML armazenado.</p>
-</body>
-</html>`;
-}
-
 export function InboundNoteMenu({
   cursor,
   onClose,
@@ -175,6 +70,7 @@ export function InboundNoteMenu({
   onManifested: () => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const danfeFrame = useRef<HTMLIFrameElement>(null);
   const [manifestOpen, setManifestOpen] = useState(false);
   const [active, setActive] = useState<InboundListItem | null>(null);
   const [panel, setPanel] = useState<Panel>(null);
@@ -444,7 +340,7 @@ export function InboundNoteMenu({
       </Dialog>
 
       <Dialog open={panel === 'danfe'} onOpenChange={(open) => !open && setPanel(null)}>
-        <DialogContent className="max-h-[90vh] max-w-5xl">
+        <DialogContent className="max-h-[92vh] max-w-[1100px]">
           <DialogHeader>
             <DialogTitle>DANFE</DialogTitle>
             <DialogDescription>
@@ -460,6 +356,7 @@ export function InboundNoteMenu({
           {danfe.data ? (
             <>
               <iframe
+                ref={danfeFrame}
                 title="DANFE"
                 className="h-[65vh] w-full rounded-md border bg-white"
                 srcDoc={danfeDocument(danfe.data)}
@@ -468,15 +365,13 @@ export function InboundNoteMenu({
                 <Button
                   type="button"
                   onClick={() => {
-                    const popup = window.open('', '_blank', 'noopener,noreferrer');
-                    if (!popup) {
-                      toast.error('O navegador bloqueou a janela do DANFE.');
+                    const frame = danfeFrame.current?.contentWindow;
+                    if (!frame) {
+                      toast.error('Não foi possível imprimir o DANFE.');
                       return;
                     }
-                    popup.document.write(danfeDocument(danfe.data));
-                    popup.document.close();
-                    popup.focus();
-                    popup.print();
+                    frame.focus();
+                    frame.print();
                   }}
                 >
                   Imprimir

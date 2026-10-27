@@ -1,0 +1,658 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>DANFE [numero]</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 10mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #fff;
+      color: #000;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .page {
+      width: 19cm;
+      margin: 0 auto;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8pt;
+      color: #000;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8pt;
+    }
+
+    td,
+    th {
+      border: 1px solid #000;
+      vertical-align: top;
+      padding: 1px 3px;
+    }
+
+    .no-border,
+    .no-border td {
+      border: none;
+    }
+
+    .nf-label {
+      display: block;
+      margin-bottom: 1px;
+      font-size: 6.5pt;
+      font-weight: 400;
+      line-height: 1.15;
+      text-transform: uppercase;
+    }
+
+    .nf-label.compact {
+      font-size: 6pt;
+    }
+
+    .info {
+      display: block;
+      min-height: 1.15em;
+      font-size: 8.5pt;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+
+    .area-name {
+      margin: 5px 0 1px;
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .center {
+      text-align: center;
+    }
+
+    .right {
+      text-align: right;
+    }
+
+    .upper {
+      text-transform: uppercase;
+    }
+
+    .canhoto-number {
+      width: 32mm;
+      font-size: 9pt;
+      font-weight: 700;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .canhoto-number span {
+      display: block;
+    }
+
+    .cut {
+      margin: 4px 0;
+      border: none;
+      border-top: 1px dashed #444;
+    }
+
+    .logo {
+      width: 28mm;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .logo img {
+      max-width: 26mm;
+      max-height: 24mm;
+    }
+
+    .emitter {
+      width: 62mm;
+      font-size: 8pt;
+      text-align: center;
+    }
+
+    .emitter .name {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 9pt;
+      font-weight: 700;
+    }
+
+    .danfe-box {
+      width: 34mm;
+      text-align: center;
+    }
+
+    .danfe-box h1 {
+      margin: 0 0 1mm;
+      font-size: 12pt;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .danfe-box p {
+      margin: 0 0 1.5mm;
+      font-size: 7pt;
+      line-height: 1.2;
+    }
+
+    .operation {
+      display: inline-block;
+      width: 5mm;
+      height: 5mm;
+      margin-left: 2mm;
+      border: 1px solid #000;
+      font-size: 9pt;
+      font-weight: 700;
+      line-height: 5mm;
+      vertical-align: middle;
+    }
+
+    .legend {
+      display: inline-block;
+      font-size: 7pt;
+      line-height: 1.2;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    .legend span,
+    .block {
+      display: block;
+    }
+
+    .access-key {
+      font-size: 7.5pt;
+      letter-spacing: 0;
+      text-align: center;
+    }
+
+    .taxes td {
+      width: 11.11%;
+    }
+
+    .taxes .info {
+      text-align: right;
+    }
+
+    .freight-code {
+      float: right;
+      width: 5mm;
+      height: 5mm;
+      border: 1px solid #000;
+      font-size: 8pt;
+      line-height: 5mm;
+      text-align: center;
+    }
+
+    .freight-legend {
+      margin: 0;
+      font-size: 6.5pt;
+      line-height: 1.2;
+    }
+
+    .products {
+      table-layout: fixed;
+    }
+
+    .products th {
+      padding: 2px 1px;
+      font-size: 6.5pt;
+      font-weight: 700;
+      text-align: center;
+      vertical-align: bottom;
+    }
+
+    .products td {
+      height: auto;
+      font-size: 7.5pt;
+      font-weight: 400;
+      overflow-wrap: anywhere;
+    }
+
+    .products {
+      margin-top: 0;
+    }
+
+    .products-box {
+      border: 1px solid #000;
+      border-top: none;
+    }
+
+    .products-box table {
+      border-style: hidden;
+    }
+
+    .extra td {
+      height: 22mm;
+    }
+
+    .extra .info {
+      font-weight: 400;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <table>
+      <tbody>
+        <tr>
+          <td colspan="2" class="upper">
+            Recebemos de [emitente_nome] os produtos e serviços constantes da nota fiscal indicada ao lado.
+          </td>
+          <td rowspan="2" class="canhoto-number">
+            <span>NF-e</span>
+            <span>Nº [numero]</span>
+            <span>Série [serie]</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="width: 32mm"><span class="nf-label">Data de recebimento</span></td>
+          <td><span class="nf-label">Identificação e assinatura do recebedor</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <hr class="cut" />
+
+    <table>
+      <tbody>
+        <tr>
+          <td rowspan="3" class="logo">[logo]</td>
+          <td rowspan="3" class="emitter">
+            <span class="name">[emitente_nome]</span>
+            <span class="block">[emitente_logradouro]</span>
+            <span class="block">[emitente_bairro] [emitente_cep]</span>
+            <span class="block">[emitente_municipio] - [emitente_uf]</span>
+            <span class="block">Fone: [emitente_telefone]</span>
+          </td>
+          <td rowspan="3" class="danfe-box">
+            <h1>DANFE</h1>
+            <p>Documento auxiliar da Nota Fiscal Eletrônica</p>
+            <p>
+              <span class="operation">[tipo_operacao]</span>
+              <span class="legend">
+                <span>0 - Entrada</span>
+                <span>1 - Saída</span>
+              </span>
+            </p>
+            <p>
+              <span class="block"><strong>Nº [numero]</strong></span>
+              <span class="block"><strong>Série [serie]</strong></span>
+              <span class="block">Página [pagina] de [total_paginas]</span>
+            </p>
+          </td>
+          <td class="center" style="width: 78mm">
+            <span class="nf-label">Controle do fisco</span>
+            <span class="info access-key">[chave]</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <span class="nf-label">Chave de acesso</span>
+            <span class="info access-key">[chave]</span>
+          </td>
+        </tr>
+        <tr>
+          <td class="center">
+            <span class="block">Consulta de autenticidade no portal nacional da NF-e</span>
+            www.nfe.fazenda.gov.br/portal ou no site da Sefaz autorizadora
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <table>
+      <tbody>
+        <tr>
+          <td>
+            <span class="nf-label">Natureza da operação</span>
+            <span class="info">[natureza]</span>
+          </td>
+          <td style="width: 78mm">
+            <span class="nf-label">Protocolo de autorização de uso</span>
+            <span class="info">[protocolo]</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <table>
+      <tbody>
+        <tr>
+          <td>
+            <span class="nf-label">Inscrição estadual</span>
+            <span class="info">[emitente_ie]</span>
+          </td>
+          <td style="width: 68mm">
+            <span class="nf-label">Inscrição estadual do substituto tributário</span>
+            <span class="info">[emitente_ie_st]</span>
+          </td>
+          <td style="width: 45mm">
+            <span class="nf-label">CNPJ</span>
+            <span class="info">[emitente_cnpj]</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="area-name">Destinatário / remetente</p>
+    <table>
+      <tbody>
+        <tr>
+          <td>
+            <span class="nf-label">Nome / razão social</span>
+            <span class="info">[destinatario_nome]</span>
+          </td>
+          <td style="width: 45mm">
+            <span class="nf-label">CNPJ / CPF</span>
+            <span class="info">[destinatario_cnpj]</span>
+          </td>
+          <td style="width: 32mm">
+            <span class="nf-label">Data de emissão</span>
+            <span class="info">[data_emissao]</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <span class="nf-label">Endereço</span>
+            <span class="info">[destinatario_logradouro]</span>
+          </td>
+          <td>
+            <span class="nf-label">Bairro / distrito</span>
+            <span class="info">[destinatario_bairro]</span>
+          </td>
+          <td>
+            <span class="nf-label">CEP</span>
+            <span class="info">[destinatario_cep]</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <table class="no-border">
+              <tbody>
+                <tr>
+                  <td>
+                    <span class="nf-label">Município</span>
+                    <span class="info">[destinatario_municipio]</span>
+                  </td>
+                  <td style="width: 32mm">
+                    <span class="nf-label">Fone</span>
+                    <span class="info">[destinatario_telefone]</span>
+                  </td>
+                  <td style="width: 12mm">
+                    <span class="nf-label">UF</span>
+                    <span class="info">[destinatario_uf]</span>
+                  </td>
+                  <td style="width: 38mm">
+                    <span class="nf-label">Inscrição estadual</span>
+                    <span class="info">[destinatario_ie]</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </td>
+          <td>
+            <span class="nf-label">Data de entrada / saída</span>
+            <span class="info">[data_entrada_saida]</span>
+          </td>
+          <td>
+            <span class="nf-label">Hora de entrada / saída</span>
+            <span class="info">[hora_entrada_saida]</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="area-name">Fatura / duplicatas</p>
+    [duplicatas]
+
+    <p class="area-name">Cálculo do imposto</p>
+    <table class="taxes">
+      <tbody>
+        <tr>
+          <td>
+            <span class="nf-label compact">Base de cálc. do ICMS</span>
+            <span class="info">[base_icms]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">Valor do ICMS</span>
+            <span class="info">[valor_icms]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">Base de cálc. ICMS ST</span>
+            <span class="info">[base_icms_st]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">Valor do ICMS ST</span>
+            <span class="info">[valor_icms_st]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">Valor do II</span>
+            <span class="info">[valor_importacao]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">ICMS UF remetente</span>
+            <span class="info">[valor_icms_remetente]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">Valor do FCP</span>
+            <span class="info">[valor_fcp]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">Valor do PIS</span>
+            <span class="info">[valor_pis]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">Valor dos produtos</span>
+            <span class="info">[valor_produtos]</span>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <span class="nf-label compact">Valor do frete</span>
+            <span class="info">[valor_frete]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">Valor do seguro</span>
+            <span class="info">[valor_seguro]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">Desconto</span>
+            <span class="info">[valor_desconto]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">Outras despesas</span>
+            <span class="info">[valor_outras]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">Valor do IPI</span>
+            <span class="info">[valor_ipi]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">ICMS UF destino</span>
+            <span class="info">[valor_icms_destino]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">Valor aprox. tributos</span>
+            <span class="info">[valor_tributos]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">Valor do COFINS</span>
+            <span class="info">[valor_cofins]</span>
+          </td>
+          <td>
+            <span class="nf-label compact">Valor total da nota</span>
+            <span class="info">[valor_total]</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="area-name">Transportador / volumes transportados</p>
+    <table>
+      <tbody>
+        <tr>
+          <td>
+            <span class="nf-label">Razão social</span>
+            <span class="info">[transportador_nome]</span>
+          </td>
+          <td style="width: 34mm">
+            <span class="nf-label">Frete por conta</span>
+            <span class="freight-code">[frete]</span>
+            <p class="freight-legend">0 - Emitente</p>
+            <p class="freight-legend">1 - Destinatário</p>
+            <p class="freight-legend">2 - Terceiros</p>
+            <p class="freight-legend">9 - Sem frete</p>
+          </td>
+          <td style="width: 22mm">
+            <span class="nf-label">Código ANTT</span>
+            <span class="info">[transportador_antt]</span>
+          </td>
+          <td style="width: 24mm">
+            <span class="nf-label">Placa</span>
+            <span class="info">[transportador_placa]</span>
+          </td>
+          <td style="width: 12mm">
+            <span class="nf-label">UF</span>
+            <span class="info">[transportador_placa_uf]</span>
+          </td>
+          <td style="width: 36mm">
+            <span class="nf-label">CNPJ / CPF</span>
+            <span class="info">[transportador_cnpj]</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <table>
+      <tbody>
+        <tr>
+          <td>
+            <span class="nf-label">Endereço</span>
+            <span class="info">[transportador_logradouro]</span>
+          </td>
+          <td style="width: 46mm">
+            <span class="nf-label">Município</span>
+            <span class="info">[transportador_municipio]</span>
+          </td>
+          <td style="width: 12mm">
+            <span class="nf-label">UF</span>
+            <span class="info">[transportador_uf]</span>
+          </td>
+          <td style="width: 40mm">
+            <span class="nf-label">Inscrição estadual</span>
+            <span class="info">[transportador_ie]</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <table>
+      <tbody>
+        <tr>
+          <td>
+            <span class="nf-label">Quantidade</span>
+            <span class="info">[volumes_quantidade]</span>
+          </td>
+          <td>
+            <span class="nf-label">Espécie</span>
+            <span class="info">[volumes_especie]</span>
+          </td>
+          <td>
+            <span class="nf-label">Marca</span>
+            <span class="info">[volumes_marca]</span>
+          </td>
+          <td>
+            <span class="nf-label">Numeração</span>
+            <span class="info">[volumes_numeracao]</span>
+          </td>
+          <td>
+            <span class="nf-label">Peso bruto</span>
+            <span class="info right">[peso_bruto]</span>
+          </td>
+          <td>
+            <span class="nf-label">Peso líquido</span>
+            <span class="info right">[peso_liquido]</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="area-name">Dados do produto / serviço</p>
+    <div class="products-box">
+      <table class="products">
+        <thead>
+          <tr>
+            <th style="width: 16mm">Código</th>
+            <th>Descrição do produto / serviço</th>
+            <th style="width: 14mm">NCM/SH</th>
+            <th style="width: 8mm">CST</th>
+            <th style="width: 9mm">CFOP</th>
+            <th style="width: 8mm">Un</th>
+            <th style="width: 12mm">Quantidade</th>
+            <th style="width: 14mm">Valor unitário</th>
+            <th style="width: 14mm">Valor total</th>
+            <th style="width: 13mm">Base ICMS</th>
+            <th style="width: 12mm">Valor ICMS</th>
+            <th style="width: 11mm">Valor IPI</th>
+            <th style="width: 10mm">Alíq. ICMS</th>
+            <th style="width: 10mm">Alíq. IPI</th>
+          </tr>
+        </thead>
+        <tbody>
+          [itens]
+        </tbody>
+      </table>
+    </div>
+
+    <p class="area-name">Cálculo do ISSQN</p>
+    <table>
+      <tbody>
+        <tr>
+          <td>
+            <span class="nf-label">Inscrição municipal</span>
+            <span class="info">[emitente_im]</span>
+          </td>
+          <td>
+            <span class="nf-label">Valor total dos serviços</span>
+            <span class="info right">[valor_servicos]</span>
+          </td>
+          <td>
+            <span class="nf-label">Base de cálculo do ISSQN</span>
+            <span class="info right">[base_issqn]</span>
+          </td>
+          <td>
+            <span class="nf-label">Valor do ISSQN</span>
+            <span class="info right">[valor_issqn]</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="area-name">Dados adicionais</p>
+    <table class="extra">
+      <tbody>
+        <tr>
+          <td>
+            <span class="nf-label">Informações complementares</span>
+            <span class="info">[informacoes_complementares]</span>
+          </td>
+          <td style="width: 70mm">
+            <span class="nf-label">Reservado ao fisco</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

@@ -13,4 +13,9 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'), // Mapeia o alias @ para a pasta src
     },
   },
+  server: {
+    fs: {
+      allow: [path.resolve(import.meta.dirname, '../..')],
+    },
+  },
 });
