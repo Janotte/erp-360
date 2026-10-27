@@ -219,7 +219,7 @@ export async function certificateMaterial(
     throw new InboundError(400, 'O certificado A1 deste ambiente está fora da validade.');
   }
   try {
-    const password = decryptPassword(certificate.passwordCipher, env.auth.jwtSecret);
+    const password = decryptPassword(certificate.passwordCipher, env.certificate.secret);
     const material = readPfxMaterial(certificate.pfx, password);
     if (!material.certificatePem || !material.privateKeyPem) {
       throw new Error('sem chave');

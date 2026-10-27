@@ -30,6 +30,7 @@ jobs:
       DATABASE_PASSWORD: postgres
       JWT_SECRET: ci-jwt-secret-with-at-least-32-chars
       JWT_EXPIRES_IN: 1d
+      CERTIFICATE_SECRET: ci-certificate-secret-with-at-least-32-chars
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

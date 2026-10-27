@@ -63,6 +63,10 @@ export const env = {
     jwtExpiresIn: rawEnv.JWT_EXPIRES_IN,
   },
 
+  certificate: {
+    secret: rawEnv.CERTIFICATE_SECRET,
+  },
+
   cors: {
     origins:
       configuredCorsOrigins.length > 0 ? configuredCorsOrigins : developmentCorsOrigins,

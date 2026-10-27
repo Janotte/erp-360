@@ -54,8 +54,18 @@ export const appEnvSchema = z
 
     JWT_SECRET: z.string().min(32),
     JWT_EXPIRES_IN: z.string().min(1).default('1d'),
+
+    CERTIFICATE_SECRET: z.string().min(32),
   })
   .superRefine((data, ctx) => {
+    if (data.CERTIFICATE_SECRET === data.JWT_SECRET) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['CERTIFICATE_SECRET'],
+        message: 'Use um segredo diferente do JWT_SECRET.',
+      });
+    }
+
     const origins = parseCorsOrigins(data.CORS_ORIGINS);
     if (origins.length === 0) {
       if (data.NODE_ENV === 'production') {

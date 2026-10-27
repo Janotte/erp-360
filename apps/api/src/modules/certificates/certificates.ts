@@ -19,7 +19,7 @@ import { z } from 'zod';
 
 import { env } from '../../config/index.ts';
 import { db } from '../../db/index.ts';
-import { decryptPassword, encryptPassword } from './cipher.ts';
+import { certificateReadMessage, decryptPassword, encryptPassword } from './cipher.ts';
 import { CertificateError } from './errors.ts';
 import {
   decodePfxBase64,
@@ -282,7 +282,7 @@ export const certificateRoutes: FastifyPluginAsyncZod = async (fastify) => {
             environment: request.body.environment,
             label: cleanLabel(request.body.label),
             pfx: decodePfxBase64(request.body.pfxBase64),
-            passwordCipher: encryptPassword(request.body.password, env.auth.jwtSecret),
+            passwordCipher: encryptPassword(request.body.password, env.certificate.secret),
             serialNumber: parsed.serialNumber,
             thumbprintSha256: parsed.thumbprintSha256,
             subjectName: parsed.subjectName,
@@ -346,14 +346,22 @@ export const certificateRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
       let certificatePem = '';
       let privateKeyPem = '';
+      let loadError: string | null = null;
       try {
-        const password = decryptPassword(certificate.passwordCipher, env.auth.jwtSecret);
+        const password = decryptPassword(certificate.passwordCipher, env.certificate.secret);
         const material = readPfxMaterial(certificate.pfx, password);
         certificatePem = material.certificatePem;
         privateKeyPem = material.privateKeyPem;
-      } catch {
-        certificatePem = '';
-        privateKeyPem = '';
+        if (!certificatePem || !privateKeyPem) {
+          loadError = 'Não foi possível carregar o certificado para a conexão.';
+        }
+      } catch (error) {
+        loadError =
+          certificateReadMessage(error) === 'saved-password'
+            ? 'A senha salva do certificado não pode mais ser lida. Importe o certificado novamente.'
+            : error instanceof CertificateError
+              ? error.message
+              : 'Não foi possível carregar o certificado para a conexão.';
       }
 
       const now = Date.now();
@@ -377,29 +385,31 @@ export const certificateRoutes: FastifyPluginAsyncZod = async (fastify) => {
         certificatePem,
       });
 
+      const unavailable = {
+        ok: false,
+        statusCode: null,
+        statusMessage: null,
+        latencyMs: 0,
+      };
       const remote = !remoteTarget.endpoint
-        ? {
-            ok: false,
-            statusCode: null,
-            statusMessage: null,
-            latencyMs: 0,
-            error: remoteTarget.error,
-          }
-        : target === 'sefaz'
-          ? await probeSefaz({
-              endpoint: remoteTarget.endpoint,
-              timeoutMs: connectionTimeoutMs,
-              certificatePem,
-              privateKeyPem,
-              cUF: remoteTarget.cUF,
-              environment: certificate.environment,
-            })
-          : await probeHttps({
-              endpoint: remoteTarget.endpoint,
-              timeoutMs: connectionTimeoutMs,
-              certificatePem,
-              privateKeyPem,
-            });
+        ? { ...unavailable, error: remoteTarget.error }
+        : loadError
+          ? { ...unavailable, error: loadError }
+          : target === 'sefaz'
+            ? await probeSefaz({
+                endpoint: remoteTarget.endpoint,
+                timeoutMs: connectionTimeoutMs,
+                certificatePem,
+                privateKeyPem,
+                cUF: remoteTarget.cUF,
+                environment: certificate.environment,
+              })
+            : await probeHttps({
+                endpoint: remoteTarget.endpoint,
+                timeoutMs: connectionTimeoutMs,
+                certificatePem,
+                privateKeyPem,
+              });
 
       return certificateConnectionSchema.parse({
         validLocal: isActive && notExpired && hasPrivateKey && hasCertificate,

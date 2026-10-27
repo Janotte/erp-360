@@ -16,6 +16,12 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   throw new Error('JWT_SECRET com pelo menos 32 caracteres é necessário para os testes.');
 }
 
+if (!process.env.CERTIFICATE_SECRET || process.env.CERTIFICATE_SECRET.length < 32) {
+  throw new Error(
+    'CERTIFICATE_SECRET com pelo menos 32 caracteres é necessário para os testes.',
+  );
+}
+
 await prepareTestDatabase();
 
 const child = spawn(
