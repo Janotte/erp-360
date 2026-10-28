@@ -1,0 +1,100 @@
+Exemplo para uma Assistência técnica:
+
+Cabeçalho:
+<!-- Informações do Emitente -->
+- Logo: {{tenants.logo}}
+- Razão Social: {{tenants.name}}
+- CNPJ: {{tenants.cnpj}}
+- Inscrição Estadual: {{tenants.stateRegistration}}
+- Endereço Completo: {{tenants.street}}, {{tenants.number}} - {{tenants.complement}} - {{tenants.city.name}}/{{tenants.city.state.abbreviation}}
+- Telefone  {{tenants.phone}}
+- Celular  {{tenants.mobilePhone}}
+- WhatsApp  {{tenants.whatsapp}}
+- E-mail {{tenants.email}}
+- Número da OS (Gerado sequencialmente) {{order.number}}
+
+<!-- Dados de Abertura -->
+- Atendente: {{order.openedBy}}
+- Data e Hora de Abertura: {{order.openedAt}}
+- Data e Hora de Previsão de Entrega:{{order.promisedAt}}
+- Situação: {{order.status}}
+
+<!-- Informações do Cliente -->
+- Documento: {{person.taxId}}
+- Nome: {{person.name}}
+// main addresses
+- Logradouro: {{person.addresses.street}}
+- Número:{{person.addresses.number}}
+- Complemento:{{person.addresses.complement}}
+- Bairro:{{person.addresses.neighborhood}}
+- Munícípio:{{person.addresses.city.name}}
+- UF:{{person.addresses.city.state.abbreviation}}
+- Telefone:{{person.contacts.phone}} 
+- Celular:{{person.contacts.mobilePhone}}
+- Whatsapp:{{person.contacts.whatsapp}}
+
+<!-- Informações do Objeto -->
+Campo01 - (x) Ativo - Rótulo: Descrição do objeto: {{order.field01}}
+Campo02 - (x) Ativo - Rótulo: Marca: {{order.field02}}
+Campo03 - (x) Ativo - Rótulo: Modelo: {{order.field03}}
+Campo04 - (x) Ativo - Rótulo: Série: {{order.field04}}
+Campo05 - (x) Ativo - Rótulo: Solicitante: {{order.field05}}
+Campo06 - (x) Ativo - Rótulo: Setor: {{order.field06}}
+Campo07 - (x) Ativo - Rótulo: Usuário: {{order.field07}}
+Campo08 - (x) Ativo - Rótulo: Problema reclamado: {{order.field08}}
+Campo09 - (x) Ativo - Rótulo: Diagnóstico: {{order.field09}}
+Campo10 - (x) Ativo - Rótulo: Solução: {{order.field10}}
+Campo11 - (x) Ativo - Rótulo: Observações: {{order.field11}}
+
+<!-- Informações dos Produtos -->
+TítuloTabela01 - Rótulo: Produtos
+// Itens tipo product
+- Código: {{itens.code}}
+- Descrição: {{itens.name}}
+- Quantidade: {{itens.amount}}
+- Unitário: {{itens.listPrice}}
+- Total: {{amount}} * {{itens.listPrice}}
+
+<!-- Informações dos Serviços -->
+TítuloTabel02 - Rótulo: Serviços
+// Itens tipo product
+- Descrição: {{itens.name}}
+- Técnico
+- Quantidade: {{amount}}
+- Unitário: {{itens.listPrice}}
+- Total: {{amount}} * {{itens.listPrice}}
+
+<!-- Totais -->
+- Subtotal de Produtos: {{order.productsAmount}} 
+- Subtotal de Serviços: {{order.servicesAmount}}
+- Frete: {{order.freight}}
+- Desconto/Acréscimo: {{order.discountAmount}}
+- Total Geral: {{order.total}}
+
+<-- Informações de Pagamento -->
+- Meio de Pagamento
+- Forma de Pagamento {{}}
+
+<!-- Observações Finais -->
+- Linha01: {{order.notes.line1}}
+- Linha02: {{order.notes.line2}}
+- Linha03: {{order.notes.line3}}
+- Linha04: {{order.notes.line4}}
+- Linha05: {{order.notes.line5}}
+
+
+Exemplo para uma Assistência técnica:
+Se esse mesmo modelo for utilizado po uma oficina mecanica com rotulos de fields diferentes como:
+
+<!-- Informações do Objeto -->
+Campo01 - (x) Ativo - Rótulo: Marca: {{order.field01}}
+Campo02 - (x) Ativo - Rótulo: Modelo: {{order.field02}}
+Campo03 - (x) Ativo - Rótulo: Ano: {{order.field03}}
+Campo04 - (x) Ativo - Rótulo: Placa: {{order.field04}}
+Campo05 - (x) Ativo - Rótulo: Cor: {{order.field05}}
+Campo06 - (x) Ativo - Rótulo: Quilometragem Atual: {{order.field06}}
+Campo07 - (x) Ativo - Rótulo: Nível de Combustívell: {{order.field07}}
+Campo08 - (x) Ativo - Rótulo: Reclamação do Cliente / Sintomas: {{order.field08}}
+Campo09 - (x) Ativo - Rótulo: Diagnóstico Técnico: {{order.field09}}
+Campo10 - (x) Ativo - Rótulo: Checklist de Entrada / Vistoria Visual: {{order.field10}}
+Campo11 - (x) Ativo - Rótulo: Solução: {{order.field11}}

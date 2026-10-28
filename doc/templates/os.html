@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ordem de Serviço</title>
+  <style>
+    :root {
+      --primary-color: #1e293b;
+      --secondary-color: #475569;
+      --bg-light: #f8fafc;
+      --border-color: #cbd5e1;
+      --text-main: #0f172a;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: #e2e8f0;
+      color: var(--text-main);
+      padding: 20px;
+      font-size: 12px;
+      line-height: 1.1;
+    }
+
+    .os-container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 25px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    }
+
+    .os-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid var(--primary-color);
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+
+    .company-logo {
+      font-size: 22px;
+      text-align: center;
+      color: var(--primary-color);
+      text-transform: uppercase;
+    }
+
+    .company-info p {
+      font-size: 10px;
+      color: var(--secondary-color);
+      margin-bottom: 2px;
+    }
+
+    .os-number-badge {
+      background-color: var(--primary-color);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      text-align: right;
+    }
+
+    .os-number-badge span {
+      display: block;
+      font-size: 9px;
+      text-transform: uppercase;
+      opacity: 0.8;
+    }
+
+    .os-number-badge strong {
+      font-size: 16px;
+    }
+
+    .section-title {
+      background-color: var(--bg-light);
+      color: var(--primary-color);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 4px 8px;
+      margin-top: 8px;
+      margin-bottom: 8px;
+      border-left: 4px solid var(--primary-color);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .grid-row {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 15px 12px;
+      /* Aumentado o gap vertical para acomodar o label na borda */
+      margin-bottom: 3px;
+    }
+
+    /* CONTAINER DO CAMPO COM LABEL NA BORDA */
+    .field-group {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .field-group label {
+      position: absolute;
+      top: -2px;
+      left: 10px;
+      font-size: 8px;
+      font-weight: 700;
+      color: var(--secondary-color);
+      text-transform: uppercase;
+      background-color: #fff;
+      /* Cobre a borda traseira */
+      padding: 0 4px;
+      line-height: 1;
+    }
+
+    .field-value {
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 6px 10px 3px 10px;
+      background-color: #fff;
+      min-height: 25px;
+      font-size: 10px;
+    }
+
+    /* Tabelas */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 5px;
+      margin-bottom: 5px;
+    }
+
+    th {
+      background-color: var(--primary-color);
+      color: white;
+      font-size: 10px;
+      text-transform: uppercase;
+      padding: 4px 6px;
+      text-align: left;
+    }
+
+    td {
+      border: 1px solid var(--border-color);
+      padding: 4px 6px;
+      font-size: 10px;
+    }
+
+    .text-right {
+      text-align: right;
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    .empty-row td {
+      height: 25px;
+    }
+
+    /* Estilos do Footer */
+    .os-footer {
+      display: block;
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    @media print {
+      body {
+        background-color: #fff;
+        padding: 0;
+      }
+
+      .os-container {
+        box-shadow: none;
+        padding: 0;
+        max-width: 100%;
+      }
+
+      .field-group label {
+        background-color: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .section-title {
+        background-color: #f1f5f9 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      th {
+        background-color: #1e293b !important;
+        color: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="os-container">
+    <header class="os-header">
+      <!-- Informações do Emitente -->
+      <div class="company-logo">
+        <h1>Logo</h1>
+      </div>
+      <div class="company-info" style="grid-column: span 6">
+        <h3 style="
+              font-size: 12px;
+              color: var(--primary-color);
+              text-transform: uppercase;
+              margin-bottom: 5px;
+            ">
+          Hobby Informática Ltda
+        </h3>
+        <p>CNPJ: 01.338.319/0001-94 - IE: 253.443.830</p>
+        <p>
+          Avenida Prefeito Witiich Freitag, 1180 - Iririú - Joinville/SC -
+          CEP: 89227-025
+        </p>
+        <p>
+          (47) 3472-3260 - (47) 99998-5259 - (47) 98888-1212 -
+          atendimento@hobby.inf.br
+        </p>
+      </div>
+      <div class="os-number-badge">
+        <span>Ordem de Serviço</span>
+        <strong>Nº 000.000.000</strong>
+      </div>
+    </header>
+
+    <!-- Dados de Abertura -->
+    <div class="grid-row" style="margin-top: 10px">
+      <div class="field-group" style="grid-column: span 3">
+        <label>Atendente</label>
+        <div class="field-value">João Silva</div>
+      </div>
+      <div class="field-group" style="grid-column: span 2">
+        <label>Abertura</label>
+        <div class="field-value">27/10/2026 15:45</div>
+      </div>
+      <div class="field-group" style="grid-column: span 2">
+        <label>Previsão de Entrega</label>
+        <div class="field-value">27/10/2026 15:45</div>
+      </div>
+      <div class="field-group" style="grid-column: span 2">
+        <label>Tipo de atendimento</label>
+        <div class="field-value" style="font-weight: bold; color: #b45309">
+          Avulso
+        </div>
+      </div>
+      <div class="field-group" style="grid-column: span 3">
+        <label>Situação</label>
+        <div class="field-value" style="font-weight: bold; color: #b45309">
+          Em Análise
+        </div>
+      </div>
+    </div>
+
+    <!-- Informações do Cliente -->
+    <div class="section-title">Informações do Cliente</div>
+
+    <div class="grid-row">
+      <div class="field-group" style="grid-column: span 3">
+        <label>CPF/CNPJ</label>
+        <div class="field-value">00.000.000/0000-00</div>
+      </div>
+      <div class="field-group" style="grid-column: span 9">
+        <label>Nome</label>
+        <div class="field-value">Empresa de Teste Cliente S.A.</div>
+      </div>
+    </div>
+
+    <div class="grid-row">
+      <div class="field-group" style="grid-column: span 3">
+        <label>Telefone</label>
+        <div class="field-value">(47) 4002-8922</div>
+      </div>
+      <div class="field-group" style="grid-column: span 3">
+        <label>Celular</label>
+        <div class="field-value">(47) 99999-8888</div>
+      </div>
+      <div class="field-group" style="grid-column: span 3">
+        <label>WhatsApp</label>
+        <div class="field-value">(47) 99999-8888</div>
+      </div>
+      <div class="field-group" style="grid-column: span 3">
+        <label>Email</label>
+        <div class="field-value">cliente@teste.com.br</div>
+      </div>
+    </div>
+
+    <div class="grid-row">
+      <div class="field-group" style="grid-column: span 6">
+        <label>Logradouro, Número - Complemento</label>
+        <div class="field-value">
+          Avenida Procópio Gomes de Oliveira, 1000 - Sala 42
+        </div>
+      </div>
+      <div class="field-group" style="grid-column: span 3">
+        <label>Bairro</label>
+        <div class="field-value">Bucarein</div>
+      </div>
+      <div class="field-group" style="grid-column: span 3">
+        <label>Município</label>
+        <div class="field-value">Joinville - SC</div>
+      </div>
+    </div>
+
+    <!-- Informações do Objeto -->
+    <div class="section-title">Informações do Objeto</div>
+
+    <div class="grid-row">
+      <div class="field-group" style="grid-column: span 12">
+        <label>Descrição do objeto</label>
+        <div class="field-value">Notebook Corporativo Ultrabook</div>
+      </div>
+    </div>
+
+    <div class="grid-row">
+      <div class="field-group" style="grid-column: span 4">
+        <label>Marca</label>
+        <div class="field-value">Dell</div>
+      </div>
+      <div class="field-group" style="grid-column: span 4">
+        <label>Modelo</label>
+        <div class="field-value">Latitude 3420</div>
+      </div>
+      <div class="field-group" style="grid-column: span 4">
+        <label>Número de série</label>
+        <div class="field-value">FX982371-X</div>
+      </div>
+    </div>
+
+    <div class="grid-row">
+      <div class="field-group" style="grid-column: span 4">
+        <label>Solicitante</label>
+        <div class="field-value">Carlos Souza</div>
+      </div>
+      <div class="field-group" style="grid-column: span 4">
+        <label>Setor</label>
+        <div class="field-value">Financeiro</div>
+      </div>
+      <div class="field-group" style="grid-column: span 4">
+        <label>Usuário do equipamento</label>
+        <div class="field-value">Mariana Lima</div>
+      </div>
+    </div>
+
+    <div class="grid-row">
+      <div class="field-group" style="grid-column: span 12">
+        <label>Problema reclamado</label>
+        <div class="field-value">
+          Equipamento desliga sozinho após 10 minutos de uso intenso.
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-row">
+      <div class="field-group" style="grid-column: span 12">
+        <label>Diagnóstico</label>
+        <div class="field-value">
+          Superaquecimento do processador devido ao acúmulo de poeira no
+          cooler.
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-row">
+      <div class="field-group" style="grid-column: span 12">
+        <label>Solução</label>
+        <div class="field-value">
+          Realizada limpeza interna preventiva e troca da pasta térmica.
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-row">
+      <div class="field-group" style="grid-column: span 12">
+        <label>Recebido com</label>
+        <div class="field-value">Fonte, case e carregador.</div>
+      </div>
+    </div>
+
+    <!-- Informações dos Produtos -->
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 8%" class="text-center">Código</th>
+          <th style="width: 57%" class="text-center">Produtos</th>
+          <th style="width: 8%" class="text-center">Quant.</th>
+          <th style="width: 12%" class="text-center">Unitário</th>
+          <th style="width: 15%" class="text-center">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>0000001</td>
+          <td>Pasta Térmica Arctic Silver 5</td>
+          <td class="text-center">1</td>
+          <td class="text-right">R$ 65,00</td>
+          <td class="text-right">R$ 65,00</td>
+        </tr>
+        <tr class="empty-row">
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Informações dos Serviços -->
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 50%" class="text-center">Serviços</th>
+          <th style="width: 15%" class="text-center">Técnico</th>
+          <th style="width: 8%" class="text-center">Quant.</th>
+          <th style="width: 12%" class="text-center">Unitário</th>
+          <th style="width: 15%" class="text-center">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Suporte técnico em informática</td>
+          <td class="text-center">Leandro Janotte</td>
+          <td class="text-center">1</td>
+          <td class="text-right">R$ 200,00</td>
+          <td class="text-right">R$ 200,00</td>
+        </tr>
+        <tr class="empty-row">
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Totais -->
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 20%" class="text-center">Subtotal de Produtos</th>
+          <th style="width: 20%" class="text-center">Subtotal de Serviços</th>
+          <th style="width: 20%" class="text-center">Frete</th>
+          <th style="width: 20%" class="text-center">Desconto/Acréscimo</th>
+          <th style="width: 20%" class="text-center">Total Geral</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="text-center">R$ 65,00</td>
+          <td class="text-center">R$ 200,00</td>
+          <td class="text-center">R$ 0,00</td>
+          <td class="text-center">R$ 0,00</td>
+          <td class="text-center">R$ 265,00</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Informações de Pagamento -->
+    <div class="grid-row">
+      <div class="field-group" style="grid-column: span 8">
+        <label>Meio de Pagamento</label>
+        <div class="field-value">Pix</div>
+      </div>
+      <div class="field-group" style="grid-column: span 4">
+        <label>Condição</label>
+        <div class="field-value">À vista</div>
+      </div>
+    </div>
+    <!-- Observações Finais -->
+    <div class="grid-row">
+      <div class="field-group" style="grid-column: span 12">
+        <label>Observações Finais</label>
+        <div class="field-value">
+          <p>Garantia dos serviços e peças de 90 dias conforme o código de defesa do consumidor brasileiro.</p>
+          <p>( ) Autorizo o descarte das peças substituídas.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rodapé  -->
+    <footer class="os-footer">
+      <!-- Campos de signature -->
+      <div class="grid-row">
+        <div class="field-group" style="grid-column: span 6">
+          <label>Responsável Técnico</label>
+          <div class="field-value">
+            <br>
+            <p>_________________________________________________________________</p>
+          </div>
+        </div>
+        <div class="field-group textarea-box" style="grid-column: span 6">
+          <label>Assinatura do Cliente</label>
+          <div class="field-value">
+            <br>
+            <p>_________________________________________________________________</p>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
+</body>
+
+</html>
