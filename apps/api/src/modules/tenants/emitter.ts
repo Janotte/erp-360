@@ -34,6 +34,9 @@ const emitterBody = z.object({
   cnae: z.string().trim().max(10).nullish(),
   email: z.string().trim().max(80).nullish(),
   phone: z.string().trim().max(20).nullish(),
+  mobilePhone: z.string().trim().max(20).nullish(),
+  whatsapp: z.string().trim().max(20).nullish(),
+  logo: z.string().trim().max(500).nullish(),
   crt: z.enum(crtValues),
   postalCode: z.string().trim().max(9).nullish(),
   street: z.string().trim().max(60).nullish(),
@@ -85,14 +88,23 @@ function normalizeCnae(value: string | null | undefined) {
   return digits;
 }
 
-function normalizePhone(value: string | null | undefined) {
+function normalizePhone(value: string | null | undefined, label = 'Telefone') {
   const raw = emptyToNull(value);
   if (!raw) return null;
   const digits = onlyDigits(raw);
   if (digits.length < 6 || digits.length > 14) {
-    throw new EmitterError(400, 'Telefone deve ter de 6 a 14 dígitos.');
+    throw new EmitterError(400, `${label} deve ter de 6 a 14 dígitos.`);
   }
   return digits;
+}
+
+function normalizeLogo(value: string | null | undefined) {
+  const logo = emptyToNull(value);
+  if (!logo) return null;
+  if (logo.length > 500 || !/^https?:\/\//i.test(logo)) {
+    throw new EmitterError(400, 'Logo deve ser uma URL http ou https de até 500 caracteres.');
+  }
+  return logo;
 }
 
 function normalizeEmitterEmail(value: string | null | undefined) {
@@ -125,6 +137,9 @@ async function loadEmitter(tenantId: string) {
       cnae: tenants.cnae,
       email: tenants.email,
       phone: tenants.phone,
+      mobilePhone: tenants.mobilePhone,
+      whatsapp: tenants.whatsapp,
+      logo: tenants.logo,
       crt: tenants.crt,
       postalCode: tenants.postalCode,
       street: tenants.street,
@@ -179,6 +194,9 @@ export const emitterRoutes: FastifyPluginAsyncZod = async (fastify) => {
         cnae: normalizeCnae(body.cnae),
         email: normalizeEmitterEmail(body.email),
         phone: normalizePhone(body.phone),
+        mobilePhone: normalizePhone(body.mobilePhone, 'Celular'),
+        whatsapp: normalizePhone(body.whatsapp, 'WhatsApp'),
+        logo: normalizeLogo(body.logo),
         crt: body.crt,
         postalCode: normalizePostalCode(body.postalCode),
         street: optionalText(body.street, 60),

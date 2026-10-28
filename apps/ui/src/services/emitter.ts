@@ -11,6 +11,9 @@ export interface Emitter {
   cnae: string | null;
   email: string | null;
   phone: string | null;
+  mobilePhone: string | null;
+  whatsapp: string | null;
+  logo: string | null;
   crt: TenantCrt;
   postalCode: string | null;
   street: string | null;
@@ -32,6 +35,9 @@ export interface EmitterInput {
   cnae: string | null;
   email: string | null;
   phone: string | null;
+  mobilePhone: string | null;
+  whatsapp: string | null;
+  logo: string | null;
   crt: TenantCrt;
   postalCode: string | null;
   street: string | null;

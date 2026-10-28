@@ -29,6 +29,12 @@ export const tenants = pgTable('tenants', {
   email: varchar('email', { length: 80 }),
   /** Telefone só com dígitos. A NF-e aceita de 6 a 14. */
   phone: varchar('phone', { length: 14 }),
+  /** Celular só com dígitos, de 6 a 14. */
+  mobilePhone: varchar('mobile_phone', { length: 14 }),
+  /** WhatsApp só com dígitos, de 6 a 14. */
+  whatsapp: varchar('whatsapp', { length: 14 }),
+  /** URL da logo. */
+  logo: varchar('logo', { length: 500 }),
   crt: tenantCrtEnum('crt').default('1').notNull(),
   status: tenantStatusEnum('status').default('active').notNull(),
   /** CEP só com dígitos. A NF-e aceita 8. */

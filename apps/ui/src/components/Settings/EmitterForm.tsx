@@ -74,6 +74,9 @@ export function EmitterForm() {
   const [cnae, setCnae] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [mobilePhone, setMobilePhone] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [logo, setLogo] = useState('');
   const [crt, setCrt] = useState<TenantCrt>('1');
   const [postalCode, setPostalCode] = useState('');
   const [street, setStreet] = useState('');
@@ -103,6 +106,9 @@ export function EmitterForm() {
     setCnae(emitter.cnae ? formatCnae(emitter.cnae) : '');
     setEmail(emitter.email ?? '');
     setPhone(displayPhone(emitter.phone));
+    setMobilePhone(displayPhone(emitter.mobilePhone));
+    setWhatsapp(displayPhone(emitter.whatsapp));
+    setLogo(emitter.logo ?? '');
     setCrt(emitter.crt);
     setPostalCode(emitter.postalCode ? formatPostalCode(emitter.postalCode) : '');
     setStreet(emitter.street ?? '');
@@ -313,6 +319,9 @@ export function EmitterForm() {
             cnae: cnae || null,
             email: email || null,
             phone: phone || null,
+            mobilePhone: mobilePhone || null,
+            whatsapp: whatsapp || null,
+            logo: logo || null,
             crt,
             postalCode: postalCode || null,
             street: street || null,
@@ -423,7 +432,7 @@ export function EmitterForm() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-1">
           <Label htmlFor="emitterCnae">CNAE</Label>
           <Input
@@ -444,6 +453,21 @@ export function EmitterForm() {
             onChange={(event) => setEmail(event.target.value)}
           />
         </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="emitterLogo">Logo</Label>
+        <Input
+          id="emitterLogo"
+          type="url"
+          value={logo}
+          maxLength={500}
+          onChange={(event) => setLogo(event.target.value)}
+          placeholder="https://"
+        />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-1">
           <Label htmlFor="emitterPhone">Telefone</Label>
           <Input
@@ -452,6 +476,26 @@ export function EmitterForm() {
             maxLength={16}
             inputMode="numeric"
             onChange={(event) => setPhone(displayPhone(event.target.value))}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="emitterMobilePhone">Celular</Label>
+          <Input
+            id="emitterMobilePhone"
+            value={mobilePhone}
+            maxLength={16}
+            inputMode="numeric"
+            onChange={(event) => setMobilePhone(displayPhone(event.target.value))}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="emitterWhatsapp">WhatsApp</Label>
+          <Input
+            id="emitterWhatsapp"
+            value={whatsapp}
+            maxLength={16}
+            inputMode="numeric"
+            onChange={(event) => setWhatsapp(displayPhone(event.target.value))}
           />
         </div>
       </div>
