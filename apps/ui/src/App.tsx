@@ -24,6 +24,7 @@ import { ListCashBook } from './components/Financial/CashBook/ListCashBook';
 import { CashFlowView } from './components/Financial/CashFlow/CashFlowView';
 import { IncomeStatementView } from './components/Financial/IncomeStatement/IncomeStatementView';
 import { PayableList } from './components/Financial/Payables/PayableList';
+import { ListPaymentMethods } from './components/Financial/PaymentMethods/ListPaymentMethods';
 import { ListPlanAccounts } from './components/Financial/PlanAccounts/ListPlanAccounts';
 import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
 import { InboundPage } from './components/Inbound/InboundPage';
@@ -43,6 +44,7 @@ const rotasPorHash: Record<string, string> = {
   '#receivables': '/receivables',
   '#payables': '/payables',
   '#plan-accounts': '/plan-accounts',
+  '#payment-methods': '/payment-methods',
   '#cash-book': '/cash-book',
   '#bank-accounts': '/bank-accounts',
   '#cash-flow': '/cash-flow',
@@ -199,6 +201,14 @@ function App() {
               element={
                 <Pagina>
                   <ListPlanAccounts />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/payment-methods"
+              element={
+                <Pagina>
+                  <ListPaymentMethods />
                 </Pagina>
               }
             />

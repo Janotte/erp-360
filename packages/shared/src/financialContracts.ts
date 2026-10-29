@@ -145,10 +145,14 @@ export const planAccountCatalogSchema = z.object({
   name: z.string(),
 });
 
+export const meansFiscalGroups = ['none', 'card', 'electronic', 'other'] as const;
+export type MeansFiscalGroup = (typeof meansFiscalGroups)[number];
+
 export const meansOfPaymentCatalogSchema = z.object({
   id: z.string().uuid(),
   code: z.string(),
   description: z.string(),
+  fiscalGroup: z.enum(meansFiscalGroups),
 });
 
 export const cardBrandCatalogSchema = z.object({
@@ -159,6 +163,76 @@ export const cardBrandCatalogSchema = z.object({
 export const planAccountCatalogListSchema = z.array(planAccountCatalogSchema);
 export const meansOfPaymentCatalogListSchema = z.array(meansOfPaymentCatalogSchema);
 export const cardBrandCatalogListSchema = z.array(cardBrandCatalogSchema);
+
+export const paymentReceiptKinds = [
+  'cash',
+  'bank',
+  'customer_receivable',
+  'acquirer_receivable',
+  'store_credit',
+] as const;
+export type PaymentReceiptKind = (typeof paymentReceiptKinds)[number];
+
+export const paymentReceiptKindLabels: Record<PaymentReceiptKind, string> = {
+  cash: 'Caixa',
+  bank: 'Conta bancária',
+  customer_receivable: 'Recebível do cliente',
+  acquirer_receivable: 'Recebível da credenciadora',
+  store_credit: 'Crédito em loja',
+};
+
+export const paymentIntegrationTypes = ['integrated', 'not_integrated'] as const;
+export type PaymentIntegrationType = (typeof paymentIntegrationTypes)[number];
+
+export const paymentIntegrationTypeLabels: Record<PaymentIntegrationType, string> = {
+  integrated: 'Integrado',
+  not_integrated: 'Não integrado',
+};
+
+export const paymentInterestTypes = ['none', 'simple', 'price', 'flat', 'issuer'] as const;
+export type PaymentInterestType = (typeof paymentInterestTypes)[number];
+
+export const paymentInterestTypeLabels: Record<PaymentInterestType, string> = {
+  none: 'Sem juros',
+  simple: 'Juros simples',
+  price: 'Tabela Price',
+  flat: 'Percentual único',
+  issuer: 'Juros do emissor',
+};
+
+export const paymentMethodTermSchema = z.object({
+  id: z.string().uuid(),
+  installmentCount: z.number().int(),
+  firstDueDays: z.number().int(),
+  intervalDays: z.number().int(),
+  interestType: z.enum(paymentInterestTypes),
+  interestRateBps: z.number().int(),
+  administrativeFeeBps: z.number().int(),
+  fixedFeeAmount: z.number().int(),
+});
+
+export const paymentMethodSchema = z.object({
+  id: z.string().uuid(),
+  code: z.string(),
+  name: z.string(),
+  meansOfPaymentId: z.string().uuid(),
+  isActive: z.boolean(),
+  receiptKind: z.enum(paymentReceiptKinds),
+  settlementDays: z.number().int().nullable(),
+  integrationType: z.enum(paymentIntegrationTypes).nullable(),
+  acquirerId: z.string().uuid().nullable(),
+  cardBrandId: z.string().uuid().nullable(),
+  bankAccountId: z.string().uuid().nullable(),
+  useInQuote: z.boolean(),
+  useInSale: z.boolean(),
+  useInPos: z.boolean(),
+  useInServiceOrder: z.boolean(),
+  sortOrder: z.number().int(),
+  terms: z.array(paymentMethodTermSchema),
+});
+
+export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
+export type PaymentMethodTerm = z.infer<typeof paymentMethodTermSchema>;
 
 export const settlementPreviewSchema = z.object({
   originalAmount: z.number(),

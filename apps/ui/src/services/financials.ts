@@ -1,6 +1,7 @@
 import {
   apiErrorMessage,
   cardBrandCatalogListSchema,
+  type MeansFiscalGroup,
   meansOfPaymentCatalogListSchema,
   type PayableTitle,
   payableTitleSchema,
@@ -178,6 +179,10 @@ export interface CatalogOption {
   label: string;
 }
 
+export interface MeansOfPaymentOption extends CatalogOption {
+  fiscalGroup: MeansFiscalGroup;
+}
+
 export type TitleSortField =
   | 'documentNumber'
   | 'personName'
@@ -234,7 +239,7 @@ export const financialService = {
       label: `${item.accountCode} - ${item.name}`,
     }));
   },
-  listMeansOfPayment: async (): Promise<CatalogOption[]> => {
+  listMeansOfPayment: async (): Promise<MeansOfPaymentOption[]> => {
     const res = await apiFetch(`/financial/means-of-payment`);
     const body = await readBody(res);
     if (!res.ok) {
@@ -245,6 +250,7 @@ export const financialService = {
     return parsed.data.map((item) => ({
       id: item.id,
       label: `${item.code} - ${item.description}`,
+      fiscalGroup: item.fiscalGroup,
     }));
   },
   listCardBrands: async (): Promise<CatalogOption[]> => {

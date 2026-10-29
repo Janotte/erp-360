@@ -6,7 +6,7 @@ Cadastro usado em orçamento, venda, PDV e ordem de serviço. O catálogo fiscal
 
 Identificadores em inglês, no padrão de `persons`, `receivables` e `bank_accounts`. Dinheiro em centavos (`integer`). Percentual em basis points (`integer`), como `financial_settings.lateFeeBps`: 199 = 1,99%. Tabelas da empresa usam `tenantColumns` e chave estrangeira composta `(id, tenant_id)`. Catálogo da SEFAZ e bandeira não têm tenant, no mesmo modelo de `ncms` e `card_brands`.
 
-O meio de pagamento e a forma comercial já estão no módulo. A tela do cadastro, o preenchimento da forma no recebível e a cópia no documento continuam nos passos seguintes.
+O meio de pagamento, a forma comercial e a tela do cadastro já estão no módulo. O preenchimento da forma no recebível e a cópia no documento continuam nos passos seguintes.
 
 ## Ajustes em relação ao rascunho
 

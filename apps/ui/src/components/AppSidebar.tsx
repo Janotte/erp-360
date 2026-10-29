@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   ArrowUpRight,
+  Banknote,
   BookOpen,
   Box,
   ChevronRight,
@@ -72,6 +73,7 @@ const itensMenu: ItemMenu[] = [
       { title: 'Fluxo de caixa', icon: BookOpen, url: '/cash-flow' },
       { title: 'DRE', icon: FileText, url: '/income-statement' },
       { title: 'Plano de Contas', icon: BookOpen, url: '/plan-accounts' },
+      { title: 'Formas de pagamento', icon: Banknote, url: '/payment-methods' },
     ],
   },
   {

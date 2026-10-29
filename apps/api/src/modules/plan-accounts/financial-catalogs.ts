@@ -56,6 +56,7 @@ export const financialCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => 
         id: meansOfPayment.id,
         code: meansOfPayment.code,
         description: meansOfPayment.description,
+        fiscalGroup: meansOfPayment.fiscalGroup,
       })
       .from(meansOfPayment)
       .where(
