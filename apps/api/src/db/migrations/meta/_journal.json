@@ -330,6 +330,13 @@
       "when": 1793236903860,
       "tag": "0046_chubby_human_robot",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1793318236065,
+      "tag": "0047_public_magik",
+      "breakpoints": true
     }
   ]
 }
