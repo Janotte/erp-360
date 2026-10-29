@@ -14,7 +14,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { cardBrands } from './card_brands.ts';
-import { paymentMethods } from './payment_methods.ts';
+import { meansOfPayment } from './means_of_payment.ts';
 import { planAccounts } from './plan_accounts.ts';
 
 export const statusReceivableEnum = pgEnum('status_receivable', [
@@ -58,8 +58,8 @@ export const receivables = pgTable(
     invoiceNumber: varchar('invoice_number', { length: 44 }),
     /** Instituição financeira */
     financialInstitutionId: uuid('financial_institution_id'),
-    /** Método de pagamento */
-    paymentMethodId: uuid('payment_method_id').references(() => paymentMethods.id, {
+    /** Meio de pagamento (tPag) */
+    meansOfPaymentId: uuid('means_of_payment_id').references(() => meansOfPayment.id, {
       onDelete: 'restrict',
     }),
     /** Bandeira do cartão */

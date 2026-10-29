@@ -38,7 +38,7 @@ export const receivableTitleSchema = z.object({
   barcode: text,
   bankSlipOurNumber: text,
   financialInstitutionId: id,
-  paymentMethodId: id,
+  meansOfPaymentId: id,
   cardBrandId: id,
   transactionAuthorization: text,
   personName: text,
@@ -144,9 +144,9 @@ export const planAccountCatalogSchema = z.object({
   name: z.string(),
 });
 
-export const paymentMethodCatalogSchema = z.object({
+export const meansOfPaymentCatalogSchema = z.object({
   id: z.string().uuid(),
-  paymentTypeCode: z.string(),
+  code: z.string(),
   description: z.string(),
 });
 
@@ -156,7 +156,7 @@ export const cardBrandCatalogSchema = z.object({
 });
 
 export const planAccountCatalogListSchema = z.array(planAccountCatalogSchema);
-export const paymentMethodCatalogListSchema = z.array(paymentMethodCatalogSchema);
+export const meansOfPaymentCatalogListSchema = z.array(meansOfPaymentCatalogSchema);
 export const cardBrandCatalogListSchema = z.array(cardBrandCatalogSchema);
 
 export const settlementPreviewSchema = z.object({
@@ -196,7 +196,7 @@ const dashboardAccountSchema = z.object({
 });
 
 const dashboardPaymentSliceSchema = z.object({
-  paymentMethodId: z.string().uuid().nullable(),
+  meansOfPaymentId: z.string().uuid().nullable(),
   description: z.string(),
   amount: z.number().int(),
 });
@@ -218,7 +218,7 @@ export const dashboardSchema = z.object({
   sales: z.object({
     day: z.number().int(),
     month: z.number().int(),
-    byPaymentMethod: z.object({
+    byMeansOfPayment: z.object({
       day: z.array(dashboardPaymentSliceSchema),
       month: z.array(dashboardPaymentSliceSchema),
     }),

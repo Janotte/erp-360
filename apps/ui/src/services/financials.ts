@@ -1,9 +1,9 @@
 import {
   apiErrorMessage,
   cardBrandCatalogListSchema,
+  meansOfPaymentCatalogListSchema,
   type PayableTitle,
   payableTitleSchema,
-  paymentMethodCatalogListSchema,
   planAccountCatalogListSchema,
   type ReceivableTitle,
   receivableTitleSchema,
@@ -32,7 +32,7 @@ export interface FinancialAccount {
   barcode?: string;
   bankSlipOurNumber?: string;
   financialInstitutionId?: string;
-  paymentMethodId?: string;
+  meansOfPaymentId?: string;
   cardBrandId?: string;
   transactionAuthorization?: string;
 }
@@ -86,7 +86,7 @@ function fromReceivable(row: ReceivableTitle): FinancialAccount {
     barcode: definedText(row.barcode),
     bankSlipOurNumber: definedText(row.bankSlipOurNumber),
     financialInstitutionId: definedText(row.financialInstitutionId),
-    paymentMethodId: definedText(row.paymentMethodId),
+    meansOfPaymentId: definedText(row.meansOfPaymentId),
     cardBrandId: definedText(row.cardBrandId),
     transactionAuthorization: definedText(row.transactionAuthorization),
   };
@@ -138,7 +138,7 @@ function toCreatePayload(
     invoiceNumber: 'invoiceNumber' in dados ? dados.invoiceNumber : undefined,
     financialInstitutionId:
       'financialInstitutionId' in dados ? dados.financialInstitutionId : undefined,
-    paymentMethodId: 'paymentMethodId' in dados ? dados.paymentMethodId : undefined,
+    meansOfPaymentId: 'meansOfPaymentId' in dados ? dados.meansOfPaymentId : undefined,
     cardBrandId: 'cardBrandId' in dados ? dados.cardBrandId : undefined,
     transactionAuthorization:
       'transactionAuthorization' in dados ? dados.transactionAuthorization : undefined,
@@ -168,7 +168,7 @@ export interface CreateReceivableInput {
   bankSlipOurNumber?: string;
   invoiceNumber?: string;
   financialInstitutionId?: string;
-  paymentMethodId?: string;
+  meansOfPaymentId?: string;
   cardBrandId?: string;
   transactionAuthorization?: string;
 }
@@ -234,17 +234,17 @@ export const financialService = {
       label: `${item.accountCode} - ${item.name}`,
     }));
   },
-  listPaymentMethods: async (): Promise<CatalogOption[]> => {
-    const res = await apiFetch(`/financial/payment-methods`);
+  listMeansOfPayment: async (): Promise<CatalogOption[]> => {
+    const res = await apiFetch(`/financial/means-of-payment`);
     const body = await readBody(res);
     if (!res.ok) {
-      throw new Error(apiErrorMessage(body, 'Falha ao listar formas de pagamento.'));
+      throw new Error(apiErrorMessage(body, 'Falha ao listar meios de pagamento.'));
     }
-    const parsed = paymentMethodCatalogListSchema.safeParse(body);
-    if (!parsed.success) throw new Error('Resposta de formas de pagamento inválida.');
+    const parsed = meansOfPaymentCatalogListSchema.safeParse(body);
+    if (!parsed.success) throw new Error('Resposta de meios de pagamento inválida.');
     return parsed.data.map((item) => ({
       id: item.id,
-      label: `${item.paymentTypeCode} - ${item.description}`,
+      label: `${item.code} - ${item.description}`,
     }));
   },
   listCardBrands: async (): Promise<CatalogOption[]> => {

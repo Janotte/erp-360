@@ -1,8 +1,8 @@
 import '../../types/fastify.ts';
 
-import { cardBrands, paymentMethods, planAccounts } from '@erp-360/mod-financial';
+import { cardBrands, meansOfPayment, planAccounts } from '@erp-360/mod-financial';
 import { planAccountDreLines, planAccountNatures } from '@erp-360/shared';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -50,15 +50,22 @@ export const financialCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => 
     },
   );
 
-  fastify.get('/payment-methods', async () => {
+  fastify.get('/means-of-payment', async () => {
     return db
       .select({
-        id: paymentMethods.id,
-        paymentTypeCode: paymentMethods.paymentTypeCode,
-        description: paymentMethods.description,
+        id: meansOfPayment.id,
+        code: meansOfPayment.code,
+        description: meansOfPayment.description,
       })
-      .from(paymentMethods)
-      .orderBy(asc(paymentMethods.description));
+      .from(meansOfPayment)
+      .where(
+        and(
+          eq(meansOfPayment.isSelectable, true),
+          lte(meansOfPayment.startsOn, sql`CURRENT_DATE`),
+          or(isNull(meansOfPayment.endsOn), gte(meansOfPayment.endsOn, sql`CURRENT_DATE`)),
+        ),
+      )
+      .orderBy(asc(meansOfPayment.code));
   });
 
   fastify.get('/card-brands', async () => {

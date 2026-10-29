@@ -44,7 +44,7 @@ export function ReceivableForm({
   const [amountStr, setAmountStr] = useState('');
   const [planAccountId, setPlanAccountId] = useState('');
   const [financialInstitutionId, setFinancialInstitutionId] = useState('');
-  const [paymentMethodId, setPaymentMethodId] = useState('');
+  const [meansOfPaymentId, setMeansOfPaymentId] = useState('');
   const [cardBrandId, setCardBrandId] = useState('');
   const [bearerName, setBearerName] = useState('');
   const [barcode, setBarcode] = useState('');
@@ -62,7 +62,7 @@ export function ReceivableForm({
     setAmountStr(formatCurrencyInput(accountToUpdate.installmentAmount));
     setPlanAccountId(accountToUpdate.planAccountId || '');
     setFinancialInstitutionId(accountToUpdate.financialInstitutionId || '');
-    setPaymentMethodId(accountToUpdate.paymentMethodId || '');
+    setMeansOfPaymentId(accountToUpdate.meansOfPaymentId || '');
     setCardBrandId(accountToUpdate.cardBrandId || '');
     setBearerName(accountToUpdate.bearerName || '');
     setBarcode(accountToUpdate.barcode || '');
@@ -75,9 +75,9 @@ export function ReceivableForm({
     queryFn: () => financialService.listPlanAccounts({ acceptsEntries: true }),
   });
 
-  const { data: paymentMethods = [] } = useQuery({
-    queryKey: ['financial', 'payment-methods'],
-    queryFn: () => financialService.listPaymentMethods(),
+  const { data: meansOfPayment = [] } = useQuery({
+    queryKey: ['financial', 'means-of-payment'],
+    queryFn: () => financialService.listMeansOfPayment(),
   });
 
   const { data: cardBrands = [] } = useQuery({
@@ -120,7 +120,7 @@ export function ReceivableForm({
       dueOn,
       planAccountId: optionalId(planAccountId),
       financialInstitutionId: optionalId(financialInstitutionId),
-      paymentMethodId: optionalId(paymentMethodId),
+      meansOfPaymentId: optionalId(meansOfPaymentId),
       cardBrandId: optionalId(cardBrandId),
       bearerName: bearerName || undefined,
       barcode: barcode || undefined,
@@ -270,13 +270,13 @@ export function ReceivableForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <Label>Forma de pagamento</Label>
+          <Label>Meio de pagamento</Label>
           <CatalogSearchSelect
-            value={paymentMethodId}
-            onChange={setPaymentMethodId}
-            options={paymentMethods}
-            placeholder="Buscar forma de pagamento..."
-            emptyMessage="Nenhuma forma de pagamento cadastrada."
+            value={meansOfPaymentId}
+            onChange={setMeansOfPaymentId}
+            options={meansOfPayment}
+            placeholder="Buscar meio de pagamento..."
+            emptyMessage="Nenhum meio de pagamento cadastrado."
             allowClear={!readOnly}
             disabled={readOnly}
           />

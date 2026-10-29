@@ -62,7 +62,7 @@ const createReceivableSchema = z.object({
   bankSlipOurNumber: z.string().max(20).optional(),
   invoiceNumber: z.string().max(44).optional(),
   financialInstitutionId: z.string().uuid().optional(),
-  paymentMethodId: z.string().uuid().optional(),
+  meansOfPaymentId: z.string().uuid().optional(),
   cardBrandId: z.string().uuid().optional(),
   transactionAuthorization: z.string().max(128).optional(),
 });
@@ -134,7 +134,7 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           bankSlipOurNumber: data.bankSlipOurNumber || null,
           invoiceNumber: data.invoiceNumber || null,
           financialInstitutionId: data.financialInstitutionId || null,
-          paymentMethodId: data.paymentMethodId || null,
+          meansOfPaymentId: data.meansOfPaymentId || null,
           cardBrandId: data.cardBrandId || null,
           transactionAuthorization: data.transactionAuthorization || null,
           tenantId,
@@ -349,7 +349,7 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           bankSlipOurNumber: data.bankSlipOurNumber || null,
           invoiceNumber: data.invoiceNumber || null,
           financialInstitutionId: data.financialInstitutionId || null,
-          paymentMethodId: data.paymentMethodId || null,
+          meansOfPaymentId: data.meansOfPaymentId || null,
           cardBrandId: data.cardBrandId || null,
           transactionAuthorization: data.transactionAuthorization || null,
         })

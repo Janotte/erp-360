@@ -316,6 +316,13 @@
       "when": 1793156002081,
       "tag": "0044_tenant_logo_phones",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1793220000000,
+      "tag": "0045_means_of_payment",
+      "breakpoints": true
     }
   ]
 }

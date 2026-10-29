@@ -3,8 +3,8 @@ import '../../types/fastify.ts';
 import {
   bankAccounts,
   cashEntries,
+  meansOfPayment,
   payables,
-  paymentMethods,
   receivables,
 } from '@erp-360/mod-financial';
 import { civilDate, dashboardSchema } from '@erp-360/shared';
@@ -33,15 +33,15 @@ function cents(value: unknown) {
 
 function slices(
   rows: Array<{
-    paymentMethodId: string | null;
+    meansOfPaymentId: string | null;
     description: string | null;
     amount: unknown;
   }>,
 ) {
   return rows
     .map((row) => ({
-      paymentMethodId: row.paymentMethodId,
-      description: row.description || 'Sem forma de pagamento',
+      meansOfPaymentId: row.meansOfPaymentId,
+      description: row.description || 'Sem meio de pagamento',
       amount: cents(row.amount),
     }))
     .filter((row) => row.amount > 0)
@@ -84,13 +84,13 @@ export async function loadDashboard(tenantId: string, today = civilDate()) {
       .then((rows) => rows[0]),
     db
       .select({
-        paymentMethodId: receivables.paymentMethodId,
-        description: paymentMethods.description,
+        meansOfPaymentId: receivables.meansOfPaymentId,
+        description: meansOfPayment.description,
         dayAmount: sql<string>`coalesce(sum(${receivables.installmentAmount}) filter (where ${receivables.issueOn} = cast(${period.today} as date)), 0)`,
         monthAmount: sql<string>`coalesce(sum(${receivables.installmentAmount}) filter (where ${receivables.issueOn} >= cast(${period.monthFrom} as date) and ${receivables.issueOn} <= cast(${period.monthTo} as date)), 0)`,
       })
       .from(receivables)
-      .leftJoin(paymentMethods, eq(receivables.paymentMethodId, paymentMethods.id))
+      .leftJoin(meansOfPayment, eq(receivables.meansOfPaymentId, meansOfPayment.id))
       .where(
         and(
           eq(receivables.tenantId, tenantId),
@@ -100,7 +100,7 @@ export async function loadDashboard(tenantId: string, today = civilDate()) {
           lte(receivables.issueOn, period.monthTo),
         ),
       )
-      .groupBy(receivables.paymentMethodId, paymentMethods.description),
+      .groupBy(receivables.meansOfPaymentId, meansOfPayment.description),
     db
       .select({ balance: cashEntries.balance })
       .from(cashEntries)
@@ -157,17 +157,17 @@ export async function loadDashboard(tenantId: string, today = civilDate()) {
     sales: {
       day: cents(receivableRow?.salesDay),
       month: cents(receivableRow?.salesMonth),
-      byPaymentMethod: {
+      byMeansOfPayment: {
         day: slices(
           paymentRows.map((row) => ({
-            paymentMethodId: row.paymentMethodId,
+            meansOfPaymentId: row.meansOfPaymentId,
             description: row.description,
             amount: row.dayAmount,
           })),
         ),
         month: slices(
           paymentRows.map((row) => ({
-            paymentMethodId: row.paymentMethodId,
+            meansOfPaymentId: row.meansOfPaymentId,
             description: row.description,
             amount: row.monthAmount,
           })),

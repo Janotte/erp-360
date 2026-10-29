@@ -115,7 +115,7 @@ export function ReplicateReceivableDialog({
           planAccountId: source.planAccountId || undefined,
           invoiceNumber: source.invoiceNumber || undefined,
           financialInstitutionId: source.financialInstitutionId || undefined,
-          paymentMethodId: source.paymentMethodId || undefined,
+          meansOfPaymentId: source.meansOfPaymentId || undefined,
           cardBrandId: source.cardBrandId || undefined,
           bearerName: source.bearerName || undefined,
           barcode: source.barcode || undefined,

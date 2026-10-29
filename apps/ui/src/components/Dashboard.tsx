@@ -44,7 +44,7 @@ const SLICE_COLORS = [
 ];
 
 type Flow = DashboardSummary['receivables'];
-type PaymentSlice = DashboardSummary['sales']['byPaymentMethod']['month'][number];
+type PaymentSlice = DashboardSummary['sales']['byMeansOfPayment']['month'][number];
 type TreasuryAccount = DashboardSummary['treasury']['operating'][number];
 
 function monthLabel(iso: string) {
@@ -241,7 +241,7 @@ function PaymentMix({ slices }: { slices: PaymentSlice[] }) {
       <ul className="space-y-2">
         {slices.map((slice, index) => (
           <li
-            key={`${slice.paymentMethodId ?? 'none'}-${slice.description}`}
+            key={`${slice.meansOfPaymentId ?? 'none'}-${slice.description}`}
             className="flex items-center justify-between gap-3 text-sm"
           >
             <span className="flex min-w-0 items-center gap-2">
@@ -385,7 +385,7 @@ export function Dashboard() {
                   <ShoppingBag className="h-4 w-4" />
                 </span>
                 <div>
-                  <h2 className="font-semibold text-zinc-900">Vendas por forma de pagamento</h2>
+                  <h2 className="font-semibold text-zinc-900">Vendas por meio de pagamento</h2>
                   <p className="text-sm text-zinc-500">
                     Pelo valor dos títulos emitidos, sem os restantes de baixa parcial.
                   </p>
@@ -414,7 +414,7 @@ export function Dashboard() {
                 ))}
               </div>
             </header>
-            <PaymentMix slices={data.sales.byPaymentMethod[salesPeriod]} />
+            <PaymentMix slices={data.sales.byMeansOfPayment[salesPeriod]} />
           </section>
 
           <div className="grid gap-4 lg:grid-cols-2">
