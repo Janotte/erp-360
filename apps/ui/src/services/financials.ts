@@ -184,6 +184,7 @@ export interface CatalogOption {
 }
 
 export interface MeansOfPaymentOption extends CatalogOption {
+  code: string;
   fiscalGroup: MeansFiscalGroup;
 }
 
@@ -253,6 +254,7 @@ export const financialService = {
     if (!parsed.success) throw new Error('Resposta de meios de pagamento inválida.');
     return parsed.data.map((item) => ({
       id: item.id,
+      code: item.code,
       label: `${item.code} - ${item.description}`,
       fiscalGroup: item.fiscalGroup,
     }));

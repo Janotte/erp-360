@@ -508,7 +508,12 @@ export function ReceivableList() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent
+          className="sm:max-w-lg"
+          onOpenAutoFocus={(event) => {
+            if (selectedAccount) event.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>
               {formReadOnly

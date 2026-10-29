@@ -107,12 +107,10 @@ export function PayableForm({
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm space-y-1">
           <p className="font-medium text-emerald-800">Liquidação</p>
           <p className="text-emerald-700">
-            Data:{' '}
-            <strong>{formatRawDate(accountToUpdate.settledOn) || '-'}</strong>
+            Data: <strong>{formatRawDate(accountToUpdate.settledOn) || '-'}</strong>
           </p>
           <p className="text-emerald-700">
-            Valor pago:{' '}
-            <strong>{formatCurrency(accountToUpdate.settledAmount)}</strong>
+            Valor pago: <strong>{formatCurrency(accountToUpdate.settledAmount)}</strong>
           </p>
           <p className="text-emerald-700">
             Status: <strong>{accountToUpdate.status}</strong>
@@ -133,7 +131,7 @@ export function PayableForm({
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="documentNumber">Nº Documento / NF</Label>
+        <Label htmlFor="documentNumber">Nº do Documento</Label>
         <Input
           id="documentNumber"
           value={documentNumber}
@@ -151,6 +149,19 @@ export function PayableForm({
           maxLength={255}
           onChange={(e) => setDescription(e.target.value)}
           required={!readOnly}
+          disabled={readOnly}
+        />
+      </div>
+
+      <div className="space-y-1">
+        <Label>Plano de contas</Label>
+        <CatalogSearchSelect
+          value={planAccountId}
+          onChange={setPlanAccountId}
+          options={planAccounts}
+          placeholder="Buscar plano de contas..."
+          emptyMessage="Nenhum plano de contas cadastrado."
+          allowClear={!readOnly}
           disabled={readOnly}
         />
       </div>
@@ -195,19 +206,6 @@ export function PayableForm({
         />
       </div>
 
-      <div className="space-y-1">
-        <Label>Plano de contas</Label>
-        <CatalogSearchSelect
-          value={planAccountId}
-          onChange={setPlanAccountId}
-          options={planAccounts}
-          placeholder="Buscar plano de contas..."
-          emptyMessage="Nenhum plano de contas cadastrado."
-          allowClear={!readOnly}
-          disabled={readOnly}
-        />
-      </div>
-
       {readOnly ? (
         <div className="mt-2 flex gap-2">
           {onReplicate && accountToUpdate && (
@@ -215,19 +213,19 @@ export function PayableForm({
               Replicar
             </Button>
           )}
-          <Button
-            type="button"
-            variant="outline"
-            className="flex-1"
-            onClick={onSuccess}
-          >
+          <Button type="button" variant="outline" className="flex-1" onClick={onSuccess}>
             Fechar
           </Button>
         </div>
       ) : (
         <div className="mt-2 flex gap-2">
           {onReplicate && accountToUpdate && (
-            <Button type="button" variant="outline" className="flex-1" onClick={onReplicate}>
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={onReplicate}
+            >
               Replicar
             </Button>
           )}

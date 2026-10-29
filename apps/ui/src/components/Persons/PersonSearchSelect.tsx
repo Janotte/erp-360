@@ -36,6 +36,7 @@ export function PersonSearchSelect({
   const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState('');
   const [selectedLabel, setSelectedLabel] = useState('');
+  const [labelPending, setLabelPending] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchText.trim()), 400);
@@ -45,8 +46,11 @@ export function PersonSearchSelect({
   useEffect(() => {
     if (!value) {
       setSelectedLabel('');
+      setLabelPending(false);
       return;
     }
+    setOpen(false);
+    setLabelPending(true);
     let cancelled = false;
     personsService
       .get(value)
@@ -55,6 +59,9 @@ export function PersonSearchSelect({
       })
       .catch(() => {
         if (!cancelled) setSelectedLabel('');
+      })
+      .finally(() => {
+        if (!cancelled) setLabelPending(false);
       });
     return () => {
       cancelled = true;
@@ -105,21 +112,25 @@ export function PersonSearchSelect({
   if (disabled) {
     return (
       <div className="flex h-9 items-center rounded-md border border-input bg-zinc-50 px-3 text-sm text-zinc-700">
-        <span className="truncate">{selectedLabel || placeholder}</span>
+        <span className="truncate">
+          {selectedLabel || (labelPending ? 'Carregando...' : placeholder)}
+        </span>
       </div>
     );
   }
 
   return (
     <div ref={rootRef} className="relative">
-      {value && selectedLabel && !open ? (
+      {value && !open ? (
         <div className="flex h-9 items-center gap-1 rounded-md border border-input bg-transparent px-2 shadow-sm">
           <button
             type="button"
             className="flex min-w-0 flex-1 items-center gap-2 px-1 text-left text-sm"
             onClick={() => setOpen(true)}
           >
-            <span className="truncate">{selectedLabel}</span>
+            <span className={cn('truncate', !selectedLabel && 'text-zinc-500')}>
+              {selectedLabel || (labelPending ? 'Carregando...' : placeholder)}
+            </span>
             <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
           </button>
           {allowClear && (
