@@ -50,7 +50,7 @@ A aba existe justamente para o rótulo não ficar gravado no código. `field01` 
 | `person.addresses` e `person.contacts` | Endereço e contato principais viram uma cópia na ordem. O cadastro da pessoa pode mudar depois. |
 | `itens` do tipo produto nas duas tabelas | Produto usa item `product`. Serviço usa item `service`. |
 | `itens.listPrice` e total calculado no HTML | A linha grava quantidade, preço negociado e total em centavos. O preço de tabela só sugere o valor inicial. |
-| Meio e forma como `<select>` no comprovante | Meio aponta para `payment_methods`. A condição é o número de parcelas. O comprovante imprime os dois textos. |
+| Meio e forma como `<select>` no comprovante | A forma comercial aponta para `payment_methods`. A condição é a quantidade de parcelas dessa forma. O comprovante imprime o nome da forma e a condição. |
 | `{{user.name}}` para o atendente | `openedBy`, para não confundir com o usuário do equipamento. |
 | `order.previsionTo` | `promisedAt`, previsão de entrega. |
 | `order.createdAt` como data de abertura | `openedAt`. `createdAt` continua sendo a criação da linha. |
@@ -94,8 +94,8 @@ Estes dados existem em qualquer nicho. Não são campos configuráveis.
 | `productsAmount` | Soma das linhas de produto, em centavos. |
 | `servicesAmount` | Soma das linhas de serviço, em centavos. |
 | `totalAmount` | Produtos + serviços + frete − desconto + acréscimo. Tem de ser zero ou positivo. |
-| `paymentMethodId` | Meio, quando houver. Referência a `payment_methods`. |
-| `paymentInstallments` | Condição. `1` é à vista. De `2` a `12`, parcelas. |
+| `paymentMethodId` | Forma comercial, quando houver. Referência a `payment_methods`. O tPag é o meio dessa forma. |
+| `paymentInstallments` | Quantidade escolhida na forma, de 1 a 48. Precisa existir em `payment_method_terms`. |
 
 A cópia do cliente segue o mesmo gesto da entrada, que grava `supplierName` e `supplierTaxId` no documento. A origem é o endereço `Principal` e o contato `Principal`. Sem endereço ou sem contato, a ordem abre mesmo assim e os campos da cópia ficam vazios. Documento usa `persons.taxId`.
 
@@ -123,7 +123,7 @@ Transições aceitas:
 - Em execução → Aguardando peça, Pronta, Cancelada
 - Pronta → Entregue, Em execução, Cancelada
 
-Campo obrigatório é o que a aba marcar, e só é exigido ao salvar enquanto estiver ativo. Entregue exige meio de pagamento. Ao entregar, `deliveredAt` recebe a data e hora atuais se ainda estiver vazia.
+Campo obrigatório é o que a aba marcar, e só é exigido ao salvar enquanto estiver ativo. Entregue exige forma de pagamento. Ao entregar, `deliveredAt` recebe a data e hora atuais se ainda estiver vazia.
 
 ### Tipo de atendimento
 
@@ -235,7 +235,9 @@ A tabela de produtos imprime código, descrição, quantidade, unitário e total
 
 Totais da ordem são recalculados a cada salvamento das linhas. Desconto maior que produtos + serviços + frete + acréscimo é recusado.
 
-O meio de pagamento é um registro de `payment_methods` (dinheiro, cartão, Pix e os demais já cadastrados). A condição não é outro cadastro: `1` imprime “À vista”; `3` imprime “3x”. Meio vazio é permitido até a entrega.
+A forma de pagamento é um registro de `payment_methods`. A condição é uma quantidade que essa forma permite, de 1 a 48. `1` com carência zero imprime “À vista”; as demais imprimem “Nx”. Forma vazia é permitida até a entrega.
+
+Ao escolher a forma e a quantidade, a ordem copia a condição de `planDocumentPayment`: meio, parcelas, juros, taxas, carência, intervalo, recebimento, integração, credenciadora e bandeira. Alterar a forma depois não muda a ordem já gravada. A geração da conta a receber continua fora desta entrega; os títulos saem dessa cópia na entrega.
 
 ## Impressão
 
@@ -273,7 +275,7 @@ Cliente, a partir da cópia gravada na ordem: `customer.taxId`, `customer.name`,
 
 Campos: `field01` … `field11` ativos, na ordem do código, com o rótulo da aba (ou o rótulo gravado, se a ordem estiver entregue ou cancelada), o valor e a largura. Linha de observação com texto: `order.notes.line01` … `order.notes.line05`. Linha vazia não imprime.
 
-Itens e totais saem formatados em reais. `totals.adjustmentAmount` é o acréscimo menos o desconto, com sinal. `payment.methodDescription` vem de `payment_methods.description`. `payment.installmentsLabel` é “À vista” ou “Nx”. As duas assinaturas usam os rótulos da aba e não são persistidas.
+Itens e totais saem formatados em reais. `totals.adjustmentAmount` é o acréscimo menos o desconto, com sinal. `payment.methodDescription` vem de `payment_methods.name`. `payment.meansDescription` vem do meio dessa forma. `payment.installmentsLabel` é “À vista” quando a quantidade é 1 e a carência é 0, e “Nx” nos demais casos. As duas assinaturas usam os rótulos da aba e não são persistidas.
 
 `internalNotes` não tem placeholder.
 

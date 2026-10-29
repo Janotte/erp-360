@@ -8,13 +8,20 @@ export const paymentReceiptKinds = [
 
 export const paymentIntegrationTypes = ['integrated', 'not_integrated'] as const;
 
-export const paymentInterestTypes = ['none', 'simple', 'price', 'flat', 'issuer'] as const;
+export const paymentInterestTypes = [
+  'none',
+  'simple',
+  'price',
+  'flat',
+  'issuer',
+] as const;
 
 export const paymentChannels = ['quote', 'sale', 'pos', 'serviceOrder'] as const;
 
 export type PaymentReceiptKind = (typeof paymentReceiptKinds)[number];
 export type PaymentIntegrationType = (typeof paymentIntegrationTypes)[number];
 export type PaymentInterestType = (typeof paymentInterestTypes)[number];
+export type PaymentChannel = (typeof paymentChannels)[number];
 export type MeansFiscalGroup = 'none' | 'card' | 'electronic' | 'other';
 
 export type PaymentTermInput = {
@@ -95,7 +102,11 @@ export function paymentMethodRuleMessage(
     return 'O prazo de crédito da credenciadora só vale para recebível da adquirente.';
   }
   const issuer = input.terms.some((term) => term.interestType === 'issuer');
-  if (input.receiptKind === 'acquirer_receivable' && issuer && input.settlementDays === null) {
+  if (
+    input.receiptKind === 'acquirer_receivable' &&
+    issuer &&
+    input.settlementDays === null
+  ) {
     return 'Informe os dias até o crédito da credenciadora.';
   }
   return null;

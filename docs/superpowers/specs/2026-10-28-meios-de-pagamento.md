@@ -6,7 +6,7 @@ Cadastro usado em orçamento, venda, PDV e ordem de serviço. O catálogo fiscal
 
 Identificadores em inglês, no padrão de `persons`, `receivables` e `bank_accounts`. Dinheiro em centavos (`integer`). Percentual em basis points (`integer`), como `financial_settings.lateFeeBps`: 199 = 1,99%. Tabelas da empresa usam `tenantColumns` e chave estrangeira composta `(id, tenant_id)`. Catálogo da SEFAZ e bandeira não têm tenant, no mesmo modelo de `ncms` e `card_brands`.
 
-O meio de pagamento, a forma comercial, a tela do cadastro e o preenchimento da forma no recebível já estão no módulo. A cópia no documento continua no passo seguinte.
+O meio de pagamento, a forma comercial, a tela do cadastro, o preenchimento da forma no recebível e a cópia da condição para o documento já estão no módulo. A emissão continua no passo seguinte.
 
 ## Ajustes em relação ao rascunho
 
@@ -405,7 +405,7 @@ Quantidade de títulos:
 
 ## 4. O que o documento grava
 
-Orçamento, venda, PDV e ordem de serviço apontam para `payment_methods` e para a quantidade escolhida, que precisa existir em `payment_method_terms`. A especificação da ordem de serviço hoje trata `payment_methods` como o meio e limita a condição a 12. Na ordem, `paymentMethodId` passa a ser a forma comercial. O tPag é o `meansOfPaymentId` dessa forma. O teto de parcelas passa a ser o da condição, até 48.
+Orçamento, venda, PDV e ordem de serviço apontam para `payment_methods` e para a quantidade escolhida, que precisa existir em `payment_method_terms`. Na ordem, `paymentMethodId` é a forma comercial. O tPag é o `meansOfPaymentId` dessa forma. O teto de parcelas é o da condição, até 48.
 
 Cada pagamento do documento copia os números da condição no momento da escolha. Taxa ou adquirente alterados depois valem para os pagamentos seguintes. A cópia leva:
 
@@ -415,7 +415,9 @@ Cada pagamento do documento copia os números da condição no momento da escolh
 - `receiptKind`, `integrationType`, `acquirerId`, `cardBrandId`
 - na captura: cAut, identificador da transação e a bandeira devolvida pelo TEF, quando vierem
 
-Ainda não existe tabela de pagamento de venda nem de parcelas geradas a partir daqui. O que já existe, e serve de modelo da cópia, é `inbound_document_installments`: número, vencimento, valor em centavos e o título gerado. `receivables` já guarda bandeira, autorização, instituição financeira e valor da parcela.
+`planDocumentPayment` monta essa cópia e a lista de títulos. Ela recusa forma inativa, canal desligado e `store_credit`. O valor do cliente soma o juros de `simple`, `price` e `flat` ao principal; `none` e `issuer` não alteram o principal. A taxa administrativa e o valor fixo ficam na cópia e não entram no título. Os títulos seguem a quantidade descrita na condição. `indPag` sai da mesma cópia: 0 quando a quantidade é 1 e a carência é 0, e 1 nos demais casos. A bandeira e o cAut da captura, quando vierem, substituem os da forma.
+
+Ainda não existe tabela de pagamento de venda nem de parcelas geradas a partir daqui. O documento, quando existir, grava o retorno e cria os recebíveis na confirmação. O modelo da cópia que já existe é `inbound_document_installments`: número, vencimento, valor em centavos e o título gerado. `receivables` já guarda bandeira, autorização, instituição financeira e valor da parcela.
 
 ## 5. Recebíveis e catálogo já publicados
 
