@@ -6,7 +6,7 @@ Cadastro usado em orçamento, venda, PDV e ordem de serviço. O catálogo fiscal
 
 Identificadores em inglês, no padrão de `persons`, `receivables` e `bank_accounts`. Dinheiro em centavos (`integer`). Percentual em basis points (`integer`), como `financial_settings.lateFeeBps`: 199 = 1,99%. Tabelas da empresa usam `tenantColumns` e chave estrangeira composta `(id, tenant_id)`. Catálogo da SEFAZ e bandeira não têm tenant, no mesmo modelo de `ncms` e `card_brands`.
 
-O meio de pagamento, a forma comercial, a tela do cadastro, o preenchimento da forma no recebível e a cópia da condição para o documento já estão no módulo. A emissão continua no passo seguinte.
+O meio de pagamento, a forma comercial, a tela do cadastro, o preenchimento da forma no recebível, a cópia da condição e o grupo de pagamento da NF-e já estão no módulo. A nota de saída ainda não existe.
 
 ## Ajustes em relação ao rascunho
 
@@ -416,6 +416,8 @@ Cada pagamento do documento copia os números da condição no momento da escolh
 - na captura: cAut, identificador da transação e a bandeira devolvida pelo TEF, quando vierem
 
 `planDocumentPayment` monta essa cópia e a lista de títulos. Ela recusa forma inativa, canal desligado e `store_credit`. O valor do cliente soma o juros de `simple`, `price` e `flat` ao principal; `none` e `issuer` não alteram o principal. A taxa administrativa e o valor fixo ficam na cópia e não entram no título. Os títulos seguem a quantidade descrita na condição. `indPag` sai da mesma cópia: 0 quando a quantidade é 1 e a carência é 0, e 1 nos demais casos. A bandeira e o cAut da captura, quando vierem, substituem os da forma.
+
+`fiscalPag` monta o grupo `pag` da NF-e a partir dessa cópia e do catálogo. `tPag` é o código do meio. `indPag` é o da cópia. `vPag` é o valor do cliente, em reais com duas casas. `xPag` é o nome da forma quando o grupo fiscal é `other`. O grupo `card` entra em `card` e `electronic`: `tpIntegra` 1 ou 2, CNPJ da credenciadora no integrado, `tBand` só no cartão e `cAut` da captura. No PIX integrado, o `cAut` é o identificador da transação. `vTroco` só existe no meio 01 e não passa do valor em dinheiro. O meio 90 sai sem `indPag` e com valor zero. A nota de saída ainda não existe; quando existir, ela grava esse grupo.
 
 Ainda não existe tabela de pagamento de venda nem de parcelas geradas a partir daqui. O documento, quando existir, grava o retorno e cria os recebíveis na confirmação. O modelo da cópia que já existe é `inbound_document_installments`: número, vencimento, valor em centavos e o título gerado. `receivables` já guarda bandeira, autorização, instituição financeira e valor da parcela.
 

@@ -49,6 +49,7 @@ const child = spawn(
     'test/dashboard-period.test.ts',
     'test/payment-method-rules.test.ts',
     'test/document-payment.test.ts',
+    'test/fiscal-payment.test.ts',
     'test/settlement-math.test.ts',
     'test/title-list-status.test.ts',
     'test/statement-order.test.ts',
