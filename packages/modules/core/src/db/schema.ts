@@ -1,4 +1,4 @@
-import { pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { pgEnum, pgTable, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
 /** CRT do emitente na NF-e: 1, 2, 3 ou 4. */
 export const tenantCrtEnum = pgEnum('tenant_crt', ['1', '2', '3', '4']);
@@ -49,16 +49,20 @@ export const tenants = pgTable('tenants', {
 });
 
 // 2. Tabela de Usuários (Vinculados a um Tenant)
-export const users = pgTable('users', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id')
-    .references(() => tenants.id, { onDelete: 'cascade' })
-    .notNull(),
-  name: varchar('name', { length: 255 }).notNull(),
-  email: text('email').notNull().unique(),
-  passwordHash: text('password_hash').notNull(), // Para Bcrypt/Argon2
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+export const users = pgTable(
+  'users',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .references(() => tenants.id, { onDelete: 'cascade' })
+      .notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    email: text('email').notNull().unique(),
+    passwordHash: text('password_hash').notNull(), // Para Bcrypt/Argon2
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [unique('users_id_tenant_id_unique').on(table.id, table.tenantId)],
+);
 
 // 3. Helper Utilitário: Cria colunas padrão de Tenant para os outros módulos usarem
 export const tenantColumns = {

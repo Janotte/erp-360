@@ -3,6 +3,7 @@ import * as coreSchema from '@erp-360/mod-core';
 import * as financialSchema from '@erp-360/mod-financial';
 import * as inboundSchema from '@erp-360/mod-inbound';
 import * as personsSchema from '@erp-360/mod-persons';
+import * as serviceOrderSchema from '@erp-360/mod-service-orders';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool, types } from 'pg';
 
@@ -17,6 +18,7 @@ const schema = {
   ...financialSchema,
   ...catalogSchema,
   ...inboundSchema,
+  ...serviceOrderSchema,
 };
 
 const pool = new Pool({
