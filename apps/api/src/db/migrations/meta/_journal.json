@@ -323,6 +323,13 @@
       "when": 1793220000000,
       "tag": "0045_means_of_payment",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1793236903860,
+      "tag": "0046_chubby_human_robot",
+      "breakpoints": true
     }
   ]
 }

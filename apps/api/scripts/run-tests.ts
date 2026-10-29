@@ -47,6 +47,7 @@ const child = spawn(
     'test/dfe-manifest.test.ts',
     'test/dfe-discover.test.ts',
     'test/dashboard-period.test.ts',
+    'test/payment-method-rules.test.ts',
     'test/settlement-math.test.ts',
     'test/title-list-status.test.ts',
     'test/statement-order.test.ts',

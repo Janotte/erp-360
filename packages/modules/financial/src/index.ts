@@ -5,6 +5,8 @@ export * from './db/cash_entries.ts';
 export * from './db/financial_settings.ts';
 export * from './db/means_of_payment.ts';
 export * from './db/payables.ts';
+export * from './db/payment_method_terms.ts';
+export * from './db/payment_methods.ts';
 export * from './db/plan_accounts.ts';
 export * from './db/receivables.ts';
 export * from './db/settlements.ts';

@@ -28,6 +28,10 @@ const uniqueMessages: Record<string, string> = {
   operation_natures_tenant_code_unique: 'Já existe uma natureza com este código.',
   cfop_entry_rules_identity_unique: 'Já existe uma regra para este CFOP e esta finalidade.',
   catalog_items_tenant_barcode_unique: 'Já existe um item com este código de barras.',
+  payment_methods_tenant_code_unique: 'Já existe uma forma de pagamento com este código.',
+  payment_methods_tenant_name_unique: 'Já existe uma forma de pagamento com este nome.',
+  payment_method_terms_method_count_unique:
+    'Cada quantidade de parcelas só pode aparecer uma vez.',
 };
 
 function fastifyClientStatus(error: unknown): number | null {
@@ -117,6 +121,25 @@ function checkMessage(error: unknown): string | null {
   }
   if (name.includes('catalog_items_name')) return 'Informe o nome.';
   if (name.includes('cfop_entry_rules_digits')) return 'O CFOP precisa ter 4 dígitos.';
+  if (name.includes('payment_methods_code_format')) {
+    return 'O código usa letras, números e hífen, em maiúsculas.';
+  }
+  if (name.includes('payment_methods_name')) return 'Informe o nome da forma.';
+  if (name.includes('payment_methods_channel')) {
+    return 'Marque ao menos um uso: orçamento, venda, PDV ou ordem de serviço.';
+  }
+  if (name.includes('payment_methods_settlement_days_kind')) {
+    return 'O prazo de crédito da credenciadora só vale para recebível da adquirente.';
+  }
+  if (name.includes('payment_methods_acquirer') || name.includes('payment_methods_integrated')) {
+    return 'Informe a credenciadora.';
+  }
+  if (name.includes('payment_method_terms_interval')) {
+    return 'O intervalo entre parcelas não confere com a quantidade.';
+  }
+  if (name.includes('payment_method_terms_interest')) {
+    return 'A taxa de juros não confere com o tipo de juros.';
+  }
   return null;
 }
 

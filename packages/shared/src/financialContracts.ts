@@ -39,6 +39,7 @@ export const receivableTitleSchema = z.object({
   bankSlipOurNumber: text,
   financialInstitutionId: id,
   meansOfPaymentId: id,
+  paymentMethodId: id,
   cardBrandId: id,
   transactionAuthorization: text,
   personName: text,

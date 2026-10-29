@@ -15,6 +15,7 @@ import {
 
 import { cardBrands } from './card_brands.ts';
 import { meansOfPayment } from './means_of_payment.ts';
+import { paymentMethods } from './payment_methods.ts';
 import { planAccounts } from './plan_accounts.ts';
 
 export const statusReceivableEnum = pgEnum('status_receivable', [
@@ -62,6 +63,8 @@ export const receivables = pgTable(
     meansOfPaymentId: uuid('means_of_payment_id').references(() => meansOfPayment.id, {
       onDelete: 'restrict',
     }),
+    /** Forma comercial. Nulo no título lançado só com o meio. */
+    paymentMethodId: uuid('payment_method_id'),
     /** Bandeira do cartão */
     cardBrandId: uuid('card_brand_id').references(() => cardBrands.id, {
       onDelete: 'restrict',
@@ -81,6 +84,11 @@ export const receivables = pgTable(
       name: 'receivables_plan_account_tenant_fk',
       columns: [table.planAccountId, table.tenantId],
       foreignColumns: [planAccounts.id, planAccounts.tenantId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'receivables_payment_method_tenant_fk',
+      columns: [table.paymentMethodId, table.tenantId],
+      foreignColumns: [paymentMethods.id, paymentMethods.tenantId],
     }).onDelete('restrict'),
     foreignKey({
       name: 'receivables_financial_institution_tenant_fk',

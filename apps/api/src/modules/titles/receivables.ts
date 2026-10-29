@@ -1,6 +1,6 @@
 import '../../types/fastify.ts';
 
-import { receivables } from '@erp-360/mod-financial';
+import { paymentMethods, receivables } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
 import {
   escapeIlike,
@@ -63,6 +63,7 @@ const createReceivableSchema = z.object({
   invoiceNumber: z.string().max(44).optional(),
   financialInstitutionId: z.string().uuid().optional(),
   meansOfPaymentId: z.string().uuid().optional(),
+  paymentMethodId: z.string().uuid().optional(),
   cardBrandId: z.string().uuid().optional(),
   transactionAuthorization: z.string().max(128).optional(),
 });
@@ -104,6 +105,33 @@ const listReceivablesQuery = z.object({
   issueTo: dateString.optional(),
 });
 
+async function receivablePayment(
+  tenantId: string,
+  data: { meansOfPaymentId?: string; paymentMethodId?: string },
+) {
+  if (!data.paymentMethodId) {
+    return {
+      paymentMethodId: null,
+      meansOfPaymentId: data.meansOfPaymentId || null,
+    };
+  }
+  const [method] = await db
+    .select({ meansOfPaymentId: paymentMethods.meansOfPaymentId })
+    .from(paymentMethods)
+    .where(
+      and(eq(paymentMethods.id, data.paymentMethodId), eq(paymentMethods.tenantId, tenantId)),
+    );
+  if (!method) {
+    const error = new Error('Forma de pagamento não encontrada.') as Error & { status: number };
+    error.status = 400;
+    throw error;
+  }
+  return {
+    paymentMethodId: data.paymentMethodId,
+    meansOfPaymentId: method.meansOfPaymentId,
+  };
+}
+
 export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
 
@@ -134,7 +162,7 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           bankSlipOurNumber: data.bankSlipOurNumber || null,
           invoiceNumber: data.invoiceNumber || null,
           financialInstitutionId: data.financialInstitutionId || null,
-          meansOfPaymentId: data.meansOfPaymentId || null,
+          ...(await receivablePayment(tenantId, data)),
           cardBrandId: data.cardBrandId || null,
           transactionAuthorization: data.transactionAuthorization || null,
           tenantId,
@@ -349,7 +377,9 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           bankSlipOurNumber: data.bankSlipOurNumber || null,
           invoiceNumber: data.invoiceNumber || null,
           financialInstitutionId: data.financialInstitutionId || null,
-          meansOfPaymentId: data.meansOfPaymentId || null,
+          ...(data.paymentMethodId === undefined
+            ? { meansOfPaymentId: data.meansOfPaymentId || null }
+            : await receivablePayment(tenantId, data)),
           cardBrandId: data.cardBrandId || null,
           transactionAuthorization: data.transactionAuthorization || null,
         })
