@@ -20,6 +20,7 @@ import {
   type FinancialAccount,
   financialService,
 } from '@/services/financials';
+import { paymentMethodsService } from '@/services/paymentMethods';
 
 interface ReceivableFormProps {
   accountToUpdate?: FinancialAccount | null;
@@ -44,6 +45,7 @@ export function ReceivableForm({
   const [amountStr, setAmountStr] = useState('');
   const [planAccountId, setPlanAccountId] = useState('');
   const [financialInstitutionId, setFinancialInstitutionId] = useState('');
+  const [paymentMethodId, setPaymentMethodId] = useState('');
   const [meansOfPaymentId, setMeansOfPaymentId] = useState('');
   const [cardBrandId, setCardBrandId] = useState('');
   const [bearerName, setBearerName] = useState('');
@@ -62,6 +64,7 @@ export function ReceivableForm({
     setAmountStr(formatCurrencyInput(accountToUpdate.installmentAmount));
     setPlanAccountId(accountToUpdate.planAccountId || '');
     setFinancialInstitutionId(accountToUpdate.financialInstitutionId || '');
+    setPaymentMethodId(accountToUpdate.paymentMethodId || '');
     setMeansOfPaymentId(accountToUpdate.meansOfPaymentId || '');
     setCardBrandId(accountToUpdate.cardBrandId || '');
     setBearerName(accountToUpdate.bearerName || '');
@@ -80,10 +83,45 @@ export function ReceivableForm({
     queryFn: () => financialService.listMeansOfPayment(),
   });
 
+  const { data: paymentMethodPage } = useQuery({
+    queryKey: ['payment-methods', 'receivable-picker'],
+    queryFn: () =>
+      paymentMethodsService.list({
+        page: 1,
+        limit: 100,
+        sortField: 'sortOrder',
+        sortOrder: 'asc',
+        isActive: true,
+      }),
+  });
+
+  const linkedMethodId = accountToUpdate?.paymentMethodId;
+  const { data: linkedMethod } = useQuery({
+    queryKey: ['payment-method', linkedMethodId],
+    enabled: Boolean(linkedMethodId),
+    queryFn: () => paymentMethodsService.get(linkedMethodId!),
+  });
+
   const { data: cardBrands = [] } = useQuery({
     queryKey: ['financial', 'card-brands'],
     queryFn: () => financialService.listCardBrands(),
   });
+
+  const paymentMethodOptions = (paymentMethodPage?.data ?? []).map((method) => ({
+    id: method.id,
+    label: `${method.code} - ${method.name}`,
+    meansOfPaymentId: method.meansOfPaymentId,
+  }));
+  if (
+    linkedMethod &&
+    !paymentMethodOptions.some((item) => item.id === linkedMethod.id)
+  ) {
+    paymentMethodOptions.push({
+      id: linkedMethod.id,
+      label: `${linkedMethod.code} - ${linkedMethod.name}`,
+      meansOfPaymentId: linkedMethod.meansOfPaymentId,
+    });
+  }
 
   const mutation = useMutation({
     mutationFn: (dados: CreateReceivableInput) =>
@@ -121,6 +159,7 @@ export function ReceivableForm({
       planAccountId: optionalId(planAccountId),
       financialInstitutionId: optionalId(financialInstitutionId),
       meansOfPaymentId: optionalId(meansOfPaymentId),
+      paymentMethodId: paymentMethodId || null,
       cardBrandId: optionalId(cardBrandId),
       bearerName: bearerName || undefined,
       barcode: barcode || undefined,
@@ -268,6 +307,23 @@ export function ReceivableForm({
         />
       </div>
 
+      <div className="space-y-1">
+        <Label>Forma de pagamento</Label>
+        <CatalogSearchSelect
+          value={paymentMethodId}
+          onChange={(id) => {
+            setPaymentMethodId(id);
+            const method = paymentMethodOptions.find((item) => item.id === id);
+            if (method) setMeansOfPaymentId(method.meansOfPaymentId);
+          }}
+          options={paymentMethodOptions}
+          placeholder="Buscar forma de pagamento..."
+          emptyMessage="Nenhuma forma de pagamento ativa."
+          allowClear={!readOnly}
+          disabled={readOnly}
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <Label>Meio de pagamento</Label>
@@ -277,9 +333,12 @@ export function ReceivableForm({
             options={meansOfPayment}
             placeholder="Buscar meio de pagamento..."
             emptyMessage="Nenhum meio de pagamento cadastrado."
-            allowClear={!readOnly}
-            disabled={readOnly}
+            allowClear={!readOnly && !paymentMethodId}
+            disabled={readOnly || Boolean(paymentMethodId)}
           />
+          {paymentMethodId ? (
+            <p className="text-xs text-zinc-500">O meio vem da forma escolhida.</p>
+          ) : null}
         </div>
         <div className="space-y-1">
           <Label>Bandeira do cartão</Label>

@@ -34,6 +34,7 @@ export interface FinancialAccount {
   bankSlipOurNumber?: string;
   financialInstitutionId?: string;
   meansOfPaymentId?: string;
+  paymentMethodId?: string;
   cardBrandId?: string;
   transactionAuthorization?: string;
 }
@@ -88,6 +89,7 @@ function fromReceivable(row: ReceivableTitle): FinancialAccount {
     bankSlipOurNumber: definedText(row.bankSlipOurNumber),
     financialInstitutionId: definedText(row.financialInstitutionId),
     meansOfPaymentId: definedText(row.meansOfPaymentId),
+    paymentMethodId: definedText(row.paymentMethodId),
     cardBrandId: definedText(row.cardBrandId),
     transactionAuthorization: definedText(row.transactionAuthorization),
   };
@@ -140,6 +142,7 @@ function toCreatePayload(
     financialInstitutionId:
       'financialInstitutionId' in dados ? dados.financialInstitutionId : undefined,
     meansOfPaymentId: 'meansOfPaymentId' in dados ? dados.meansOfPaymentId : undefined,
+    paymentMethodId: 'paymentMethodId' in dados ? dados.paymentMethodId : undefined,
     cardBrandId: 'cardBrandId' in dados ? dados.cardBrandId : undefined,
     transactionAuthorization:
       'transactionAuthorization' in dados ? dados.transactionAuthorization : undefined,
@@ -170,6 +173,7 @@ export interface CreateReceivableInput {
   invoiceNumber?: string;
   financialInstitutionId?: string;
   meansOfPaymentId?: string;
+  paymentMethodId?: string | null;
   cardBrandId?: string;
   transactionAuthorization?: string;
 }

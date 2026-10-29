@@ -62,8 +62,8 @@ const createReceivableSchema = z.object({
   bankSlipOurNumber: z.string().max(20).optional(),
   invoiceNumber: z.string().max(44).optional(),
   financialInstitutionId: z.string().uuid().optional(),
-  meansOfPaymentId: z.string().uuid().optional(),
-  paymentMethodId: z.string().uuid().optional(),
+  meansOfPaymentId: z.string().uuid().nullish(),
+  paymentMethodId: z.string().uuid().nullish(),
   cardBrandId: z.string().uuid().optional(),
   transactionAuthorization: z.string().max(128).optional(),
 });
@@ -107,7 +107,7 @@ const listReceivablesQuery = z.object({
 
 async function receivablePayment(
   tenantId: string,
-  data: { meansOfPaymentId?: string; paymentMethodId?: string },
+  data: { meansOfPaymentId?: string | null; paymentMethodId?: string | null },
 ) {
   if (!data.paymentMethodId) {
     return {

@@ -116,6 +116,7 @@ export function ReplicateReceivableDialog({
           invoiceNumber: source.invoiceNumber || undefined,
           financialInstitutionId: source.financialInstitutionId || undefined,
           meansOfPaymentId: source.meansOfPaymentId || undefined,
+          paymentMethodId: source.paymentMethodId || null,
           cardBrandId: source.cardBrandId || undefined,
           bearerName: source.bearerName || undefined,
           barcode: source.barcode || undefined,
