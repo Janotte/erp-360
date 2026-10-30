@@ -239,10 +239,14 @@ export async function buildServiceOrderPrint(tenantId: string, orderId: string) 
   }
 
   const postalCode = tenant.postalCode ? formatPostalCode(tenant.postalCode) : '';
-  const addressLine = [tenant.street, tenant.number, tenant.complement, tenant.neighborhood, postalCode]
+  const street = [tenant.street, tenant.number]
     .map((part) => part?.trim() ?? '')
     .filter(Boolean)
     .join(', ');
+  const addressLine = [street, tenant.complement?.trim() ?? ''].filter(Boolean).join(' - ');
+  const place =
+    cityName && stateAbbreviation ? `${cityName}/${stateAbbreviation}` : cityName || stateAbbreviation;
+  const cityLine = [tenant.neighborhood?.trim() ?? '', place, postalCode].filter(Boolean).join(' - ');
 
   return {
     number: formatServiceOrderNumber(order.number),
@@ -254,7 +258,7 @@ export async function buildServiceOrderPrint(tenantId: string, orderId: string) 
       cnpj: formatCnpj(tenant.cnpj),
       stateRegistration: blank(tenant.stateRegistration),
       addressLine,
-      cityLine: cityName && stateAbbreviation ? `${cityName} / ${stateAbbreviation}` : '',
+      cityLine,
       phone: printPhone(tenant.phone),
       mobilePhone: printPhone(tenant.mobilePhone),
       whatsapp: printPhone(tenant.whatsapp),

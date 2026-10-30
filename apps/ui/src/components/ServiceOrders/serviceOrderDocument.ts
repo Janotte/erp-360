@@ -103,6 +103,22 @@ function emptyRow(columns: number) {
   return `<tr class="empty-row">${'<td></td>'.repeat(columns)}</tr>`;
 }
 
+const contactIcons = {
+  phone:
+    '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.35 1.9.68 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.33 1.85.55 2.81.68A2 2 0 0 1 22 16.92z"/>',
+  mobile:
+    '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
+  whatsapp:
+    '<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/>',
+  email: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+} as const;
+
+function contactItem(kind: keyof typeof contactIcons, value: string | null | undefined) {
+  const text = value?.trim() ?? '';
+  if (!text) return '';
+  return `<span class="contact-item"><svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${contactIcons[kind]}</svg>${escapeHtml(text)}</span>`;
+}
+
 export function serviceOrderDocument(model: ServiceOrderPrint, css: string) {
   const logo = model.logoUrl
     ? `<img alt="" src="${escapeHtml(model.logoUrl)}" />`
@@ -110,15 +126,19 @@ export function serviceOrderDocument(model: ServiceOrderPrint, css: string) {
   const registration = model.tenant.stateRegistration
     ? ` - IE: ${escapeHtml(model.tenant.stateRegistration)}`
     : '';
-  const address = [model.tenant.addressLine, model.tenant.cityLine].filter(Boolean).join(' - ');
-  const contact = [
-    model.tenant.phone,
-    model.tenant.mobilePhone,
-    model.tenant.whatsapp,
-    model.tenant.email,
+  const addressLines = [model.tenant.addressLine, model.tenant.cityLine]
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `<p>${escapeHtml(line)}</p>`)
+    .join('');
+  const phones = [
+    contactItem('phone', model.tenant.phone),
+    contactItem('mobile', model.tenant.mobilePhone),
+    contactItem('whatsapp', model.tenant.whatsapp),
   ]
     .filter(Boolean)
     .join(' - ');
+  const email = contactItem('email', model.tenant.email);
   const attendance = model.originNumber
     ? `${escapeHtml(model.attendanceLabel)}<br>${escapeHtml(model.originNumber)}`
     : escapeHtml(model.attendanceLabel);
@@ -177,10 +197,11 @@ export function serviceOrderDocument(model: ServiceOrderPrint, css: string) {
 <header class="os-header">
 <div class="company-logo">${logo}</div>
 <div class="company-info">
-<h3>${escapeHtml(model.tenant.tradeName)}</h3>
+<h3>${escapeHtml(model.tenant.name)}</h3>
 <p>CNPJ: ${escapeHtml(model.tenant.cnpj)}${registration}</p>
-<p>${escapeHtml(address)}</p>
-<p>${escapeHtml(contact)}</p>
+${addressLines}
+${phones ? `<p>${phones}</p>` : ''}
+${email ? `<p>${email}</p>` : ''}
 </div>
 <div class="os-number-badge"><span>Ordem de Serviço</span><strong>Nº ${escapeHtml(model.number)}</strong></div>
 </header>
@@ -248,8 +269,8 @@ ${field('Condição', model.payment.installmentsLabel, 4)}
 </div>
 ${notes}
 <footer class="os-footer"><div class="grid-row">
-<div class="field-group" style="grid-column: span 6"><label>${escapeHtml(model.technicianSignatureLabel)}</label><div class="field-value"><br><p>_________________________________________________________________</p></div></div>
-<div class="field-group" style="grid-column: span 6"><label>${escapeHtml(model.customerSignatureLabel)}</label><div class="field-value"><br><p>_________________________________________________________________</p></div></div>
+<div class="field-group" style="grid-column: span 6"><label>${escapeHtml(model.technicianSignatureLabel)}</label><div class="field-value"></div></div>
+<div class="field-group" style="grid-column: span 6"><label>${escapeHtml(model.customerSignatureLabel)}</label><div class="field-value"></div></div>
 </div></footer>
 </div>
 </body>

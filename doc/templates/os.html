@@ -54,29 +54,45 @@
       text-transform: uppercase;
     }
 
+    .company-info h3 {
+      font-size: 12px;
+      color: var(--primary-color);
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
     .company-info p {
       font-size: 10px;
       color: var(--secondary-color);
       margin-bottom: 2px;
     }
 
+    .company-info .contact-icon {
+      width: 10px;
+      height: 10px;
+      margin-right: 2px;
+      vertical-align: -1px;
+    }
+
     .os-number-badge {
-      background-color: var(--primary-color);
-      color: #fff;
-      padding: 8px 16px;
-      border-radius: 6px;
+      background-color: var(--bg-light);
+      color: var(--primary-color);
+      padding: 4px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
       text-align: right;
+      font-weight: 700;
+      text-transform: uppercase;
     }
 
     .os-number-badge span {
       display: block;
-      font-size: 9px;
-      text-transform: uppercase;
-      opacity: 0.8;
+      font-size: 11px;
     }
 
     .os-number-badge strong {
-      font-size: 16px;
+      font-size: 11px;
+      font-weight: 700;
     }
 
     .section-title {
@@ -88,8 +104,8 @@
       padding: 4px 8px;
       margin-top: 8px;
       margin-bottom: 8px;
-      border-left: 4px solid var(--primary-color);
-      border-bottom: 1px solid var(--border-color);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
     }
 
     .grid-row {
@@ -133,24 +149,56 @@
     /* Tabelas */
     table {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
       margin-top: 5px;
       margin-bottom: 5px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
     }
 
     th {
-      background-color: var(--primary-color);
-      color: white;
+      background-color: var(--bg-light);
+      color: var(--primary-color);
       font-size: 10px;
+      font-weight: 700;
       text-transform: uppercase;
       padding: 4px 6px;
       text-align: left;
+      border-bottom: 1px solid var(--border-color);
+      border-right: 1px solid var(--border-color);
     }
 
     td {
-      border: 1px solid var(--border-color);
+      border-bottom: 1px solid var(--border-color);
+      border-right: 1px solid var(--border-color);
       padding: 4px 6px;
       font-size: 10px;
+    }
+
+    th:last-child,
+    td:last-child {
+      border-right: none;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    thead tr:first-child th:first-child {
+      border-top-left-radius: 4px;
+    }
+
+    thead tr:first-child th:last-child {
+      border-top-right-radius: 4px;
+    }
+
+    tbody tr:last-child td:first-child {
+      border-bottom-left-radius: 4px;
+    }
+
+    tbody tr:last-child td:last-child {
+      border-bottom-right-radius: 4px;
     }
 
     .text-right {
@@ -172,10 +220,14 @@
       margin-top: 20px;
     }
 
+    .os-footer .field-value {
+      min-height: 48px;
+    }
+
     @media print {
       body {
         background-color: #fff;
-        padding: 0;
+        padding: 0 1px 0 0;
       }
 
       .os-container {
@@ -190,15 +242,17 @@
         print-color-adjust: exact;
       }
 
-      .section-title {
+      .section-title,
+      .os-number-badge {
         background-color: #f1f5f9 !important;
+        color: #1e293b !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
 
       th {
-        background-color: #1e293b !important;
-        color: #fff !important;
+        background-color: #f1f5f9 !important;
+        color: #1e293b !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
@@ -214,23 +268,18 @@
         <h1>Logo</h1>
       </div>
       <div class="company-info" style="grid-column: span 6">
-        <h3 style="
-              font-size: 12px;
-              color: var(--primary-color);
-              text-transform: uppercase;
-              margin-bottom: 5px;
-            ">
-          Hobby Informática Ltda
-        </h3>
-        <p>CNPJ: 01.338.319/0001-94 - IE: 253.443.830</p>
+        <h3>Hobby Informática Ltda</h3>
+        <p>CNPJ: 01.338.319/0001-94 - IE: 253443830</p>
+        <p>Avenida Prefeito Wittich Freitag, 1180 - Sala 03</p>
+        <p>Iririú - Joinville/SC - 89227-025</p>
         <p>
-          Avenida Prefeito Witiich Freitag, 1180 - Iririú - Joinville/SC -
-          CEP: 89227-025
+          <span class="contact-item"><svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.35 1.9.68 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.33 1.85.55 2.81.68A2 2 0 0 1 22 16.92z"/></svg>(47) 3472-3260</span>
+          -
+          <span class="contact-item"><svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>(47) 99998-5259</span>
+          -
+          <span class="contact-item"><svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/></svg>(47) 99998-5259</span>
         </p>
-        <p>
-          (47) 3472-3260 - (47) 99998-5259 - (47) 98888-1212 -
-          atendimento@hobby.inf.br
-        </p>
+        <p><span class="contact-item"><svg class="contact-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>atendimento@hobby.inf.br</span></p>
       </div>
       <div class="os-number-badge">
         <span>Ordem de Serviço</span>
@@ -499,17 +548,11 @@
       <div class="grid-row">
         <div class="field-group" style="grid-column: span 6">
           <label>Responsável Técnico</label>
-          <div class="field-value">
-            <br>
-            <p>_________________________________________________________________</p>
-          </div>
+          <div class="field-value"></div>
         </div>
         <div class="field-group textarea-box" style="grid-column: span 6">
           <label>Assinatura do Cliente</label>
-          <div class="field-value">
-            <br>
-            <p>_________________________________________________________________</p>
-          </div>
+          <div class="field-value"></div>
         </div>
       </div>
     </footer>

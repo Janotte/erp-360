@@ -12,13 +12,13 @@ function model(patch: Partial<ServiceOrderPrint> = {}): ServiceOrderPrint {
       tradeName: 'Hobby',
       name: 'Hobby Informática Ltda',
       cnpj: '01.338.319/0001-94',
-      stateRegistration: null,
-      addressLine: 'Rua das Flores, 10',
-      cityLine: 'Joinville / SC',
+      stateRegistration: '253443830',
+      addressLine: 'Avenida Prefeito Wittich Freitag, 1180 - Sala 03',
+      cityLine: 'Iririú - Joinville/SC - 89227-025',
       phone: '(47) 3472-3260',
-      mobilePhone: null,
-      whatsapp: null,
-      email: null,
+      mobilePhone: '(47) 99999-0000',
+      whatsapp: '(47) 98888-0000',
+      email: 'atendimento@hobby.inf.br',
     },
     openedByName: 'João',
     openedAt: '29/10/2026 21:00',
@@ -72,7 +72,19 @@ describe('folha da ordem de serviço', () => {
     assert.doesNotMatch(sheet, /<img/);
     assert.match(sheet, /Cliente &lt;b&gt;/);
     assert.equal(sheet.includes('Cliente <b>'), false);
+    assert.match(sheet, /<h3>Hobby Informática Ltda<\/h3>/);
+    assert.match(sheet, /CNPJ: 01\.338\.319\/0001-94 - IE: 253443830/);
+    assert.match(
+      sheet,
+      /<p>Avenida Prefeito Wittich Freitag, 1180 - Sala 03<\/p><p>Iririú - Joinville\/SC - 89227-025<\/p>/,
+    );
+    assert.equal((sheet.match(/contact-icon/g) ?? []).length, 4);
+    assert.match(sheet, /\(47\) 3472-3260/);
+    assert.match(sheet, /\(47\) 99999-0000/);
+    assert.match(sheet, /\(47\) 98888-0000/);
+    assert.match(sheet, /atendimento@hobby\.inf\.br/);
     assert.match(sheet, /grid-column: span 12/);
+    assert.equal(sheet.includes('____'), false);
     assert.equal(sheet.includes('Celular'), false);
     assert.equal(sheet.includes('WhatsApp'), false);
 
