@@ -84,6 +84,11 @@ function field(label: string, value: string | null | undefined, span: number) {
   return `<div class="field-group" style="grid-column: span ${span}"><label>${escapeHtml(label)}</label><div class="field-value">${escapeHtml(value)}</div></div>`;
 }
 
+function optionalField(label: string, value: string | null | undefined, span: number) {
+  if (!value?.trim()) return '';
+  return field(label, value, span);
+}
+
 function marked(label: string, value: string, span: number) {
   return `<div class="field-group" style="grid-column: span ${span}"><label>${escapeHtml(label)}</label><div class="field-value" style="font-weight: bold; color: #b45309">${value}</div></div>`;
 }
@@ -146,6 +151,13 @@ export function serviceOrderDocument(model: ServiceOrderPrint, css: string) {
       ),
     )
     .join('');
+  const contacts = [
+    optionalField('Telefone', model.customer.phone, 3),
+    optionalField('Celular', model.customer.mobilePhone, 3),
+    optionalField('WhatsApp', model.customer.whatsapp, 3),
+    optionalField('Email', model.customer.email, 3),
+  ].join('');
+  const contactRow = contacts ? `<div class="grid-row">${contacts}</div>` : '';
   const notes =
     model.notes.length === 0
       ? ''
@@ -184,12 +196,7 @@ ${marked('Situação', escapeHtml(model.statusLabel), 3)}
 ${field('CPF/CNPJ', model.customer.taxId, 3)}
 ${field('Nome', model.customer.name, 9)}
 </div>
-<div class="grid-row">
-${field('Telefone', model.customer.phone, 3)}
-${field('Celular', model.customer.mobilePhone, 3)}
-${field('WhatsApp', model.customer.whatsapp, 3)}
-${field('Email', model.customer.email, 3)}
-</div>
+${contactRow}
 <div class="grid-row">
 ${field('Logradouro, Número - Complemento', model.customer.streetLine, 6)}
 ${field('Bairro', model.customer.neighborhood, 3)}

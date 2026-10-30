@@ -73,6 +73,22 @@ describe('folha da ordem de serviço', () => {
     assert.match(sheet, /Cliente &lt;b&gt;/);
     assert.equal(sheet.includes('Cliente <b>'), false);
     assert.match(sheet, /grid-column: span 12/);
+    assert.equal(sheet.includes('Celular'), false);
+    assert.equal(sheet.includes('WhatsApp'), false);
+
+    const withPhones = serviceOrderDocument(
+      model({
+        customer: {
+          ...model().customer,
+          mobilePhone: '(47) 99999-0000',
+          whatsapp: '(47) 98888-0000',
+        },
+      }),
+      'body{color:red}',
+    );
+    assert.match(withPhones, /Celular/);
+    assert.match(withPhones, /\(47\) 99999-0000/);
+    assert.match(withPhones, /WhatsApp/);
 
     const withLogo = serviceOrderDocument(
       model({ logoUrl: 'https://cdn.example/x.png" onerror="alert(1)' }),

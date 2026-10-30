@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { type CatalogItem,itemsService } from '@/services/items';
+import { type CatalogItem, itemsService } from '@/services/items';
 import { paymentMethodsService } from '@/services/paymentMethods';
 import { personsService } from '@/services/persons';
 import {
@@ -25,6 +25,11 @@ import {
   type ServiceOrderStatus,
   type ServiceOrderWrite,
 } from '@/services/serviceOrders';
+
+import sheetTemplate from '../../../../../doc/templates/os.html?raw';
+import { serviceOrderDocument } from './serviceOrderDocument';
+
+const sheetCss = sheetTemplate.match(/<style>([\s\S]*?)<\/style>/i)?.[1] ?? '';
 
 const statusLabels: Record<ServiceOrderStatus, string> = {
   open: 'Aberta',
@@ -555,15 +560,15 @@ export function FormServiceOrder() {
     }
   }
 
-  function submit(status: ServiceOrderStatus) {
-    if (!draft) return;
+  function canSubmit(status: ServiceOrderStatus) {
+    if (!draft) return false;
     if (!draft.personId) {
       toast.error('Informe um cliente ativo.');
-      return;
+      return false;
     }
     if (!draft.customerName.trim()) {
       toast.error('Informe o nome do cliente.');
-      return;
+      return false;
     }
     if (status !== 'cancelled') {
       const missing = draft.fields.some(
@@ -571,24 +576,61 @@ export function FormServiceOrder() {
       );
       if (missing) {
         toast.error('Preencha os campos obrigatórios.');
-        return;
+        return false;
       }
     }
     const hasMethod = Boolean(draft.paymentMethodId);
     const hasInstallments = Boolean(draft.paymentInstallments);
     if (hasMethod !== hasInstallments) {
       toast.error('Informe a forma e a quantidade de parcelas.');
-      return;
+      return false;
     }
     if (status === 'delivered' && !hasMethod) {
       toast.error('Informe a forma de pagamento para entregar.');
-      return;
+      return false;
     }
     if (discountAmount > productAmount + serviceAmount + freightAmount + surchargeAmount) {
       toast.error('O desconto não pode passar da soma dos itens, do frete e do acréscimo.');
+      return false;
+    }
+    return true;
+  }
+
+  function submit(status: ServiceOrderStatus) {
+    if (!canSubmit(status)) return;
+    save.mutate(status);
+  }
+
+  async function printSheet() {
+    if (!draft) return;
+    const knownId = id ?? createdId.current;
+    if (!knownId && !canSubmit(draft.status)) return;
+    const popup = window.open('', '_blank');
+    if (!popup) {
+      toast.error('O navegador bloqueou a janela da folha.');
       return;
     }
-    save.mutate(status);
+    popup.document.write('<!doctype html><title>Ordem de Serviço</title><p>Montando a folha...</p>');
+    popup.document.close();
+    let persisted = Boolean(knownId);
+    try {
+      let orderId = knownId;
+      if (!orderId) {
+        const saved = await save.mutateAsync(draft.status);
+        orderId = saved.id;
+        persisted = true;
+      }
+      const model = await serviceOrdersService.print(orderId);
+      popup.document.open();
+      popup.document.write(serviceOrderDocument(model, sheetCss));
+      popup.document.close();
+      popup.focus();
+    } catch (error) {
+      popup.close();
+      if (persisted) {
+        toast.error(error instanceof Error ? error.message : 'Falha ao montar a folha da ordem.');
+      }
+    }
   }
 
   return (
@@ -878,6 +920,9 @@ export function FormServiceOrder() {
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={save.isPending}>
           {save.isPending ? 'Salvando...' : 'Salvar'}
+        </Button>
+        <Button type="button" variant="outline" disabled={save.isPending} onClick={() => void printSheet()}>
+          Imprimir
         </Button>
         {canDeliver && !locked ? (
           <Button type="button" disabled={save.isPending} onClick={() => submit('delivered')}>
