@@ -1,11 +1,15 @@
 import {
+  formatCnpj,
+  formatCpf,
   formatCurrency,
+  formatPhone,
   formatPostalCode,
   maskCurrencyInput,
+  onlyDigits,
   parseCurrencyToCents,
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 
@@ -95,6 +99,7 @@ type Draft = {
   customerMobilePhone: string;
   customerWhatsapp: string;
   customerEmail: string;
+  customerPostalCode: string;
   customerStreetLine: string;
   customerNeighborhood: string;
   customerCityLine: string;
@@ -144,6 +149,67 @@ function emptyToNull(value: string) {
   return trimmed ? trimmed : null;
 }
 
+function formatCpfOrCnpj(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/[A-Za-z]/.test(trimmed)) return trimmed.slice(0, 19);
+  const digits = onlyDigits(trimmed).slice(0, 14);
+  if (digits.length <= 11) return formatCpf(digits);
+  return formatCnpj(digits);
+}
+
+function splitStreetPostal(value: string) {
+  const trimmed = value.trim();
+  const onlyPostal = /^(\d{5}-?\d{3})$/.exec(trimmed);
+  if (onlyPostal) return { street: '', postal: formatPostalCode(onlyPostal[1]) };
+  const match = /^(.*?),\s*(\d{5}-?\d{3})$/.exec(trimmed);
+  if (!match) return { street: trimmed, postal: '' };
+  return {
+    street: match[1].trim(),
+    postal: formatPostalCode(match[2]),
+  };
+}
+
+function joinStreetPostal(street: string, postal: string) {
+  const line = street.trim();
+  const digits = onlyDigits(postal);
+  if (digits.length !== 8) return line.slice(0, 200);
+  const cep = formatPostalCode(digits);
+  if (!line) return cep;
+  if (onlyDigits(line).endsWith(digits) && /\d{5}-?\d{3}$/.test(line)) return line.slice(0, 200);
+  return `${line}, ${cep}`.slice(0, 200);
+}
+
+function focusNextOsField(form: HTMLFormElement, current: HTMLElement) {
+  const fields = Array.from(form.querySelectorAll<HTMLElement>('[data-enter-sequence]')).filter(
+    (field) => !field.hasAttribute('disabled'),
+  );
+  const index = fields.findIndex((field) => field === current || field.contains(current));
+  if (index < 0) return;
+  fields[index + 1]?.focus();
+}
+
+function onEnterSequence(event: KeyboardEvent<HTMLFormElement>) {
+  if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.defaultPrevented) return;
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (target instanceof HTMLTextAreaElement && event.shiftKey) return;
+  if (target instanceof HTMLButtonElement && target.type === 'submit') return;
+  const field = target.closest<HTMLElement>('[data-enter-sequence]');
+  if (
+    !field &&
+    (target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement)
+  ) {
+    event.preventDefault();
+    return;
+  }
+  if (!field || field.hasAttribute('disabled')) return;
+  event.preventDefault();
+  focusNextOsField(event.currentTarget, field);
+}
+
 function needsOrigin(attendance: ServiceOrderAttendance) {
   return attendance === 'warranty' || attendance === 'rework';
 }
@@ -162,6 +228,7 @@ function emptyDraft(settings: ServiceOrderSettings): Draft {
     customerMobilePhone: '',
     customerWhatsapp: '',
     customerEmail: '',
+    customerPostalCode: '',
     customerStreetLine: '',
     customerNeighborhood: '',
     customerCityLine: '',
@@ -187,6 +254,7 @@ function emptyDraft(settings: ServiceOrderSettings): Draft {
 }
 
 function draftFromOrder(order: ServiceOrderDetail): Draft {
+  const address = splitStreetPostal(order.customerStreetLine ?? '');
   return {
     personId: order.personId,
     attendance: order.attendance,
@@ -195,12 +263,13 @@ function draftFromOrder(order: ServiceOrderDetail): Draft {
     status: order.status,
     internalNotes: order.internalNotes,
     customerName: order.customerName,
-    customerTaxId: order.customerTaxId ?? '',
-    customerPhone: order.customerPhone ?? '',
-    customerMobilePhone: order.customerMobilePhone ?? '',
-    customerWhatsapp: order.customerWhatsapp ?? '',
+    customerTaxId: formatCpfOrCnpj(order.customerTaxId ?? ''),
+    customerPhone: formatPhone(order.customerPhone ?? ''),
+    customerMobilePhone: formatPhone(order.customerMobilePhone ?? ''),
+    customerWhatsapp: formatPhone(order.customerWhatsapp ?? ''),
     customerEmail: order.customerEmail ?? '',
-    customerStreetLine: order.customerStreetLine ?? '',
+    customerPostalCode: address.postal,
+    customerStreetLine: address.street,
     customerNeighborhood: order.customerNeighborhood ?? '',
     customerCityLine: order.customerCityLine ?? '',
     freight: formatInput(order.freightAmount),
@@ -251,7 +320,9 @@ function toWrite(draft: Draft, status: ServiceOrderStatus): ServiceOrderWrite {
     customerMobilePhone: emptyToNull(draft.customerMobilePhone),
     customerWhatsapp: emptyToNull(draft.customerWhatsapp),
     customerEmail: emptyToNull(draft.customerEmail),
-    customerStreetLine: emptyToNull(draft.customerStreetLine),
+    customerStreetLine: emptyToNull(
+      joinStreetPostal(draft.customerStreetLine, draft.customerPostalCode),
+    ),
     customerNeighborhood: emptyToNull(draft.customerNeighborhood),
     customerCityLine: emptyToNull(draft.customerCityLine),
     freightAmount: parseCurrencyToCents(draft.freight),
@@ -328,18 +399,19 @@ async function copyFromPerson(personId: string) {
   const address = addresses.find((item) => item.type === 'Principal');
   const postal = address?.postalCode ? formatPostalCode(address.postalCode) : '';
   const street = address
-    ? [address.street, address.number, address.complement, postal]
+    ? [address.street, address.number, address.complement]
         .map((part) => part?.trim() ?? '')
         .filter(Boolean)
         .join(', ')
     : '';
   return {
     customerName: person.name,
-    customerTaxId: person.taxId?.trim() ?? '',
-    customerPhone: contact?.phone?.trim() ?? '',
-    customerMobilePhone: contact?.mobilePhone?.trim() ?? '',
-    customerWhatsapp: contact?.whatsapp?.trim() ?? '',
+    customerTaxId: formatCpfOrCnpj(person.taxId?.trim() ?? ''),
+    customerPhone: formatPhone(contact?.phone?.trim() ?? ''),
+    customerMobilePhone: formatPhone(contact?.mobilePhone?.trim() ?? ''),
+    customerWhatsapp: formatPhone(contact?.whatsapp?.trim() ?? ''),
     customerEmail: contact?.email?.trim() ?? '',
+    customerPostalCode: postal,
     customerStreetLine: street.slice(0, 200),
     customerNeighborhood: address?.neighborhood?.trim() ?? '',
     customerCityLine:
@@ -667,6 +739,7 @@ export function FormServiceOrder() {
   return (
     <form
       className="space-y-6"
+      onKeyDown={onEnterSequence}
       onSubmit={(event) => {
         event.preventDefault();
         submit(draft.status);
@@ -698,6 +771,7 @@ export function FormServiceOrder() {
               type="cliente"
               placeholder="Buscar cliente ativo..."
               disabled={locked}
+              enterSequence
             />
           </div>
           <div className="space-y-1.5">
@@ -705,6 +779,7 @@ export function FormServiceOrder() {
             <select
               id="service-order-attendance"
               className={selectClass}
+              data-enter-sequence=""
               value={draft.attendance}
               disabled={locked}
               onChange={(event) => {
@@ -730,6 +805,7 @@ export function FormServiceOrder() {
               <select
                 id="service-order-origin"
                 className={selectClass}
+                data-enter-sequence=""
                 value={draft.originOrderId}
                 disabled={locked}
                 onChange={(event) => patch({ originOrderId: event.target.value })}
@@ -750,6 +826,7 @@ export function FormServiceOrder() {
             <Input
               id="service-order-promised"
               type="datetime-local"
+              data-enter-sequence=""
               value={toLocalInput(draft.promisedAt)}
               disabled={locked}
               onChange={(event) =>
@@ -766,6 +843,7 @@ export function FormServiceOrder() {
             <select
               id="service-order-status"
               className={selectClass}
+              data-enter-sequence=""
               value={draft.status}
               disabled={locked}
               onChange={(event) =>
@@ -784,59 +862,98 @@ export function FormServiceOrder() {
         {draft.personId ? (
           <div className="grid gap-4 md:grid-cols-2">
             <CopyField
+              id="service-order-customer-name"
               label="Nome"
               value={draft.customerName}
               disabled={locked}
               onChange={(customerName) => patch({ customerName })}
             />
             <CopyField
-              label="Documento"
+              id="service-order-customer-tax-id"
+              label="CPF/CNPJ"
               value={draft.customerTaxId}
               disabled={locked}
-              onChange={(customerTaxId) => patch({ customerTaxId })}
+              maxLength={18}
+              onChange={(customerTaxId) =>
+                patch({ customerTaxId: formatCpfOrCnpj(customerTaxId) })
+              }
             />
             <CopyField
+              id="service-order-customer-phone"
               label="Telefone"
               value={draft.customerPhone}
               disabled={locked}
-              onChange={(customerPhone) => patch({ customerPhone })}
+              inputMode="numeric"
+              maxLength={15}
+              onChange={(customerPhone) => patch({ customerPhone: formatPhone(customerPhone) })}
             />
             <CopyField
+              id="service-order-customer-mobile"
               label="Celular"
               value={draft.customerMobilePhone}
               disabled={locked}
-              onChange={(customerMobilePhone) => patch({ customerMobilePhone })}
+              inputMode="numeric"
+              maxLength={15}
+              onChange={(customerMobilePhone) =>
+                patch({ customerMobilePhone: formatPhone(customerMobilePhone) })
+              }
             />
             <CopyField
+              id="service-order-customer-whatsapp"
               label="WhatsApp"
               value={draft.customerWhatsapp}
               disabled={locked}
-              onChange={(customerWhatsapp) => patch({ customerWhatsapp })}
+              inputMode="numeric"
+              maxLength={15}
+              onChange={(customerWhatsapp) =>
+                patch({ customerWhatsapp: formatPhone(customerWhatsapp) })
+              }
             />
             <CopyField
+              id="service-order-customer-email"
               label="E-mail"
               value={draft.customerEmail}
               disabled={locked}
               onChange={(customerEmail) => patch({ customerEmail })}
             />
-            <CopyField
-              label="Endereço"
-              value={draft.customerStreetLine}
-              disabled={locked}
-              onChange={(customerStreetLine) => patch({ customerStreetLine })}
-            />
-            <CopyField
-              label="Bairro"
-              value={draft.customerNeighborhood}
-              disabled={locked}
-              onChange={(customerNeighborhood) => patch({ customerNeighborhood })}
-            />
-            <CopyField
-              label="Cidade"
-              value={draft.customerCityLine}
-              disabled={locked}
-              onChange={(customerCityLine) => patch({ customerCityLine })}
-            />
+            <div className="grid grid-cols-12 gap-4 md:col-span-2">
+              <CopyField
+                id="service-order-customer-postal-code"
+                className="col-span-12 sm:col-span-3"
+                label="CEP"
+                value={draft.customerPostalCode}
+                disabled={locked}
+                inputMode="numeric"
+                maxLength={9}
+                onChange={(customerPostalCode) =>
+                  patch({ customerPostalCode: formatPostalCode(customerPostalCode) })
+                }
+              />
+              <CopyField
+                id="service-order-customer-street"
+                className="col-span-12 sm:col-span-9"
+                label="Endereço"
+                value={draft.customerStreetLine}
+                disabled={locked}
+                onChange={(customerStreetLine) => patch({ customerStreetLine })}
+              />
+              <CopyField
+                id="service-order-customer-neighborhood"
+                className="col-span-12 sm:col-span-6"
+                label="Bairro"
+                value={draft.customerNeighborhood}
+                disabled={locked}
+                onChange={(customerNeighborhood) => patch({ customerNeighborhood })}
+              />
+              <CopyField
+                id="service-order-customer-city"
+                className="col-span-12 sm:col-span-6"
+                label="Cidade"
+                value={draft.customerCityLine}
+                disabled={locked}
+                onChange={(customerCityLine) => patch({ customerCityLine })}
+              />
+            </div>
           </div>
         ) : null}
       </section>
@@ -855,6 +972,7 @@ export function FormServiceOrder() {
                 {longField(field.slot) ? (
                   <textarea
                     id={field.slot}
+                    data-enter-sequence=""
                     className="min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm disabled:bg-zinc-50"
                     maxLength={2000}
                     value={field.value}
@@ -864,6 +982,7 @@ export function FormServiceOrder() {
                 ) : (
                   <Input
                     id={field.slot}
+                    data-enter-sequence=""
                     value={field.value}
                     maxLength={120}
                     disabled={locked}
@@ -939,6 +1058,7 @@ export function FormServiceOrder() {
             <select
               id="service-order-method"
               className={selectClass}
+              data-enter-sequence=""
               value={draft.paymentMethodId}
               disabled={locked}
               onChange={(event) => {
@@ -969,6 +1089,7 @@ export function FormServiceOrder() {
             <select
               id="service-order-installments"
               className={selectClass}
+              data-enter-sequence=""
               value={draft.paymentInstallments}
               disabled={locked || !draft.paymentMethodId}
               onChange={(event) => patch({ paymentInstallments: event.target.value })}
@@ -1001,6 +1122,7 @@ export function FormServiceOrder() {
           <Label htmlFor="service-order-internal">Nota interna</Label>
           <textarea
             id="service-order-internal"
+            data-enter-sequence=""
             className="min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
             value={draft.internalNotes}
             onChange={(event) => patch({ internalNotes: event.target.value })}
@@ -1010,7 +1132,7 @@ export function FormServiceOrder() {
       </section>
 
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={save.isPending}>
+        <Button type="submit" data-enter-sequence="" disabled={save.isPending}>
           {save.isPending ? 'Salvando...' : 'Salvar'}
         </Button>
         <Button
@@ -1036,22 +1158,35 @@ export function FormServiceOrder() {
 }
 
 function CopyField({
+  id,
   label,
   value,
   disabled,
   onChange,
+  className,
+  inputMode,
+  maxLength,
 }: {
+  id: string;
   label: string;
   value: string;
   disabled: boolean;
   onChange: (value: string) => void;
+  className?: string;
+  inputMode?: 'numeric' | 'text';
+  maxLength?: number;
 }) {
   return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
+    <div className={className ? `space-y-1.5 ${className}` : 'space-y-1.5'}>
+      <Label htmlFor={id}>{label}</Label>
       <Input
+        id={id}
+        data-enter-sequence=""
         value={value}
         disabled={disabled}
+        inputMode={inputMode}
+        maxLength={maxLength}
+        autoComplete="off"
         onChange={(event) => onChange(event.target.value)}
       />
     </div>
@@ -1073,6 +1208,7 @@ function MoneyField({
     <div className="space-y-1.5">
       <Label>{label}</Label>
       <Input
+        data-enter-sequence=""
         inputMode="numeric"
         autoComplete="off"
         placeholder="0,00"
@@ -1166,6 +1302,7 @@ function LineTable({
                   <td className="px-2 py-2">
                     <Input
                       aria-label="Descrição"
+                      data-enter-sequence=""
                       value={line.description}
                       maxLength={120}
                       disabled={locked}
@@ -1189,6 +1326,7 @@ function LineTable({
                   <td className="px-2 py-2">
                     <Input
                       aria-label="Quantidade"
+                      data-enter-sequence=""
                       value={line.quantity}
                       disabled={locked}
                       onChange={(event) =>
@@ -1199,6 +1337,7 @@ function LineTable({
                   <td className="px-2 py-2">
                     <Input
                       aria-label="Unitário"
+                      data-enter-sequence=""
                       value={line.unitPrice}
                       disabled={locked}
                       onChange={(event) =>
