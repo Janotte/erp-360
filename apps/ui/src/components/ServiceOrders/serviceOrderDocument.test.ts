@@ -109,4 +109,21 @@ describe('folha da ordem de serviço', () => {
     assert.match(withLogo, /<img/);
     assert.equal(withLogo.includes('onerror="alert(1)"'), false);
   });
+
+  it('separa as linhas do objeto como as informações do cliente', () => {
+    const sheet = serviceOrderDocument(
+      model({
+        fields: [
+          { slot: 'field01', label: 'Descrição', value: 'Notebook', width: 12 },
+          { slot: 'field02', label: 'Marca', value: 'Dell', width: 4 },
+          { slot: 'field03', label: 'Modelo', value: 'Latitude', width: 4 },
+          { slot: 'field04', label: 'Número de série', value: 'FX1', width: 4 },
+        ],
+      }),
+      '',
+    );
+    const section = sheet.split('Informações do objeto')[1]?.split('<table>')[0] ?? '';
+    assert.equal((section.match(/class="grid-row"/g) ?? []).length, 2);
+    assert.match(section, /span 4[\s\S]*span 4[\s\S]*span 4/);
+  });
 });

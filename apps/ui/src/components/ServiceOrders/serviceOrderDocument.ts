@@ -93,6 +93,23 @@ function marked(label: string, value: string, span: number) {
   return `<div class="field-group" style="grid-column: span ${span}"><label>${escapeHtml(label)}</label><div class="field-value" style="font-weight: bold; color: #b45309">${value}</div></div>`;
 }
 
+function rowsByWidth<T extends { width: number }>(items: T[]) {
+  const rows: T[][] = [];
+  let row: T[] = [];
+  let used = 0;
+  for (const item of items) {
+    if (row.length > 0 && used + item.width > 12) {
+      rows.push(row);
+      row = [];
+      used = 0;
+    }
+    row.push(item);
+    used += item.width;
+  }
+  if (row.length > 0) rows.push(row);
+  return rows;
+}
+
 function cells(values: string[], align: string[]) {
   return `<tr>${values
     .map((value, index) => `<td class="${align[index] ?? ''}">${value}</td>`)
@@ -224,9 +241,12 @@ ${field('Bairro', model.customer.neighborhood, 3)}
 ${field('Município', model.customer.cityLine, 3)}
 </div>
 <div class="section-title">${escapeHtml(model.sectionTitle)}</div>
-<div class="grid-row">
-${model.fields.map((item) => field(item.label, item.value, item.width)).join('')}
-</div>
+${rowsByWidth(model.fields)
+  .map(
+    (row) =>
+      `<div class="grid-row">${row.map((item) => field(item.label, item.value, item.width)).join('')}</div>`,
+  )
+  .join('\n')}
 <table>
 <thead><tr>
 <th style="width: 8%" class="text-center">Código</th>
