@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import { catalogItems, measures } from '@erp-360/mod-catalog';
+import { tenants } from '@erp-360/mod-core';
 import { meansOfPayment, paymentMethods, paymentMethodTerms } from '@erp-360/mod-financial';
 import { serviceOrderFields, serviceOrderFieldValues, serviceOrderNoteLines, serviceOrders } from '@erp-360/mod-service-orders';
+import { formatPhone } from '@erp-360/shared';
 import { eq, sql } from 'drizzle-orm';
 
 import { buildApp } from '../src/app.ts';
@@ -639,5 +641,200 @@ describe('gravação da ordem de serviço', { concurrency: false }, () => {
     assert.equal(byDigit.statusCode, 200, byDigit.body);
     const digits = byDigit.json() as { data: { number: number }[] };
     assert.ok(digits.data.some((row) => row.number === 1));
+  });
+});
+
+describe('comprovante da ordem', { concurrency: false }, () => {
+  const app = buildApp({ logger: false });
+  let token = '';
+  let tenantId = '';
+  let personId = '';
+  let paymentMethodId = '';
+  let orderId = '';
+
+  before(async () => {
+    assert.equal(env.database.name, 'erp360_test', 'Os testes só rodam no banco erp360_test.');
+    await app.ready();
+    const company = await createCompany('Folha');
+    tenantId = company.tenantId;
+    personId = company.personId;
+    token = app.jwt.sign({ userId: company.userId, tenantId });
+    await db
+      .update(tenants)
+      .set({ phone: '4734723260', mobilePhone: null, whatsapp: null, logo: null })
+      .where(eq(tenants.id, tenantId));
+
+    const [cash] = await db
+      .select({ id: meansOfPayment.id })
+      .from(meansOfPayment)
+      .where(eq(meansOfPayment.code, '01'))
+      .limit(1);
+    const [method] = await db
+      .insert(paymentMethods)
+      .values({
+        tenantId,
+        code: 'DIN',
+        name: 'Dinheiro',
+        meansOfPaymentId: cash.id,
+        receiptKind: 'cash',
+        useInServiceOrder: true,
+      })
+      .returning({ id: paymentMethods.id });
+    paymentMethodId = method.id;
+    await db.insert(paymentMethodTerms).values({
+      tenantId,
+      paymentMethodId,
+      installmentCount: 1,
+    });
+  });
+
+  after(async () => {
+    if (tenantId) {
+      await db.delete(serviceOrders).where(eq(serviceOrders.tenantId, tenantId));
+      await db.delete(paymentMethods).where(eq(paymentMethods.tenantId, tenantId));
+      await removeCompany(tenantId);
+    }
+    await app.close();
+  });
+
+  function headers() {
+    return { authorization: `Bearer ${token}` };
+  }
+
+  async function settings(): Promise<SettingsBody> {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/settings/service-order',
+      headers: headers(),
+    });
+    assert.equal(response.statusCode, 200, response.body);
+    return response.json();
+  }
+
+  async function saveSettings(body: SettingsBody) {
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/settings/service-order',
+      headers: headers(),
+      payload: body,
+    });
+    assert.equal(response.statusCode, 200, response.body);
+  }
+
+  async function readOrder(id: string): Promise<OrderDetail> {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/service-orders/${id}`,
+      headers: headers(),
+    });
+    assert.equal(response.statusCode, 200, response.body);
+    return response.json();
+  }
+
+  async function save(detail: OrderDetail, patch: Record<string, unknown> = {}) {
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/service-orders/${detail.id}`,
+      headers: headers(),
+      payload: { ...detail, ...patch },
+    });
+    assert.equal(response.statusCode, 200, response.body);
+    return response.json() as OrderDetail;
+  }
+
+  it('formata a folha sem nota interna e sem campo inativo', async () => {
+    const opened = await app.inject({
+      method: 'POST',
+      url: '/service-orders',
+      headers: headers(),
+      payload: { personId },
+    });
+    assert.equal(opened.statusCode, 201, opened.body);
+    const order = opened.json() as OrderDetail;
+    orderId = order.id;
+
+    const current = await settings();
+    await saveSettings({
+      ...current,
+      fields: current.fields.map((field) =>
+        field.slot === 'field06' ? { ...field, isActive: false } : field,
+      ),
+    });
+    await save(order, {
+      discountAmount: 50,
+      surchargeAmount: 200,
+      paymentMethodId,
+      paymentInstallments: 1,
+      internalNotes: 'Senha do balcão',
+      fields: order.fields.map((field) => {
+        if (field.slot === 'field01') return { ...field, value: 'Aparelho' };
+        if (field.slot === 'field08') return { ...field, value: 'Defeito' };
+        return field;
+      }),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/service-orders/${order.id}/print`,
+      headers: headers(),
+    });
+    assert.equal(response.statusCode, 200, response.body);
+    const printed = response.json() as {
+      number: string;
+      logoText: string;
+      logoUrl: string | null;
+      tenant: { phone: string | null; mobilePhone: string | null; whatsapp: string | null };
+      fields: { slot: string; label: string; value: string }[];
+      notes: { slot: string; body: string }[];
+      payment: { methodDescription: string | null; installmentsLabel: string | null };
+      totals: { adjustmentAmount: number };
+    };
+
+    assert.equal(printed.number, '000.000.001');
+    assert.equal(printed.logoText, 'Folha');
+    assert.equal(printed.logoUrl, null);
+    assert.equal(printed.tenant.mobilePhone, null);
+    assert.equal(printed.tenant.whatsapp, null);
+    assert.equal(printed.tenant.phone, formatPhone('4734723260'));
+    const empty = printed.fields.find((field) => field.slot === 'field03');
+    assert.equal(empty?.value, '');
+    assert.equal(empty?.label, 'Modelo');
+    assert.equal(
+      printed.fields.some((field) => field.slot === 'field06'),
+      false,
+    );
+    assert.equal(
+      printed.notes.some((note) => note.slot === 'line03' || note.body.trim() === ''),
+      false,
+    );
+    assert.equal('internalNotes' in printed, false);
+    assert.equal(JSON.stringify(printed).includes('Senha do balcão'), false);
+    assert.equal(printed.payment.methodDescription, 'Dinheiro');
+    assert.equal(printed.payment.installmentsLabel, 'À vista');
+    assert.equal(printed.totals.adjustmentAmount, 150);
+  });
+
+  it('mantém o rótulo congelado depois que a aba muda', async () => {
+    let detail = await readOrder(orderId);
+    detail = await save(detail, { status: 'in_progress' });
+    detail = await save(detail, { status: 'ready' });
+    await save(detail, { status: 'delivered' });
+
+    const current = await settings();
+    await saveSettings({
+      ...current,
+      fields: current.fields.map((field) =>
+        field.slot === 'field02' ? { ...field, label: 'Fabricante' } : field,
+      ),
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/service-orders/${orderId}/print`,
+      headers: headers(),
+    });
+    assert.equal(response.statusCode, 200, response.body);
+    const printed = response.json() as { fields: { slot: string; label: string }[] };
+    assert.equal(printed.fields.find((field) => field.slot === 'field02')?.label, 'Marca');
   });
 });

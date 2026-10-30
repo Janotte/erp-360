@@ -19,6 +19,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
+import { buildServiceOrderPrint } from './print-model.ts';
 import {
   assertLine,
   assertOrigin,
@@ -939,6 +940,16 @@ export const serviceOrderRoutes: FastifyPluginAsyncZod = async (fastify) => {
     if (!loaded) return reply.status(404).send({ message: 'Ordem não encontrada.' });
     return present(loaded);
   });
+
+  fastify.get(
+    '/:id/print',
+    { schema: { params: z.object({ id: z.string().uuid() }) } },
+    async (request, reply) => {
+      const printed = await buildServiceOrderPrint(request.user.tenantId, request.params.id);
+      if (!printed) return reply.status(404).send({ message: 'Ordem não encontrada.' });
+      return printed;
+    },
+  );
 
   fastify.put(
     '/:id',
