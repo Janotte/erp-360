@@ -31,6 +31,8 @@ import { InboundPage } from './components/Inbound/InboundPage';
 import { InboundSetupPage } from './components/Inbound/Setup/InboundSetupPage';
 import { Navbar } from './components/Navbar';
 import { ListPersons } from './components/Persons/ListPersons';
+import { FormServiceOrder } from './components/ServiceOrders/FormServiceOrder';
+import { ListServiceOrders } from './components/ServiceOrders/ListServiceOrders';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { setUnauthorizedHandler } from './services/apiClient';
 import { authStorage } from './utils/auth';
@@ -52,6 +54,7 @@ const rotasPorHash: Record<string, string> = {
   '#inbound': '/inbound',
   '#inbound-setup': '/inbound/setup',
   '#settings': '/settings',
+  '#service-orders': '/service-orders',
 };
 
 function destinoDoHash(hash: string, autenticado: boolean) {
@@ -257,6 +260,30 @@ function App() {
               element={
                 <Pagina>
                   <InboundSetupPage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/service-orders"
+              element={
+                <Pagina>
+                  <ListServiceOrders />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/service-orders/new"
+              element={
+                <Pagina>
+                  <FormServiceOrder />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/service-orders/:id"
+              element={
+                <Pagina>
+                  <FormServiceOrder />
                 </Pagina>
               }
             />

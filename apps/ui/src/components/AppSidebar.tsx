@@ -5,6 +5,7 @@ import {
   BookOpen,
   Box,
   ChevronRight,
+  ClipboardList,
   CreditCard,
   FileText,
   FolderTree,
@@ -53,6 +54,7 @@ type ItemMenu = {
 const itensMenu: ItemMenu[] = [
   { title: 'Dashboard', icon: LayoutDashboard, url: '/dashboard' },
   { title: 'Pessoas', icon: Users, url: '/persons' },
+  { title: 'Ordens de serviço', icon: ClipboardList, url: '/service-orders' },
   {
     title: 'Catálogo',
     icon: Package,
@@ -174,7 +176,12 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       asChild
                       tooltip={item.title}
-                      isActive={pathAtivo === item.url}
+                      isActive={
+                        item.url === '/service-orders'
+                          ? pathAtivo === '/service-orders' ||
+                            pathAtivo.startsWith('/service-orders/')
+                          : pathAtivo === item.url
+                      }
                     >
                       <Link
                         to={item.url ?? '/dashboard'}
