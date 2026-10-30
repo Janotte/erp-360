@@ -132,9 +132,42 @@ function toLocalInput(iso: string | null) {
 }
 
 function scale4(value: string) {
-  const match = /^(\d+)(?:\.(\d{1,4}))?$/.exec(value.trim());
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.includes(',')
+    ? trimmed.replace(/\./g, '').replace(',', '.')
+    : trimmed;
+  const match = /^(\d+)(?:\.(\d{1,4}))?$/.exec(normalized);
   if (!match) return null;
   return BigInt(match[1]) * 10_000n + BigInt((match[2] ?? '').padEnd(4, '0'));
+}
+
+function maskUnitPrice(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 15);
+  if (!digits) return '';
+  const padded = digits.padStart(5, '0');
+  const fraction = padded.slice(-4);
+  const integers = padded.slice(0, -4).replace(/^0+(?=\d)/, '') || '0';
+  const grouped = integers.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${grouped},${fraction}`;
+}
+
+function formatUnitPrice(value: string | null | undefined) {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return '';
+  const normalized = trimmed.includes(',')
+    ? trimmed.replace(/\./g, '').replace(',', '.')
+    : trimmed;
+  const [integers, fraction = ''] = normalized.split('.');
+  const intDigits = integers.replace(/\D/g, '').replace(/^0+(?=\d)/, '') || '0';
+  const fractionDigits = fraction.replace(/\D/g, '').padEnd(4, '0').slice(0, 4);
+  return maskUnitPrice(`${intDigits}${fractionDigits}`);
+}
+
+function unitPriceForApi(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '0.0000';
+  return trimmed.replace(/\./g, '').replace(',', '.');
 }
 
 function lineAmountCents(quantity: string, unitPrice: string) {
@@ -294,7 +327,7 @@ function draftFromOrder(order: ServiceOrderDetail): Draft {
       code: line.code,
       description: line.description,
       quantity: line.quantity,
-      unitPrice: line.unitPrice,
+      unitPrice: formatUnitPrice(line.unitPrice),
       technicianPersonId: line.technicianPersonId,
     })),
   };
@@ -342,7 +375,7 @@ function toWrite(draft: Draft, status: ServiceOrderStatus): ServiceOrderWrite {
       itemId: line.itemId,
       description: line.description,
       quantity: line.quantity.trim(),
-      unitPrice: line.unitPrice.trim(),
+      unitPrice: unitPriceForApi(line.unitPrice),
       technicianPersonId: line.kind === 'service' ? line.technicianPersonId : null,
     })),
   };
@@ -600,7 +633,7 @@ export function FormServiceOrder() {
                 code: item.code,
                 description: item.name,
                 quantity: '1.0000',
-                unitPrice: item.listPrice ?? '0.0000',
+                unitPrice: formatUnitPrice(item.listPrice ?? '0'),
                 technicianPersonId: null,
               },
             ],
@@ -1338,10 +1371,13 @@ function LineTable({
                     <Input
                       aria-label="Unitário"
                       data-enter-sequence=""
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="0,0000"
                       value={line.unitPrice}
                       disabled={locked}
                       onChange={(event) =>
-                        onPatch(index, { unitPrice: event.target.value })
+                        onPatch(index, { unitPrice: maskUnitPrice(event.target.value) })
                       }
                     />
                   </td>
