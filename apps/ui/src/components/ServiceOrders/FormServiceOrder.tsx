@@ -114,10 +114,6 @@ function spanClass(width: number) {
   return 'col-span-12';
 }
 
-function lineCode(slot: string) {
-  return `Linha ${slot.slice(-2)}`;
-}
-
 function longField(slot: string) {
   return /^field(08|09|10|11)$/.test(slot);
 }
@@ -211,7 +207,9 @@ function draftFromOrder(order: ServiceOrderDetail): Draft {
     discount: formatInput(order.discountAmount),
     surcharge: formatInput(order.surchargeAmount),
     paymentMethodId: order.paymentMethodId ?? '',
-    paymentInstallments: order.paymentInstallments ? String(order.paymentInstallments) : '',
+    paymentInstallments: order.paymentInstallments
+      ? String(order.paymentInstallments)
+      : '',
     fields: order.fields.map((field) => ({
       slot: field.slot,
       value: field.value ?? '',
@@ -241,7 +239,9 @@ function toWrite(draft: Draft, status: ServiceOrderStatus): ServiceOrderWrite {
   return {
     personId: draft.personId,
     attendance: draft.attendance,
-    originOrderId: needsOrigin(draft.attendance) ? emptyToNull(draft.originOrderId) : null,
+    originOrderId: needsOrigin(draft.attendance)
+      ? emptyToNull(draft.originOrderId)
+      : null,
     promisedAt: draft.promisedAt,
     status,
     internalNotes: draft.internalNotes,
@@ -258,8 +258,13 @@ function toWrite(draft: Draft, status: ServiceOrderStatus): ServiceOrderWrite {
     discountAmount: parseCurrencyToCents(draft.discount),
     surchargeAmount: parseCurrencyToCents(draft.surcharge),
     paymentMethodId: draft.paymentMethodId || null,
-    paymentInstallments: draft.paymentInstallments ? Number(draft.paymentInstallments) : null,
-    fields: draft.fields.map((field) => ({ slot: field.slot, value: emptyToNull(field.value) })),
+    paymentInstallments: draft.paymentInstallments
+      ? Number(draft.paymentInstallments)
+      : null,
+    fields: draft.fields.map((field) => ({
+      slot: field.slot,
+      value: emptyToNull(field.value),
+    })),
     notes: draft.notes.map((note) => ({ slot: note.slot, body: note.body })),
     lines: draft.lines.map((line) => ({
       kind: line.kind,
@@ -272,7 +277,10 @@ function toWrite(draft: Draft, status: ServiceOrderStatus): ServiceOrderWrite {
   };
 }
 
-function writeFromDetail(order: ServiceOrderDetail, internalNotes: string): ServiceOrderWrite {
+function writeFromDetail(
+  order: ServiceOrderDetail,
+  internalNotes: string,
+): ServiceOrderWrite {
   return {
     personId: order.personId,
     attendance: order.attendance,
@@ -397,14 +405,19 @@ export function FormServiceOrder() {
       const current = order.data;
       const closed = current?.status === 'delivered' || current?.status === 'cancelled';
       if (closed && current) {
-        return serviceOrdersService.save(current.id, writeFromDetail(current, draft.internalNotes));
+        return serviceOrdersService.save(
+          current.id,
+          writeFromDetail(current, draft.internalNotes),
+        );
       }
       let orderId = id ?? createdId.current;
       if (!orderId) {
         const created = await serviceOrdersService.create({
           personId: draft.personId,
           attendance: draft.attendance,
-          originOrderId: needsOrigin(draft.attendance) ? emptyToNull(draft.originOrderId) : null,
+          originOrderId: needsOrigin(draft.attendance)
+            ? emptyToNull(draft.originOrderId)
+            : null,
           promisedAt: draft.promisedAt,
           internalNotes: draft.internalNotes,
         });
@@ -436,13 +449,21 @@ export function FormServiceOrder() {
   const currentStatus = order.data?.status ?? 'open';
   const destinations = [currentStatus, ...transitions[currentStatus]];
   const canDeliver = transitions[currentStatus].includes('delivered');
+  const activeNoteSlots = new Set(
+    (settings.data?.noteLines ?? []).filter((line) => line.isActive).map((line) => line.slot),
+  );
+  const visibleNotes = draft.notes.filter(
+    (note) => activeNoteSlots.has(note.slot) && note.body.trim(),
+  );
   const sectionTitle = settings.data?.sectionTitle ?? 'Informações do objeto';
   const productsTitle = settings.data?.productsTitle ?? 'Produtos';
   const servicesTitle = settings.data?.servicesTitle ?? 'Serviços';
   const paymentMethods = (methods.data?.data ?? []).filter(
     (method) => method.receiptKind !== 'store_credit',
   );
-  const selectedMethod = paymentMethods.find((method) => method.id === draft.paymentMethodId);
+  const selectedMethod = paymentMethods.find(
+    (method) => method.id === draft.paymentMethodId,
+  );
   const terms = [...(selectedMethod?.terms ?? [])].sort(
     (left, right) => left.installmentCount - right.installmentCount,
   );
@@ -461,7 +482,8 @@ export function FormServiceOrder() {
   const freightAmount = parseCurrencyToCents(draft.freight);
   const discountAmount = parseCurrencyToCents(draft.discount);
   const surchargeAmount = parseCurrencyToCents(draft.surcharge);
-  const totalAmount = productAmount + serviceAmount + freightAmount - discountAmount + surchargeAmount;
+  const totalAmount =
+    productAmount + serviceAmount + freightAmount - discountAmount + surchargeAmount;
 
   function patch(partial: Partial<Draft>) {
     setDraft((current) => (current ? { ...current, ...partial } : current));
@@ -472,18 +494,9 @@ export function FormServiceOrder() {
       current
         ? {
             ...current,
-            fields: current.fields.map((field) => (field.slot === slot ? { ...field, value } : field)),
-          }
-        : current,
-    );
-  }
-
-  function patchNote(slot: string, body: string) {
-    setDraft((current) =>
-      current
-        ? {
-            ...current,
-            notes: current.notes.map((note) => (note.slot === slot ? { ...note, body } : note)),
+            fields: current.fields.map((field) =>
+              field.slot === slot ? { ...field, value } : field,
+            ),
           }
         : current,
     );
@@ -527,7 +540,10 @@ export function FormServiceOrder() {
   function removeLine(index: number) {
     setDraft((current) =>
       current
-        ? { ...current, lines: current.lines.filter((_, lineIndex) => lineIndex !== index) }
+        ? {
+            ...current,
+            lines: current.lines.filter((_, lineIndex) => lineIndex !== index),
+          }
         : current,
     );
   }
@@ -537,7 +553,9 @@ export function FormServiceOrder() {
     if (!personId) return;
     try {
       const copy = await copyFromPerson(personId);
-      setDraft((current) => (current && current.personId === personId ? { ...current, ...copy } : current));
+      setDraft((current) =>
+        current && current.personId === personId ? { ...current, ...copy } : current,
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Informe um cliente ativo.');
       patch({ personId: '' });
@@ -556,7 +574,11 @@ export function FormServiceOrder() {
       }
       patchLine(index, { technicianPersonId: person.id });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'O técnico precisa ser um funcionário ativo.');
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'O técnico precisa ser um funcionário ativo.',
+      );
     }
   }
 
@@ -589,8 +611,13 @@ export function FormServiceOrder() {
       toast.error('Informe a forma de pagamento para entregar.');
       return false;
     }
-    if (discountAmount > productAmount + serviceAmount + freightAmount + surchargeAmount) {
-      toast.error('O desconto não pode passar da soma dos itens, do frete e do acréscimo.');
+    if (
+      discountAmount >
+      productAmount + serviceAmount + freightAmount + surchargeAmount
+    ) {
+      toast.error(
+        'O desconto não pode passar da soma dos itens, do frete e do acréscimo.',
+      );
       return false;
     }
     return true;
@@ -610,7 +637,9 @@ export function FormServiceOrder() {
       toast.error('O navegador bloqueou a janela da folha.');
       return;
     }
-    popup.document.write('<!doctype html><title>Ordem de Serviço</title><p>Montando a folha...</p>');
+    popup.document.write(
+      '<!doctype html><title>Ordem de Serviço</title><p>Montando a folha...</p>',
+    );
     popup.document.close();
     let persisted = Boolean(knownId);
     try {
@@ -628,7 +657,9 @@ export function FormServiceOrder() {
     } catch (error) {
       popup.close();
       if (persisted) {
-        toast.error(error instanceof Error ? error.message : 'Falha ao montar a folha da ordem.');
+        toast.error(
+          error instanceof Error ? error.message : 'Falha ao montar a folha da ordem.',
+        );
       }
     }
   }
@@ -684,11 +715,13 @@ export function FormServiceOrder() {
                 });
               }}
             >
-              {(Object.keys(attendanceLabels) as ServiceOrderAttendance[]).map((value) => (
-                <option key={value} value={value}>
-                  {attendanceLabels[value]}
-                </option>
-              ))}
+              {(Object.keys(attendanceLabels) as ServiceOrderAttendance[]).map(
+                (value) => (
+                  <option key={value} value={value}>
+                    {attendanceLabels[value]}
+                  </option>
+                ),
+              )}
             </select>
           </div>
           {needsOrigin(draft.attendance) ? (
@@ -721,7 +754,9 @@ export function FormServiceOrder() {
               disabled={locked}
               onChange={(event) =>
                 patch({
-                  promisedAt: event.target.value ? new Date(event.target.value).toISOString() : null,
+                  promisedAt: event.target.value
+                    ? new Date(event.target.value).toISOString()
+                    : null,
                 })
               }
             />
@@ -733,7 +768,9 @@ export function FormServiceOrder() {
               className={selectClass}
               value={draft.status}
               disabled={locked}
-              onChange={(event) => patch({ status: event.target.value as ServiceOrderStatus })}
+              onChange={(event) =>
+                patch({ status: event.target.value as ServiceOrderStatus })
+              }
             >
               {destinations.map((value) => (
                 <option key={value} value={value}>
@@ -746,15 +783,60 @@ export function FormServiceOrder() {
 
         {draft.personId ? (
           <div className="grid gap-4 md:grid-cols-2">
-            <CopyField label="Nome" value={draft.customerName} disabled={locked} onChange={(customerName) => patch({ customerName })} />
-            <CopyField label="Documento" value={draft.customerTaxId} disabled={locked} onChange={(customerTaxId) => patch({ customerTaxId })} />
-            <CopyField label="Telefone" value={draft.customerPhone} disabled={locked} onChange={(customerPhone) => patch({ customerPhone })} />
-            <CopyField label="Celular" value={draft.customerMobilePhone} disabled={locked} onChange={(customerMobilePhone) => patch({ customerMobilePhone })} />
-            <CopyField label="WhatsApp" value={draft.customerWhatsapp} disabled={locked} onChange={(customerWhatsapp) => patch({ customerWhatsapp })} />
-            <CopyField label="E-mail" value={draft.customerEmail} disabled={locked} onChange={(customerEmail) => patch({ customerEmail })} />
-            <CopyField label="Endereço" value={draft.customerStreetLine} disabled={locked} onChange={(customerStreetLine) => patch({ customerStreetLine })} />
-            <CopyField label="Bairro" value={draft.customerNeighborhood} disabled={locked} onChange={(customerNeighborhood) => patch({ customerNeighborhood })} />
-            <CopyField label="Cidade" value={draft.customerCityLine} disabled={locked} onChange={(customerCityLine) => patch({ customerCityLine })} />
+            <CopyField
+              label="Nome"
+              value={draft.customerName}
+              disabled={locked}
+              onChange={(customerName) => patch({ customerName })}
+            />
+            <CopyField
+              label="Documento"
+              value={draft.customerTaxId}
+              disabled={locked}
+              onChange={(customerTaxId) => patch({ customerTaxId })}
+            />
+            <CopyField
+              label="Telefone"
+              value={draft.customerPhone}
+              disabled={locked}
+              onChange={(customerPhone) => patch({ customerPhone })}
+            />
+            <CopyField
+              label="Celular"
+              value={draft.customerMobilePhone}
+              disabled={locked}
+              onChange={(customerMobilePhone) => patch({ customerMobilePhone })}
+            />
+            <CopyField
+              label="WhatsApp"
+              value={draft.customerWhatsapp}
+              disabled={locked}
+              onChange={(customerWhatsapp) => patch({ customerWhatsapp })}
+            />
+            <CopyField
+              label="E-mail"
+              value={draft.customerEmail}
+              disabled={locked}
+              onChange={(customerEmail) => patch({ customerEmail })}
+            />
+            <CopyField
+              label="Endereço"
+              value={draft.customerStreetLine}
+              disabled={locked}
+              onChange={(customerStreetLine) => patch({ customerStreetLine })}
+            />
+            <CopyField
+              label="Bairro"
+              value={draft.customerNeighborhood}
+              disabled={locked}
+              onChange={(customerNeighborhood) => patch({ customerNeighborhood })}
+            />
+            <CopyField
+              label="Cidade"
+              value={draft.customerCityLine}
+              disabled={locked}
+              onChange={(customerCityLine) => patch({ customerCityLine })}
+            />
           </div>
         ) : null}
       </section>
@@ -827,12 +909,28 @@ export function FormServiceOrder() {
       <section className="space-y-4 rounded-lg border bg-white p-6">
         <h3 className="text-lg font-semibold text-zinc-900">Totais e pagamento</h3>
         <div className="grid gap-4 md:grid-cols-3">
-          <MoneyField label="Frete (R$)" value={draft.freight} disabled={locked} onChange={(freight) => patch({ freight })} />
-          <MoneyField label="Desconto (R$)" value={draft.discount} disabled={locked} onChange={(discount) => patch({ discount })} />
-          <MoneyField label="Acréscimo (R$)" value={draft.surcharge} disabled={locked} onChange={(surcharge) => patch({ surcharge })} />
+          <MoneyField
+            label="Frete (R$)"
+            value={draft.freight}
+            disabled={locked}
+            onChange={(freight) => patch({ freight })}
+          />
+          <MoneyField
+            label="Desconto (R$)"
+            value={draft.discount}
+            disabled={locked}
+            onChange={(discount) => patch({ discount })}
+          />
+          <MoneyField
+            label="Acréscimo (R$)"
+            value={draft.surcharge}
+            disabled={locked}
+            onChange={(surcharge) => patch({ surcharge })}
+          />
         </div>
         <p className="text-sm text-zinc-700">
-          Produtos {formatCurrency(productAmount)} · Serviços {formatCurrency(serviceAmount)} · Total{' '}
+          Produtos {formatCurrency(productAmount)} · Serviços{' '}
+          {formatCurrency(serviceAmount)} · Total{' '}
           <strong>{formatCurrency(totalAmount)}</strong>
         </p>
         <div className="grid gap-4 md:grid-cols-2">
@@ -889,22 +987,16 @@ export function FormServiceOrder() {
       </section>
 
       <section className="space-y-4 rounded-lg border bg-white p-6">
-        <h3 className="text-lg font-semibold text-zinc-900">Observações da folha</h3>
-        <div className="space-y-3">
-          {draft.notes.map((note) => (
-            <div key={note.slot} className="grid gap-2 md:grid-cols-[6.5rem_minmax(0,1fr)]">
-              <span className="pt-2 text-sm font-medium text-zinc-800">{lineCode(note.slot)}</span>
-              <textarea
-                aria-label={`Texto da ${lineCode(note.slot)}`}
-                className="min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm disabled:bg-zinc-50"
-                maxLength={500}
-                value={note.body}
-                disabled={locked}
-                onChange={(event) => patchNote(note.slot, event.target.value)}
-              />
-            </div>
-          ))}
-        </div>
+        <h3 className="text-lg font-semibold text-zinc-900">Observações</h3>
+        {visibleNotes.length ? (
+          <div className="space-y-3">
+            {visibleNotes.map((note) => (
+              <p key={note.slot} className="whitespace-pre-wrap text-sm text-zinc-800">
+                {note.body}
+              </p>
+            ))}
+          </div>
+        ) : null}
         <div className="space-y-1.5">
           <Label htmlFor="service-order-internal">Nota interna</Label>
           <textarea
@@ -921,11 +1013,20 @@ export function FormServiceOrder() {
         <Button type="submit" disabled={save.isPending}>
           {save.isPending ? 'Salvando...' : 'Salvar'}
         </Button>
-        <Button type="button" variant="outline" disabled={save.isPending} onClick={() => void printSheet()}>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={save.isPending}
+          onClick={() => void printSheet()}
+        >
           Imprimir
         </Button>
         {canDeliver && !locked ? (
-          <Button type="button" disabled={save.isPending} onClick={() => submit('delivered')}>
+          <Button
+            type="button"
+            disabled={save.isPending}
+            onClick={() => submit('delivered')}
+          >
             Entregar
           </Button>
         ) : null}
@@ -948,7 +1049,11 @@ function CopyField({
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
-      <Input value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+      <Input
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </div>
   );
 }
@@ -1017,9 +1122,16 @@ function LineTable({
             const item = items.find((entry) => entry.id === itemId);
             if (item) onAdd(item);
           }}
-          options={items.map((item) => ({ id: item.id, label: `${item.code} — ${item.name}` }))}
-          placeholder={kind === 'product' ? 'Buscar produto ativo...' : 'Buscar serviço ativo...'}
-          emptyMessage={kind === 'product' ? 'Nenhum produto ativo.' : 'Nenhum serviço ativo.'}
+          options={items.map((item) => ({
+            id: item.id,
+            label: `${item.code} — ${item.name}`,
+          }))}
+          placeholder={
+            kind === 'product' ? 'Buscar produto ativo...' : 'Buscar serviço ativo...'
+          }
+          emptyMessage={
+            kind === 'product' ? 'Nenhum produto ativo.' : 'Nenhum serviço ativo.'
+          }
         />
       )}
       <div className="overflow-x-auto">
@@ -1028,7 +1140,9 @@ function LineTable({
             <tr>
               <th className="px-2 py-2 font-medium">Código</th>
               <th className="px-2 py-2 font-medium">Descrição</th>
-              {kind === 'service' ? <th className="px-2 py-2 font-medium">Técnico</th> : null}
+              {kind === 'service' ? (
+                <th className="px-2 py-2 font-medium">Técnico</th>
+              ) : null}
               <th className="px-2 py-2 font-medium">Quantidade</th>
               <th className="px-2 py-2 font-medium">Unitário</th>
               <th className="px-2 py-2 font-medium">Total</th>
@@ -1038,7 +1152,10 @@ function LineTable({
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={kind === 'service' ? 7 : 6} className="px-2 py-3 text-zinc-500">
+                <td
+                  colSpan={kind === 'service' ? 7 : 6}
+                  className="px-2 py-3 text-zinc-500"
+                >
                   Nenhum item nesta tabela.
                 </td>
               </tr>
@@ -1052,7 +1169,9 @@ function LineTable({
                       value={line.description}
                       maxLength={120}
                       disabled={locked}
-                      onChange={(event) => onPatch(index, { description: event.target.value })}
+                      onChange={(event) =>
+                        onPatch(index, { description: event.target.value })
+                      }
                     />
                   </td>
                   {kind === 'service' ? (
@@ -1072,7 +1191,9 @@ function LineTable({
                       aria-label="Quantidade"
                       value={line.quantity}
                       disabled={locked}
-                      onChange={(event) => onPatch(index, { quantity: event.target.value })}
+                      onChange={(event) =>
+                        onPatch(index, { quantity: event.target.value })
+                      }
                     />
                   </td>
                   <td className="px-2 py-2">
@@ -1080,7 +1201,9 @@ function LineTable({
                       aria-label="Unitário"
                       value={line.unitPrice}
                       disabled={locked}
-                      onChange={(event) => onPatch(index, { unitPrice: event.target.value })}
+                      onChange={(event) =>
+                        onPatch(index, { unitPrice: event.target.value })
+                      }
                     />
                   </td>
                   <td className="px-2 py-2 whitespace-nowrap">
@@ -1088,7 +1211,11 @@ function LineTable({
                   </td>
                   <td className="px-2 py-2">
                     {locked ? null : (
-                      <Button type="button" variant="ghost" onClick={() => onRemove(index)}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => onRemove(index)}
+                      >
                         Remover
                       </Button>
                     )}
