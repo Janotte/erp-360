@@ -28,6 +28,7 @@ import { locationsRoutes } from './modules/persons/locations.ts';
 import { personsRoutes } from './modules/persons/persons.ts';
 import { financialCatalogRoutes } from './modules/plan-accounts/financial-catalogs.ts';
 import { planAccountsRoutes } from './modules/plan-accounts/plan-accounts.ts';
+import { serviceOrderSettingsRoutes } from './modules/service-orders/settings.ts';
 import { emitterRoutes } from './modules/tenants/emitter.ts';
 import { payablesRoutes } from './modules/titles/payables.ts';
 import { receivablesRoutes } from './modules/titles/receivables.ts';
@@ -81,6 +82,7 @@ export function buildApp(options?: { logger?: boolean }) {
   fastify.register(treasuryRoutes, { prefix: '/financial' });
   fastify.register(emitterRoutes, { prefix: '/settings' });
   fastify.register(nfeSettingsRoutes, { prefix: '/settings' });
+  fastify.register(serviceOrderSettingsRoutes, { prefix: '/settings' });
   fastify.register(planAccountsRoutes, { prefix: '/plan-accounts' });
   fastify.register(categoryRoutes, { prefix: '/catalog/categories' });
   fastify.register(itemRoutes, { prefix: '/catalog/items' });
