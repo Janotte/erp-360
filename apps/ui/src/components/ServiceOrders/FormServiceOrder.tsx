@@ -9,7 +9,8 @@ import {
   parseCurrencyToCents,
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Trash2 } from 'lucide-react';
+import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 
@@ -1335,7 +1336,16 @@ function LineTable({
         />
       )}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full table-fixed text-sm">
+          <colgroup>
+            <col className="w-24" />
+            <col />
+            {kind === 'service' ? <col className="w-56" /> : null}
+            <col className="w-24" />
+            <col className="w-28" />
+            <col className="w-24" />
+            <col className="w-10" />
+          </colgroup>
           <thead className="text-left text-xs text-zinc-500">
             <tr>
               <th className="px-2 py-2 font-medium">Código</th>
@@ -1346,7 +1356,7 @@ function LineTable({
               <th className="px-2 py-2 font-medium">Quantidade</th>
               <th className="px-2 py-2 font-medium">Unitário</th>
               <th className="px-2 py-2 font-medium">Total</th>
-              <th className="px-2 py-2" />
+              <th className="px-1 py-2" />
             </tr>
           </thead>
           <tbody>
@@ -1362,10 +1372,13 @@ function LineTable({
             ) : (
               visible.map(({ line, index }) => (
                 <tr key={`${line.itemId}-${index}`} className="border-t border-zinc-100">
-                  <td className="px-2 py-2 font-medium text-zinc-800">{line.code}</td>
+                  <td className="px-2 py-2 font-medium whitespace-nowrap text-zinc-800">
+                    {line.code}
+                  </td>
                   <td className="px-2 py-2">
                     <Input
                       aria-label="Descrição"
+                      className="w-full"
                       data-enter-sequence=""
                       value={line.description}
                       maxLength={120}
@@ -1376,7 +1389,7 @@ function LineTable({
                     />
                   </td>
                   {kind === 'service' ? (
-                    <td className="min-w-56 px-2 py-2">
+                    <td className="px-2 py-2">
                       <PersonSearchSelect
                         value={line.technicianPersonId ?? ''}
                         onChange={(personId) => onTechnician(index, personId)}
@@ -1390,6 +1403,7 @@ function LineTable({
                   <td className="px-2 py-2">
                     <Input
                       aria-label="Quantidade"
+                      className="w-full px-2"
                       data-enter-sequence=""
                       value={line.quantity}
                       disabled={locked}
@@ -1401,6 +1415,7 @@ function LineTable({
                   <td className="px-2 py-2">
                     <Input
                       aria-label="Unitário"
+                      className="w-full px-2"
                       data-enter-sequence=""
                       inputMode="numeric"
                       autoComplete="off"
@@ -1415,14 +1430,16 @@ function LineTable({
                   <td className="px-2 py-2 whitespace-nowrap">
                     {formatCurrency(lineAmountCents(line.quantity, line.unitPrice))}
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-1 py-2">
                     {locked ? null : (
                       <Button
                         type="button"
                         variant="ghost"
+                        size="icon"
+                        aria-label="Remover"
                         onClick={() => onRemove(index)}
                       >
-                        Remover
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     )}
                   </td>
