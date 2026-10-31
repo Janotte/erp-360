@@ -118,7 +118,7 @@ function cells(values: string[], align: string[]) {
 }
 
 function emptyRow(columns: number) {
-  return `<tr class="empty-row">${'<td></td>'.repeat(columns)}</tr>`;
+  return `<tr class="empty-row">${'<td>&nbsp;</td>'.repeat(columns)}</tr>`;
 }
 
 const contactIcons = {
