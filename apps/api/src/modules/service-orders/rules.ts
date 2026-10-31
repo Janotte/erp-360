@@ -10,6 +10,8 @@ export type ServiceOrderStatus =
 
 export type ServiceOrderAttendance = 'walk_in' | 'warranty' | 'rework' | 'contract';
 
+export type ServiceOrderLocation = 'remote' | 'internal' | 'external';
+
 export type ServiceOrderLineKind = 'product' | 'service';
 
 const transitions: Record<ServiceOrderStatus, readonly ServiceOrderStatus[]> = {

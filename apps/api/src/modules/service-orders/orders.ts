@@ -9,6 +9,7 @@ import {
   serviceOrderFieldValues,
   serviceOrderLineKinds,
   serviceOrderLines,
+  serviceOrderLocations,
   serviceOrderNotes,
   serviceOrders,
   serviceOrderStatuses,
@@ -30,6 +31,7 @@ import {
   lineAmountCents,
   type ServiceOrderAttendance,
   type ServiceOrderLineKind,
+  type ServiceOrderLocation,
   type ServiceOrderStatus,
 } from './rules.ts';
 import { getOrCreateServiceOrderSettings } from './settings.ts';
@@ -61,6 +63,7 @@ const timestampSchema = z
 const createBody = z.object({
   personId: z.string().uuid(),
   attendance: z.enum(serviceOrderAttendances).optional(),
+  location: z.enum(serviceOrderLocations).optional(),
   originOrderId: z.string().uuid().nullable().optional(),
   promisedAt: timestampSchema.nullable().optional(),
   internalNotes: z.string().trim().optional(),
@@ -70,6 +73,7 @@ const orderBody = z
   .object({
     personId: z.string().uuid(),
     attendance: z.enum(serviceOrderAttendances),
+    location: z.enum(serviceOrderLocations),
     originOrderId: z.string().uuid().nullable(),
     promisedAt: timestampSchema.nullable(),
     status: z.enum(serviceOrderStatuses),
@@ -179,6 +183,7 @@ type LoadedOrder = {
   number: number;
   status: ServiceOrderStatus;
   attendance: ServiceOrderAttendance;
+  location: ServiceOrderLocation;
   openedAt: Date;
   promisedAt: Date | null;
   deliveredAt: Date | null;
@@ -529,6 +534,7 @@ async function loadOrder(tenantId: string, id: string): Promise<LoadedOrder | nu
     number: order.number,
     status: order.status,
     attendance: order.attendance,
+    location: order.location,
     openedAt: order.openedAt,
     promisedAt: order.promisedAt,
     deliveredAt: order.deliveredAt,
@@ -569,6 +575,7 @@ function present(order: LoadedOrder) {
     numberLabel: formatServiceOrderNumber(order.number),
     status: order.status,
     attendance: order.attendance,
+    location: order.location,
     openedAt: order.openedAt,
     promisedAt: order.promisedAt,
     deliveredAt: order.deliveredAt,
@@ -595,6 +602,7 @@ function present(order: LoadedOrder) {
 function sameExceptInternalNotes(current: LoadedOrder, body: OrderBody) {
   if (current.personId !== body.personId) return false;
   if (current.attendance !== body.attendance) return false;
+  if (current.location !== body.location) return false;
   if ((current.originOrderId ?? null) !== (body.originOrderId ?? null)) return false;
   if (!sameInstant(current.promisedAt, body.promisedAt)) return false;
   if (current.status !== body.status) return false;
@@ -647,6 +655,7 @@ export async function createServiceOrder(
 ) {
   const settings = await getOrCreateServiceOrderSettings(tenantId);
   const attendance = input.attendance ?? 'walk_in';
+  const location = input.location ?? 'remote';
   const originOrderId = input.originOrderId ?? null;
   assertOrigin({ attendance, originOrderId, orderId: '' });
   if (originOrderId) await assertOriginExists(tenantId, originOrderId);
@@ -671,6 +680,7 @@ export async function createServiceOrder(
         number: counter.lastNumber,
         status: 'open',
         attendance,
+        location,
         promisedAt: input.promisedAt ? new Date(input.promisedAt) : null,
         openedByUserId: userId,
         originOrderId,
@@ -771,6 +781,7 @@ async function updateServiceOrder(tenantId: string, id: string, body: OrderBody)
       .set({
         status: body.status,
         attendance: body.attendance,
+        location: body.location,
         originOrderId: body.originOrderId,
         promisedAt: body.promisedAt ? new Date(body.promisedAt) : null,
         personId: body.personId,

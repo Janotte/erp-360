@@ -54,6 +54,8 @@ export type ServiceOrderStatus =
 
 export type ServiceOrderAttendance = 'walk_in' | 'warranty' | 'rework' | 'contract';
 
+export type ServiceOrderLocation = 'remote' | 'internal' | 'external';
+
 export interface ServiceOrderListItem {
   id: string;
   number: number;
@@ -100,6 +102,7 @@ export interface ServiceOrderDetail {
   numberLabel: string;
   status: ServiceOrderStatus;
   attendance: ServiceOrderAttendance;
+  location: ServiceOrderLocation;
   openedAt: string;
   promisedAt: string | null;
   deliveredAt: string | null;
@@ -133,6 +136,7 @@ export interface ServiceOrderDetail {
 export interface ServiceOrderWrite {
   personId: string;
   attendance: ServiceOrderAttendance;
+  location: ServiceOrderLocation;
   originOrderId: string | null;
   promisedAt: string | null;
   status: ServiceOrderStatus;
@@ -166,6 +170,7 @@ export interface ServiceOrderWrite {
 export interface OpenServiceOrderInput {
   personId: string;
   attendance?: ServiceOrderAttendance;
+  location?: ServiceOrderLocation;
   originOrderId?: string | null;
   promisedAt?: string | null;
   internalNotes?: string;

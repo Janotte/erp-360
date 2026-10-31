@@ -83,6 +83,7 @@ Estes dados existem em qualquer nicho. Não são campos configuráveis.
 | `number`              | Inteiro sequencial da empresa. Na tela e no comprovante, nove dígitos em grupos de três: `000.000.001`. O contador não reaproveita número. |
 | `status`              | Situação do atendimento.                                                                                                                   |
 | `attendance`          | Tipo de atendimento.                                                                                                                       |
+| `location`            | Local de atendimento. Remoto, interno ou externo. O padrão é remoto.                                                                      |
 | `openedAt`            | Data e hora de abertura. Nasce com a ordem.                                                                                                |
 | `promisedAt`          | Previsão de entrega. Opcional.                                                                                                             |
 | `deliveredAt`         | Preenchida ao marcar Entregue.                                                                                                             |
@@ -141,6 +142,14 @@ O mock já mostra esse dado no cabeçalho. Ele entra no núcleo.
 | `contract` | Contrato   |
 
 O padrão é Avulso. Garantia e Retrabalho podem apontar `originOrderId` para outra ordem da mesma empresa.
+
+### Local de atendimento
+
+| Valor      | Rótulo  | Quando                                                                 |
+| ---------- | ------- | ---------------------------------------------------------------------- |
+| `remote`   | Remoto  | O serviço é feito à distância. É o padrão.                             |
+| `internal` | Interno | O cliente traz o equipamento até a empresa.                            |
+| `external` | Externo | O técnico vai até a empresa ou a residência do cliente.                |
 
 ## Aba Ordem de serviço
 
@@ -272,6 +281,7 @@ Cabeçalho da ordem:
 | `order.openedAt`        | Abertura, no fuso de `cities.timezone` do município da empresa. Sem fuso, `America/Sao_Paulo`. |
 | `order.promisedAt`      | Previsão. Em branco quando nula.                                                               |
 | `order.attendanceLabel` | Rótulo do tipo de atendimento.                                                                 |
+| `order.locationLabel`   | Rótulo do local de atendimento.                                                                |
 | `order.statusLabel`     | Rótulo da situação.                                                                            |
 | `order.originNumber`    | Número da ordem de origem, só quando houver.                                                   |
 

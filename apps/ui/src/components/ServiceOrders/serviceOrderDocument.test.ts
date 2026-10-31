@@ -24,6 +24,7 @@ function model(patch: Partial<ServiceOrderPrint> = {}): ServiceOrderPrint {
     openedAt: '29/10/2026 21:00',
     promisedAt: '',
     attendanceLabel: 'Avulso',
+    locationLabel: 'Remoto',
     statusLabel: 'Aberta',
     originNumber: null,
     customer: {
@@ -85,6 +86,8 @@ describe('folha da ordem de serviço', () => {
     assert.match(sheet, /atendimento@hobby\.inf\.br/);
     assert.match(sheet, /grid-column: span 12/);
     assert.equal(sheet.includes('____'), false);
+    assert.match(sheet, /Local de atendimento/);
+    assert.match(sheet, /Remoto/);
     assert.equal(sheet.includes('Celular'), false);
     assert.equal(sheet.includes('WhatsApp'), false);
 

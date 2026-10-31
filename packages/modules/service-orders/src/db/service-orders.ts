@@ -46,6 +46,13 @@ export const serviceOrderAttendanceEnum = pgEnum('service_order_attendance', [
   'contract',
 ]);
 
+/** Onde o serviço é feito. */
+export const serviceOrderLocationEnum = pgEnum('service_order_location', [
+  'remote',
+  'internal',
+  'external',
+]);
+
 /** Produto ou serviço da linha. Igual ao tipo do item do catálogo. */
 export const serviceOrderLineKindEnum = pgEnum('service_order_line_kind', [
   'product',
@@ -54,6 +61,7 @@ export const serviceOrderLineKindEnum = pgEnum('service_order_line_kind', [
 
 export const serviceOrderStatuses = serviceOrderStatusEnum.enumValues;
 export const serviceOrderAttendances = serviceOrderAttendanceEnum.enumValues;
+export const serviceOrderLocations = serviceOrderLocationEnum.enumValues;
 export const serviceOrderLineKinds = serviceOrderLineKindEnum.enumValues;
 
 /** Próximo número da empresa. A chave é a própria empresa. */
@@ -163,6 +171,7 @@ export const serviceOrders = pgTable(
     number: integer('number').notNull(),
     status: serviceOrderStatusEnum('status').default('open').notNull(),
     attendance: serviceOrderAttendanceEnum('attendance').default('walk_in').notNull(),
+    location: serviceOrderLocationEnum('location').default('remote').notNull(),
     openedAt: timestamp('opened_at', { withTimezone: true }).defaultNow().notNull(),
     promisedAt: timestamp('promised_at', { withTimezone: true }),
     deliveredAt: timestamp('delivered_at', { withTimezone: true }),

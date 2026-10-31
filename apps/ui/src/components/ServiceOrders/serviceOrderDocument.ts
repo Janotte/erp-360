@@ -20,6 +20,7 @@ export type ServiceOrderPrint = {
   openedAt: string;
   promisedAt: string;
   attendanceLabel: string;
+  locationLabel: string;
   statusLabel: string;
   originNumber: string | null;
   customer: {
@@ -223,11 +224,12 @@ ${email ? `<p>${email}</p>` : ''}
 <div class="os-number-badge"><span>Ordem de Serviço</span><strong>Nº ${escapeHtml(model.number)}</strong></div>
 </header>
 <div class="grid-row">
-${field('Atendente', model.openedByName, 3)}
+${field('Atendente', model.openedByName, 2)}
 ${field('Abertura', model.openedAt, 2)}
 ${field('Previsão de Entrega', model.promisedAt, 2)}
 ${marked('Tipo de atendimento', attendance, 2)}
-${marked('Situação', escapeHtml(model.statusLabel), 3)}
+${marked('Local de atendimento', escapeHtml(model.locationLabel), 2)}
+${marked('Situação', escapeHtml(model.statusLabel), 2)}
 </div>
 <div class="section-title">Informações do Cliente</div>
 <div class="grid-row">

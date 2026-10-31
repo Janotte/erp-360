@@ -1,0 +1,2 @@
+CREATE TYPE "public"."service_order_location" AS ENUM('remote', 'internal', 'external');--> statement-breakpoint
+ALTER TABLE "service_orders" ADD COLUMN "location" "service_order_location" DEFAULT 'remote' NOT NULL;

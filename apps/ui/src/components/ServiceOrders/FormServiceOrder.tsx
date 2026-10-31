@@ -24,6 +24,7 @@ import { personsService } from '@/services/persons';
 import {
   type ServiceOrderAttendance,
   type ServiceOrderDetail,
+  type ServiceOrderLocation,
   type ServiceOrderSettings,
   serviceOrdersService,
   type ServiceOrderStatus,
@@ -51,6 +52,12 @@ const attendanceLabels: Record<ServiceOrderAttendance, string> = {
   warranty: 'Garantia',
   rework: 'Retrabalho',
   contract: 'Contrato',
+};
+
+const locationLabels: Record<ServiceOrderLocation, string> = {
+  remote: 'Remoto',
+  internal: 'Interno',
+  external: 'Externo',
 };
 
 const transitions: Record<ServiceOrderStatus, readonly ServiceOrderStatus[]> = {
@@ -89,6 +96,7 @@ type DraftLine = {
 type Draft = {
   personId: string;
   attendance: ServiceOrderAttendance;
+  location: ServiceOrderLocation;
   originOrderId: string;
   promisedAt: string | null;
   status: ServiceOrderStatus;
@@ -251,6 +259,7 @@ function emptyDraft(settings: ServiceOrderSettings): Draft {
   return {
     personId: '',
     attendance: 'walk_in',
+    location: 'remote',
     originOrderId: '',
     promisedAt: null,
     status: 'open',
@@ -291,6 +300,7 @@ function draftFromOrder(order: ServiceOrderDetail): Draft {
   return {
     personId: order.personId,
     attendance: order.attendance,
+    location: order.location,
     originOrderId: order.originOrderId ?? '',
     promisedAt: order.promisedAt,
     status: order.status,
@@ -341,6 +351,7 @@ function toWrite(draft: Draft, status: ServiceOrderStatus): ServiceOrderWrite {
   return {
     personId: draft.personId,
     attendance: draft.attendance,
+    location: draft.location,
     originOrderId: needsOrigin(draft.attendance)
       ? emptyToNull(draft.originOrderId)
       : null,
@@ -388,6 +399,7 @@ function writeFromDetail(
   return {
     personId: order.personId,
     attendance: order.attendance,
+    location: order.location,
     originOrderId: order.originOrderId,
     promisedAt: order.promisedAt,
     status: order.status,
@@ -520,6 +532,7 @@ export function FormServiceOrder() {
         const created = await serviceOrdersService.create({
           personId: draft.personId,
           attendance: draft.attendance,
+          location: draft.location,
           originOrderId: needsOrigin(draft.attendance)
             ? emptyToNull(draft.originOrderId)
             : null,
@@ -795,8 +808,8 @@ export function FormServiceOrder() {
       </div>
 
       <section className="space-y-4 rounded-lg border bg-white p-6">
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5">
+        <div className="grid grid-cols-12 gap-4">
+          <div className="col-span-12 space-y-1.5 md:col-span-8">
             <Label>Cliente</Label>
             <PersonSearchSelect
               value={draft.personId}
@@ -807,8 +820,8 @@ export function FormServiceOrder() {
               enterSequence
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="service-order-attendance">Atendimento</Label>
+          <div className="col-span-6 space-y-1.5 md:col-span-2">
+            <Label htmlFor="service-order-attendance">Tipo de atendimento</Label>
             <select
               id="service-order-attendance"
               className={selectClass}
@@ -832,8 +845,26 @@ export function FormServiceOrder() {
               )}
             </select>
           </div>
+          <div className="col-span-6 space-y-1.5 md:col-span-2">
+            <Label htmlFor="service-order-location">Local de atendimento</Label>
+            <select
+              id="service-order-location"
+              className={selectClass}
+              value={draft.location}
+              disabled={locked}
+              onChange={(event) =>
+                patch({ location: event.target.value as ServiceOrderLocation })
+              }
+            >
+              {(Object.keys(locationLabels) as ServiceOrderLocation[]).map((value) => (
+                <option key={value} value={value}>
+                  {locationLabels[value]}
+                </option>
+              ))}
+            </select>
+          </div>
           {needsOrigin(draft.attendance) ? (
-            <div className="space-y-1.5">
+            <div className="col-span-12 space-y-1.5 md:col-span-4">
               <Label htmlFor="service-order-origin">Ordem de origem</Label>
               <select
                 id="service-order-origin"
@@ -854,7 +885,7 @@ export function FormServiceOrder() {
               </select>
             </div>
           ) : null}
-          <div className="space-y-1.5">
+          <div className="col-span-12 space-y-1.5 md:col-span-6">
             <Label htmlFor="service-order-promised">Previsão</Label>
             <Input
               id="service-order-promised"
@@ -871,7 +902,7 @@ export function FormServiceOrder() {
               }
             />
           </div>
-          <div className="space-y-1.5">
+          <div className="col-span-12 space-y-1.5 md:col-span-6">
             <Label htmlFor="service-order-status">Situação</Label>
             <select
               id="service-order-status"

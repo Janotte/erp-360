@@ -27,6 +27,12 @@ const attendanceLabels = {
   contract: 'Contrato',
 } as const;
 
+const locationLabels = {
+  remote: 'Remoto',
+  internal: 'Interno',
+  external: 'Externo',
+} as const;
+
 const statusLabels = {
   open: 'Aberta',
   analyzing: 'Em análise',
@@ -268,6 +274,7 @@ export async function buildServiceOrderPrint(tenantId: string, orderId: string) 
     openedAt: formatDateTime(order.openedAt, timeZone),
     promisedAt: formatDateTime(order.promisedAt, timeZone),
     attendanceLabel: attendanceLabels[order.attendance],
+    locationLabel: locationLabels[order.location],
     statusLabel: statusLabels[order.status],
     originNumber,
     customer: {

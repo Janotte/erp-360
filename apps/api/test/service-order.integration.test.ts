@@ -267,6 +267,7 @@ type OrderDetail = {
   numberLabel: string;
   status: string;
   attendance: string;
+  location: string;
   personId: string;
   originOrderId: string | null;
   promisedAt: string | null;
@@ -455,6 +456,7 @@ describe('gravação da ordem de serviço', { concurrency: false }, () => {
     const created = first.json() as OrderDetail;
     const next = second.json() as OrderDetail;
     assert.equal(created.numberLabel, '000.000.001');
+    assert.equal(created.location, 'remote');
     assert.equal(next.numberLabel, '000.000.002');
 
     const cancelled = await save(created, { status: 'cancelled' });
