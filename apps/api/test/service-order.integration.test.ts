@@ -3,7 +3,12 @@ import { after, before, describe, it } from 'node:test';
 
 import { catalogItems, measures } from '@erp-360/mod-catalog';
 import { tenants } from '@erp-360/mod-core';
-import { meansOfPayment, paymentMethods, paymentMethodTerms } from '@erp-360/mod-financial';
+import {
+  meansOfPayment,
+  paymentMethods,
+  paymentMethodTerms,
+  paymentPlans,
+} from '@erp-360/mod-financial';
 import { serviceOrderFields, serviceOrderFieldValues, serviceOrderNoteLines, serviceOrders } from '@erp-360/mod-service-orders';
 import { formatPhone } from '@erp-360/shared';
 import { eq, sql } from 'drizzle-orm';
@@ -371,6 +376,7 @@ describe('gravação da ordem de serviço', { concurrency: false }, () => {
   after(async () => {
     if (tenantId) {
       await db.delete(serviceOrders).where(eq(serviceOrders.tenantId, tenantId));
+      await db.delete(paymentPlans).where(eq(paymentPlans.tenantId, tenantId));
       await db.delete(catalogItems).where(eq(catalogItems.tenantId, tenantId));
       await db.delete(measures).where(eq(measures.tenantId, tenantId));
       await db.delete(paymentMethods).where(eq(paymentMethods.tenantId, tenantId));
@@ -623,6 +629,68 @@ describe('gravação da ordem de serviço', { concurrency: false }, () => {
     const origin = created.json() as OrderDetail;
     const refused = await open({ attendance: 'walk_in', originOrderId: origin.id });
     assert.equal(refused.statusCode, 400);
+  });
+
+  it('divide o pagamento e só entrega com o saldo zerado', async () => {
+    const created = await open();
+    assert.equal(created.statusCode, 201, created.body);
+    let detail = await save(created.json() as OrderDetail, {
+      lines: [{ kind: 'product', itemId: productId, quantity: '1.0000', unitPrice: '10.0000' }],
+    });
+
+    const over = await send(detail, {
+      paymentMethodId: null,
+      paymentInstallments: null,
+      payments: [
+        { paymentMethodId, installmentCount: 1, dueOn: '2026-10-31', amount: 1001 },
+      ],
+    });
+    assert.equal(over.statusCode, 400);
+
+    detail = await save(detail, {
+      paymentMethodId: null,
+      paymentInstallments: null,
+      payments: [
+        { paymentMethodId, installmentCount: 1, dueOn: '2026-10-31', amount: 400 },
+        { paymentMethodId, installmentCount: 1, dueOn: '2026-11-30', amount: 600 },
+      ],
+    });
+    const planned = detail as OrderDetail & {
+      paymentMethodId: string | null;
+      payments: { methodName: string; dueOn: string; amount: number }[];
+    };
+    assert.equal(planned.paymentMethodId, null);
+    assert.deepEqual(
+      planned.payments.map((line) => ({
+        methodName: line.methodName,
+        dueOn: line.dueOn,
+        amount: line.amount,
+      })),
+      [
+        { methodName: 'Dinheiro', dueOn: '2026-10-31', amount: 400 },
+        { methodName: 'Dinheiro', dueOn: '2026-11-30', amount: 600 },
+      ],
+    );
+
+    detail = await save(detail, { status: 'in_progress' });
+    detail = await save(detail, { status: 'ready' });
+
+    const partial = await send(detail, {
+      payments: [{ paymentMethodId, installmentCount: 1, dueOn: '2026-10-31', amount: 400 }],
+    });
+    assert.equal(partial.statusCode, 200, partial.body);
+    const blocked = await send(partial.json() as OrderDetail, { status: 'delivered' });
+    assert.equal(blocked.statusCode, 400);
+    assert.match(blocked.body, /Quite o saldo/);
+
+    const delivered = await save(detail, { status: 'delivered' });
+    assert.equal(delivered.status, 'delivered');
+    assert.equal(
+      (await send(delivered, {
+        payments: [{ paymentMethodId, installmentCount: 1, dueOn: '2026-12-30', amount: 1000 }],
+      })).statusCode,
+      400,
+    );
   });
 
   it('encontra a primeira ordem pelo número mascarado e pelo dígito', async () => {

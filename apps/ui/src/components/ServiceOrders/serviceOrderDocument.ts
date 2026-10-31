@@ -64,6 +64,7 @@ export type ServiceOrderPrint = {
     meansDescription: string | null;
     installmentsLabel: string | null;
   };
+  payments?: { methodName: string; dueOn: string; amount: number }[];
   notes: { body: string }[];
   technicianSignatureLabel: string;
   customerSignatureLabel: string;
@@ -79,6 +80,31 @@ function escapeHtml(value: string | null | undefined) {
 
 function money(cents: number) {
   return escapeHtml(formatCurrency(cents));
+}
+
+function formatDue(iso: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : iso;
+}
+
+function paymentSection(model: ServiceOrderPrint) {
+  const rows = model.payments ?? [];
+  if (rows.length === 0) {
+    return `<div class="grid-row">
+${field('Meio de Pagamento', model.payment.methodDescription, 8)}
+${field('Condição', model.payment.installmentsLabel, 4)}
+</div>`;
+  }
+  const body = rows
+    .map(
+      (row) =>
+        `<tr><td>${escapeHtml(row.methodName)}</td><td class="text-center">${escapeHtml(formatDue(row.dueOn))}</td><td class="text-right">${money(row.amount)}</td></tr>`,
+    )
+    .join('');
+  return `<table>
+<thead><tr><th>Forma</th><th class="text-center">Vencimento</th><th class="text-right">Valor</th></tr></thead>
+<tbody>${body}</tbody>
+</table>`;
 }
 
 function field(label: string, value: string | null | undefined, span: number) {
@@ -285,10 +311,7 @@ ${rowsByWidth(model.fields)
 <td class="text-center">${money(model.totals.totalAmount)}</td>
 </tr></tbody>
 </table>
-<div class="grid-row">
-${field('Meio de Pagamento', model.payment.methodDescription, 8)}
-${field('Condição', model.payment.installmentsLabel, 4)}
-</div>
+${paymentSection(model)}
 ${notes}
 <footer class="os-footer"><div class="grid-row">
 <div class="field-group" style="grid-column: span 6"><label>${escapeHtml(model.technicianSignatureLabel)}</label><div class="field-value"></div></div>

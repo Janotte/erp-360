@@ -1,5 +1,5 @@
 import { tenants, users } from '@erp-360/mod-core';
-import { meansOfPayment, paymentMethods } from '@erp-360/mod-financial';
+import { meansOfPayment, paymentMethods, paymentPlanLines } from '@erp-360/mod-financial';
 import { cities, states } from '@erp-360/mod-persons';
 import {
   serviceOrderFieldValues,
@@ -203,6 +203,23 @@ export async function buildServiceOrderPrint(tenantId: string, orderId: string) 
     .where(and(eq(serviceOrderLines.tenantId, tenantId), eq(serviceOrderLines.orderId, orderId)))
     .orderBy(asc(serviceOrderLines.lineNumber));
 
+  const planLines = order.paymentPlanId
+    ? await db
+        .select({
+          methodName: paymentPlanLines.methodName,
+          dueOn: paymentPlanLines.dueOn,
+          amount: paymentPlanLines.amount,
+        })
+        .from(paymentPlanLines)
+        .where(
+          and(
+            eq(paymentPlanLines.tenantId, tenantId),
+            eq(paymentPlanLines.planId, order.paymentPlanId),
+          ),
+        )
+        .orderBy(asc(paymentPlanLines.lineNumber))
+    : [];
+
   let methodDescription: string | null = null;
   let meansDescription: string | null = null;
   let condition: string | null = null;
@@ -322,6 +339,11 @@ export async function buildServiceOrderPrint(tenantId: string, orderId: string) 
       meansDescription,
       installmentsLabel: condition,
     },
+    payments: planLines.map((line) => ({
+      methodName: line.methodName,
+      dueOn: String(line.dueOn).slice(0, 10),
+      amount: line.amount,
+    })),
     notes,
     technicianSignatureLabel: settings.technicianSignatureLabel,
     customerSignatureLabel: settings.customerSignatureLabel,

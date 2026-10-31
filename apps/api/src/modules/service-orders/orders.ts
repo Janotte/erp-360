@@ -1,7 +1,12 @@
 import '../../types/fastify.ts';
 
 import { catalogItems } from '@erp-360/mod-catalog';
-import { paymentMethods, paymentMethodTerms } from '@erp-360/mod-financial';
+import {
+  paymentMethods,
+  paymentMethodTerms,
+  paymentPlanLines,
+  paymentPlans,
+} from '@erp-360/mod-financial';
 import { cities, personAddresses, personContacts, persons, states } from '@erp-360/mod-persons';
 import {
   serviceOrderAttendances,
@@ -92,6 +97,17 @@ const orderBody = z
     surchargeAmount: z.number().int().min(0),
     paymentMethodId: z.string().uuid().nullable(),
     paymentInstallments: z.number().int().min(1).max(48).nullable(),
+    payments: z
+      .array(
+        z.object({
+          paymentMethodId: z.string().uuid(),
+          installmentCount: z.number().int().min(1).max(48),
+          dueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          amount: z.number().int().min(0),
+        }),
+      )
+      .max(96)
+      .optional(),
     fields: z
       .array(
         z.object({
@@ -165,6 +181,14 @@ type LoadedField = {
   isRequired: boolean;
 };
 
+type LoadedPayment = {
+  paymentMethodId: string;
+  methodName: string;
+  installmentCount: number;
+  dueOn: string;
+  amount: number;
+};
+
 type LoadedLine = {
   lineNumber: number;
   kind: ServiceOrderLineKind;
@@ -200,6 +224,8 @@ type LoadedOrder = {
   totalAmount: number;
   paymentMethodId: string | null;
   paymentInstallments: number | null;
+  paymentPlanId: string | null;
+  payments: LoadedPayment[];
   customer: CustomerCopy;
   fields: LoadedField[];
   notes: { slot: string; body: string }[];
@@ -340,12 +366,8 @@ async function assertOriginExists(tenantId: string, originOrderId: string) {
   if (!origin) reject('A ordem de origem não existe.');
 }
 
-async function paymentSnapshot(
-  tenantId: string,
-  methodId: string | null,
-  installments: number | null,
-) {
-  const empty = {
+function emptyPaymentSnapshot() {
+  return {
     paymentMethodId: null,
     paymentInstallments: null,
     meansOfPaymentId: null,
@@ -360,11 +382,35 @@ async function paymentSnapshot(
     acquirerId: null,
     cardBrandId: null,
   };
-  if (!methodId && installments == null) return empty;
-  if (!methodId || installments == null) {
-    reject('Informe a forma e a quantidade de parcelas.');
-  }
+}
 
+function isoDate(value: unknown) {
+  if (value instanceof Date) {
+    const year = value.getUTCFullYear();
+    const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(value.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return String(value).slice(0, 10);
+}
+
+function assertDueOn(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) reject('Data de vencimento inválida.');
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    reject('Data de vencimento inválida.');
+  }
+}
+
+async function loadMethodTerm(tenantId: string, methodId: string, installments: number) {
   const [method] = await db
     .select()
     .from(paymentMethods)
@@ -387,7 +433,19 @@ async function paymentSnapshot(
     )
     .limit(1);
   if (!term) reject('Esta forma não tem a quantidade de parcelas escolhida.');
+  return { method, term };
+}
 
+async function paymentSnapshot(
+  tenantId: string,
+  methodId: string | null,
+  installments: number | null,
+) {
+  if (!methodId && installments == null) return emptyPaymentSnapshot();
+  if (!methodId || installments == null) {
+    reject('Informe a forma e a quantidade de parcelas.');
+  }
+  const { method, term } = await loadMethodTerm(tenantId, methodId, installments);
   return {
     paymentMethodId: method.id,
     paymentInstallments: installments,
@@ -403,6 +461,42 @@ async function paymentSnapshot(
     acquirerId: method.acquirerId,
     cardBrandId: method.cardBrandId,
   };
+}
+
+async function resolvePlanLines(
+  tenantId: string,
+  payments: NonNullable<OrderBody['payments']>,
+) {
+  const cache = new Map<string, Awaited<ReturnType<typeof loadMethodTerm>>>();
+  const lines = [];
+  for (const payment of payments) {
+    assertDueOn(payment.dueOn);
+    const key = `${payment.paymentMethodId}:${payment.installmentCount}`;
+    let loaded = cache.get(key);
+    if (!loaded) {
+      loaded = await loadMethodTerm(tenantId, payment.paymentMethodId, payment.installmentCount);
+      cache.set(key, loaded);
+    }
+    lines.push({
+      paymentMethodId: loaded.method.id,
+      methodName: loaded.method.name,
+      dueOn: payment.dueOn,
+      amount: payment.amount,
+      installmentCount: payment.installmentCount,
+      meansOfPaymentId: loaded.method.meansOfPaymentId,
+      interestType: loaded.term.interestType,
+      interestRateBps: loaded.term.interestRateBps,
+      administrativeFeeBps: loaded.term.administrativeFeeBps,
+      fixedFeeAmount: loaded.term.fixedFeeAmount,
+      firstDueDays: loaded.term.firstDueDays,
+      intervalDays: loaded.term.intervalDays,
+      receiptKind: loaded.method.receiptKind,
+      integrationType: loaded.method.integrationType,
+      acquirerId: loaded.method.acquirerId,
+      cardBrandId: loaded.method.cardBrandId,
+    });
+  }
+  return lines;
 }
 
 async function prepareLines(tenantId: string, lines: OrderLineBody[]) {
@@ -529,6 +623,25 @@ async function loadOrder(tenantId: string, id: string): Promise<LoadedOrder | nu
     .where(and(eq(serviceOrderLines.tenantId, tenantId), eq(serviceOrderLines.orderId, id)))
     .orderBy(asc(serviceOrderLines.lineNumber));
 
+  const storedPayments = order.paymentPlanId
+    ? await db
+        .select({
+          paymentMethodId: paymentPlanLines.paymentMethodId,
+          methodName: paymentPlanLines.methodName,
+          installmentCount: paymentPlanLines.installmentCount,
+          dueOn: paymentPlanLines.dueOn,
+          amount: paymentPlanLines.amount,
+        })
+        .from(paymentPlanLines)
+        .where(
+          and(
+            eq(paymentPlanLines.tenantId, tenantId),
+            eq(paymentPlanLines.planId, order.paymentPlanId),
+          ),
+        )
+        .orderBy(asc(paymentPlanLines.lineNumber))
+    : [];
+
   return {
     id: order.id,
     number: order.number,
@@ -551,6 +664,14 @@ async function loadOrder(tenantId: string, id: string): Promise<LoadedOrder | nu
     totalAmount: order.totalAmount,
     paymentMethodId: order.paymentMethodId,
     paymentInstallments: order.paymentInstallments,
+    paymentPlanId: order.paymentPlanId,
+    payments: storedPayments.map((line) => ({
+      paymentMethodId: line.paymentMethodId,
+      methodName: line.methodName,
+      installmentCount: line.installmentCount,
+      dueOn: isoDate(line.dueOn),
+      amount: line.amount,
+    })),
     customer: {
       customerName: order.customerName,
       customerTaxId: order.customerTaxId,
@@ -593,6 +714,7 @@ function present(order: LoadedOrder) {
     totalAmount: order.totalAmount,
     paymentMethodId: order.paymentMethodId,
     paymentInstallments: order.paymentInstallments,
+    ...(order.payments.length > 0 ? { payments: order.payments } : {}),
     fields: order.fields,
     notes: order.notes,
     lines: order.lines,
@@ -611,6 +733,7 @@ function sameExceptInternalNotes(current: LoadedOrder, body: OrderBody) {
   if (current.surchargeAmount !== body.surchargeAmount) return false;
   if ((current.paymentMethodId ?? null) !== (body.paymentMethodId ?? null)) return false;
   if ((current.paymentInstallments ?? null) !== (body.paymentInstallments ?? null)) return false;
+  if (body.payments !== undefined && !samePayments(current.payments, body.payments)) return false;
 
   const copy = copyFromBody(body);
   const stored = current.customer;
@@ -646,6 +769,19 @@ function sameExceptInternalNotes(current: LoadedOrder, body: OrderBody) {
     if ((incoming.technicianPersonId ?? null) !== line.technicianPersonId) return false;
   }
   return true;
+}
+
+function samePayments(current: LoadedPayment[], incoming: NonNullable<OrderBody['payments']>) {
+  if (current.length !== incoming.length) return false;
+  return current.every((line, index) => {
+    const other = incoming[index];
+    return (
+      line.paymentMethodId === other?.paymentMethodId &&
+      line.installmentCount === other.installmentCount &&
+      line.dueOn === other.dueOn &&
+      line.amount === other.amount
+    );
+  });
 }
 
 export async function createServiceOrder(
@@ -767,8 +903,19 @@ async function updateServiceOrder(tenantId: string, id: string, body: OrderBody)
   });
   const totalAmount =
     productsAmount + servicesAmount + body.freightAmount - body.discountAmount + body.surchargeAmount;
-  const payment = await paymentSnapshot(tenantId, body.paymentMethodId, body.paymentInstallments);
-  if (body.status === 'delivered' && !payment.paymentMethodId) {
+  const usesPlan =
+    body.payments !== undefined && !(body.payments.length === 0 && body.paymentMethodId);
+  const planLines = usesPlan ? await resolvePlanLines(tenantId, body.payments ?? []) : [];
+  const payment = usesPlan
+    ? emptyPaymentSnapshot()
+    : await paymentSnapshot(tenantId, body.paymentMethodId, body.paymentInstallments);
+  if (usesPlan) {
+    const allocated = planLines.reduce((sum, line) => sum + line.amount, 0);
+    if (allocated > totalAmount) reject('O pagamento passa do total da ordem.');
+    if (body.status === 'delivered' && allocated !== totalAmount) {
+      reject('Quite o saldo para entregar.');
+    }
+  } else if (body.status === 'delivered' && !payment.paymentMethodId) {
     reject('Informe a forma de pagamento para entregar.');
   }
 
@@ -776,6 +923,40 @@ async function updateServiceOrder(tenantId: string, id: string, body: OrderBody)
   const settingBySlot = new Map(settings.fields.map((field) => [field.slot, field]));
 
   await db.transaction(async (tx) => {
+    let paymentPlanId = current.paymentPlanId;
+    if (usesPlan) {
+      if (planLines.length === 0) {
+        paymentPlanId = null;
+      } else if (!paymentPlanId) {
+        const [plan] = await tx
+          .insert(paymentPlans)
+          .values({ tenantId })
+          .returning({ id: paymentPlans.id });
+        if (!plan) throw new Error('Não foi possível gravar o pagamento.');
+        paymentPlanId = plan.id;
+      } else {
+        await tx
+          .delete(paymentPlanLines)
+          .where(
+            and(
+              eq(paymentPlanLines.tenantId, tenantId),
+              eq(paymentPlanLines.planId, paymentPlanId),
+            ),
+          );
+      }
+      if (planLines.length > 0 && paymentPlanId) {
+        const planId = paymentPlanId;
+        await tx.insert(paymentPlanLines).values(
+          planLines.map((line, index) => ({
+            tenantId,
+            planId,
+            lineNumber: index + 1,
+            ...line,
+          })),
+        );
+      }
+    }
+
     await tx
       .update(serviceOrders)
       .set({
@@ -796,8 +977,17 @@ async function updateServiceOrder(tenantId: string, id: string, body: OrderBody)
         deliveredAt: body.status === 'delivered' ? (current.deliveredAt ?? new Date()) : null,
         labelFrozenAt: freezing ? (current.labelFrozenAt ?? new Date()) : null,
         ...payment,
+        paymentPlanId: usesPlan ? paymentPlanId : current.paymentPlanId,
       })
       .where(and(eq(serviceOrders.id, id), eq(serviceOrders.tenantId, tenantId)));
+
+    if (usesPlan && planLines.length === 0 && current.paymentPlanId) {
+      await tx
+        .delete(paymentPlans)
+        .where(
+          and(eq(paymentPlans.id, current.paymentPlanId), eq(paymentPlans.tenantId, tenantId)),
+        );
+    }
 
     for (const note of body.notes) {
       await tx

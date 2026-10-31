@@ -161,4 +161,5 @@ export * from './certificateContracts.ts';
 export * from './financialContracts.ts';
 export * from './utils/civilDate.ts';
 export * from './utils/FormatCurrency.ts';
+export * from './utils/paymentPlan.ts';
 export * from './utils/FormatRawDate.ts';

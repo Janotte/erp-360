@@ -96,6 +96,21 @@ export interface ServiceOrderLine {
   technicianName: string | null;
 }
 
+export interface ServiceOrderPayment {
+  paymentMethodId: string;
+  methodName: string;
+  installmentCount: number;
+  dueOn: string;
+  amount: number;
+}
+
+export interface ServiceOrderPaymentInput {
+  paymentMethodId: string;
+  installmentCount: number;
+  dueOn: string;
+  amount: number;
+}
+
 export interface ServiceOrderDetail {
   id: string;
   number: number;
@@ -128,6 +143,7 @@ export interface ServiceOrderDetail {
   totalAmount: number;
   paymentMethodId: string | null;
   paymentInstallments: number | null;
+  payments?: ServiceOrderPayment[];
   fields: ServiceOrderFieldValue[];
   notes: ServiceOrderNoteValue[];
   lines: ServiceOrderLine[];
@@ -155,6 +171,7 @@ export interface ServiceOrderWrite {
   surchargeAmount: number;
   paymentMethodId: string | null;
   paymentInstallments: number | null;
+  payments?: ServiceOrderPaymentInput[];
   fields: { slot: string; value: string | null }[];
   notes: { slot: string; body: string }[];
   lines: {

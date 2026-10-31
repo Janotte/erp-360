@@ -129,4 +129,28 @@ describe('folha da ordem de serviço', () => {
     assert.equal((section.match(/class="grid-row"/g) ?? []).length, 2);
     assert.match(section, /span 4[\s\S]*span 4[\s\S]*span 4/);
   });
+
+  it('lista as parcelas no lugar da forma única', () => {
+    const sheet = serviceOrderDocument(
+      model({
+        payments: [
+          { methodName: 'PIX', dueOn: '2026-10-31', amount: 30000 },
+          { methodName: 'Visa', dueOn: '2026-11-30', amount: 33334 },
+        ],
+      }),
+      '',
+    );
+    assert.match(sheet, /PIX/);
+    assert.match(sheet, /Visa/);
+    assert.match(sheet, /31\/10\/2026/);
+    assert.match(sheet, /30\/11\/2026/);
+    assert.equal(sheet.includes('Meio de Pagamento'), false);
+  });
+
+  it('mantém a forma única quando não há parcelas', () => {
+    const sheet = serviceOrderDocument(model(), '');
+    assert.match(sheet, /Meio de Pagamento/);
+    assert.match(sheet, /Dinheiro/);
+    assert.match(sheet, /À vista/);
+  });
 });

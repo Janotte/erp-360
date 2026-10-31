@@ -1,12 +1,15 @@
 import {
+  civilDate,
   formatCnpj,
   formatCpf,
   formatCurrency,
   formatPhone,
   formatPostalCode,
+  installmentDueDates,
   maskCurrencyInput,
   onlyDigits,
   parseCurrencyToCents,
+  splitInstallmentAmounts,
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
@@ -94,6 +97,15 @@ type DraftLine = {
   technicianPersonId: string | null;
 };
 
+type DraftPayment = {
+  key: string;
+  paymentMethodId: string;
+  methodName: string;
+  installmentCount: number;
+  dueOn: string;
+  amount: string;
+};
+
 type Draft = {
   personId: string;
   attendance: ServiceOrderAttendance;
@@ -117,6 +129,7 @@ type Draft = {
   surcharge: string;
   paymentMethodId: string;
   paymentInstallments: string;
+  payments: DraftPayment[];
   fields: DraftField[];
   notes: { slot: string; body: string }[];
   lines: DraftLine[];
@@ -280,6 +293,7 @@ function emptyDraft(settings: ServiceOrderSettings): Draft {
     surcharge: '',
     paymentMethodId: '',
     paymentInstallments: '',
+    payments: [],
     fields: settings.fields.map((field) => ({
       slot: field.slot,
       value: '',
@@ -323,6 +337,14 @@ function draftFromOrder(order: ServiceOrderDetail): Draft {
     paymentInstallments: order.paymentInstallments
       ? String(order.paymentInstallments)
       : '',
+    payments: (order.payments ?? []).map((line) => ({
+      key: crypto.randomUUID(),
+      paymentMethodId: line.paymentMethodId,
+      methodName: line.methodName,
+      installmentCount: line.installmentCount,
+      dueOn: line.dueOn,
+      amount: maskCurrencyInput(String(line.amount)),
+    })),
     fields: order.fields.map((field) => ({
       slot: field.slot,
       value: field.value ?? '',
@@ -344,11 +366,36 @@ function draftFromOrder(order: ServiceOrderDetail): Draft {
   };
 }
 
+function allocatedPayments(draft: Draft) {
+  return draft.payments.reduce((sum, row) => sum + parseCurrencyToCents(row.amount), 0);
+}
+
 function formatInput(cents: number) {
   return cents ? maskCurrencyInput(String(cents)) : '';
 }
 
+function orderTotal(draft: Draft) {
+  const productAmount = draft.lines
+    .filter((line) => line.kind === 'product')
+    .reduce((sum, line) => sum + lineAmountCents(line.quantity, line.unitPrice), 0);
+  const serviceAmount = draft.lines
+    .filter((line) => line.kind === 'service')
+    .reduce((sum, line) => sum + lineAmountCents(line.quantity, line.unitPrice), 0);
+  const freightAmount = parseCurrencyToCents(draft.freight);
+  const discountAmount = parseCurrencyToCents(draft.discount);
+  const surchargeAmount = parseCurrencyToCents(draft.surcharge);
+  return {
+    productAmount,
+    serviceAmount,
+    freightAmount,
+    discountAmount,
+    surchargeAmount,
+    totalAmount: productAmount + serviceAmount + freightAmount - discountAmount + surchargeAmount,
+  };
+}
+
 function toWrite(draft: Draft, status: ServiceOrderStatus): ServiceOrderWrite {
+  const usesPlan = draft.payments.length > 0;
   return {
     personId: draft.personId,
     attendance: draft.attendance,
@@ -373,10 +420,18 @@ function toWrite(draft: Draft, status: ServiceOrderStatus): ServiceOrderWrite {
     freightAmount: parseCurrencyToCents(draft.freight),
     discountAmount: parseCurrencyToCents(draft.discount),
     surchargeAmount: parseCurrencyToCents(draft.surcharge),
-    paymentMethodId: draft.paymentMethodId || null,
-    paymentInstallments: draft.paymentInstallments
-      ? Number(draft.paymentInstallments)
-      : null,
+    paymentMethodId: usesPlan ? null : draft.paymentMethodId || null,
+    paymentInstallments: usesPlan
+      ? null
+      : draft.paymentInstallments
+        ? Number(draft.paymentInstallments)
+        : null,
+    payments: draft.payments.map((line) => ({
+      paymentMethodId: line.paymentMethodId,
+      installmentCount: line.installmentCount,
+      dueOn: line.dueOn,
+      amount: parseCurrencyToCents(line.amount),
+    })),
     fields: draft.fields.map((field) => ({
       slot: field.slot,
       value: emptyToNull(field.value),
@@ -419,6 +474,12 @@ function writeFromDetail(
     surchargeAmount: order.surchargeAmount,
     paymentMethodId: order.paymentMethodId,
     paymentInstallments: order.paymentInstallments,
+    payments: (order.payments ?? []).map((line) => ({
+      paymentMethodId: line.paymentMethodId,
+      installmentCount: line.installmentCount,
+      dueOn: line.dueOn,
+      amount: line.amount,
+    })),
     fields: order.fields.map((field) => ({ slot: field.slot, value: field.value })),
     notes: order.notes.map((note) => ({ slot: note.slot, body: note.body })),
     lines: order.lines.map((line) => ({
@@ -475,6 +536,10 @@ export function FormServiceOrder() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [productPicker, setProductPicker] = useState(0);
   const [servicePicker, setServicePicker] = useState(0);
+  const [allocationMethodId, setAllocationMethodId] = useState('');
+  const [allocationInstallments, setAllocationInstallments] = useState('');
+  const [allocationAmount, setAllocationAmount] = useState('');
+  const amountTouched = useRef(false);
 
   const settings = useQuery({
     queryKey: ['settings', 'service-order'],
@@ -556,6 +621,18 @@ export function FormServiceOrder() {
     },
   });
 
+  useEffect(() => {
+    amountTouched.current = false;
+    setAllocationMethodId('');
+    setAllocationInstallments('');
+  }, [id]);
+
+  useEffect(() => {
+    if (!draft || amountTouched.current) return;
+    const remaining = orderTotal(draft).totalAmount - allocatedPayments(draft);
+    setAllocationAmount(remaining > 0 ? maskCurrencyInput(String(remaining)) : '');
+  }, [draft]);
+
   if (order.isError || settings.isError) {
     return <p className="text-sm text-red-600">Não foi possível carregar a ordem.</p>;
   }
@@ -580,10 +657,8 @@ export function FormServiceOrder() {
   const paymentMethods = (methods.data?.data ?? []).filter(
     (method) => method.receiptKind !== 'store_credit',
   );
-  const selectedMethod = paymentMethods.find(
-    (method) => method.id === draft.paymentMethodId,
-  );
-  const terms = [...(selectedMethod?.terms ?? [])].sort(
+  const allocationMethod = paymentMethods.find((method) => method.id === allocationMethodId);
+  const allocationTerms = [...(allocationMethod?.terms ?? [])].sort(
     (left, right) => left.installmentCount - right.installmentCount,
   );
   const products = (catalog.data?.data ?? []).filter(
@@ -592,17 +667,16 @@ export function FormServiceOrder() {
   const services = (catalog.data?.data ?? []).filter(
     (item) => item.type === 'service' && item.isActive,
   );
-  const productAmount = draft.lines
-    .filter((line) => line.kind === 'product')
-    .reduce((sum, line) => sum + lineAmountCents(line.quantity, line.unitPrice), 0);
-  const serviceAmount = draft.lines
-    .filter((line) => line.kind === 'service')
-    .reduce((sum, line) => sum + lineAmountCents(line.quantity, line.unitPrice), 0);
-  const freightAmount = parseCurrencyToCents(draft.freight);
-  const discountAmount = parseCurrencyToCents(draft.discount);
-  const surchargeAmount = parseCurrencyToCents(draft.surcharge);
-  const totalAmount =
-    productAmount + serviceAmount + freightAmount - discountAmount + surchargeAmount;
+  const {
+    productAmount,
+    serviceAmount,
+    freightAmount,
+    discountAmount,
+    surchargeAmount,
+    totalAmount,
+  } = orderTotal(draft);
+  const allocatedAmount = allocatedPayments(draft);
+  const remainingAmount = totalAmount - allocatedAmount;
 
   function patch(partial: Partial<Draft>) {
     setDraft((current) => (current ? { ...current, ...partial } : current));
@@ -654,6 +728,73 @@ export function FormServiceOrder() {
           }
         : current,
     );
+  }
+
+  function patchPayment(key: string, partial: Partial<DraftPayment>) {
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            payments: current.payments.map((row) =>
+              row.key === key ? { ...row, ...partial } : row,
+            ),
+          }
+        : current,
+    );
+  }
+
+  function removePayment(key: string) {
+    setDraft((current) =>
+      current
+        ? { ...current, payments: current.payments.filter((row) => row.key !== key) }
+        : current,
+    );
+  }
+
+  function addPaymentGroup() {
+    if (!draft) return;
+    const method = paymentMethods.find((item) => item.id === allocationMethodId);
+    const term = method?.terms.find(
+      (item) => String(item.installmentCount) === allocationInstallments,
+    );
+    const amount = parseCurrencyToCents(allocationAmount);
+    if (!method || !term) {
+      toast.error('Informe a forma e a condição.');
+      return;
+    }
+    if (amount <= 0) {
+      toast.error('Informe o valor desta condição.');
+      return;
+    }
+    if (amount > remainingAmount) {
+      toast.error('O valor passa do saldo restante.');
+      return;
+    }
+    const dates = installmentDueDates(
+      civilDate(),
+      term.firstDueDays,
+      term.intervalDays,
+      term.installmentCount,
+    );
+    const amounts = splitInstallmentAmounts(amount, term.installmentCount);
+    patch({
+      payments: [
+        ...draft.payments,
+        ...dates.map((dueOn, index) => ({
+          key: crypto.randomUUID(),
+          paymentMethodId: method.id,
+          methodName: method.name,
+          installmentCount: term.installmentCount,
+          dueOn,
+          amount: maskCurrencyInput(String(amounts[index] ?? 0)),
+        })),
+      ],
+      paymentMethodId: '',
+      paymentInstallments: '',
+    });
+    amountTouched.current = false;
+    setAllocationMethodId('');
+    setAllocationInstallments('');
   }
 
   function removeLine(index: number) {
@@ -720,14 +861,21 @@ export function FormServiceOrder() {
         return false;
       }
     }
-    const hasMethod = Boolean(draft.paymentMethodId);
-    const hasInstallments = Boolean(draft.paymentInstallments);
-    if (hasMethod !== hasInstallments) {
+    if (draft.payments.some((row) => !/^\d{4}-\d{2}-\d{2}$/.test(row.dueOn))) {
+      toast.error('Informe o vencimento de cada parcela.');
+      return false;
+    }
+    if (allocatedAmount > totalAmount) {
+      toast.error('O pagamento passa do total da ordem.');
+      return false;
+    }
+    const keepsLegacyMethod = draft.payments.length === 0 && Boolean(draft.paymentMethodId);
+    if (keepsLegacyMethod && !draft.paymentInstallments) {
       toast.error('Informe a forma e a quantidade de parcelas.');
       return false;
     }
-    if (status === 'delivered' && !hasMethod) {
-      toast.error('Informe a forma de pagamento para entregar.');
+    if (status === 'delivered' && !keepsLegacyMethod && allocatedAmount !== totalAmount) {
+      toast.error('Quite o saldo para entregar.');
       return false;
     }
     if (
@@ -1116,60 +1264,144 @@ export function FormServiceOrder() {
           Produtos {formatCurrency(productAmount)} · Serviços{' '}
           {formatCurrency(serviceAmount)} · Total{' '}
           <strong>{formatCurrency(totalAmount)}</strong>
+          {' · '}
+          Saldo{' '}
+          <strong className={remainingAmount < 0 ? 'text-red-600' : undefined}>
+            {formatCurrency(remainingAmount)}
+          </strong>
         </p>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="service-order-method">Forma de pagamento</Label>
-            <select
-              id="service-order-method"
-              className={selectClass}
-              data-enter-sequence=""
-              value={draft.paymentMethodId}
-              disabled={locked}
-              onChange={(event) => {
-                const paymentMethodId = event.target.value;
-                const method = paymentMethods.find((item) => item.id === paymentMethodId);
-                const stillValid = method?.terms.some(
-                  (term) => String(term.installmentCount) === draft.paymentInstallments,
-                );
-                patch({
-                  paymentMethodId,
-                  paymentInstallments: stillValid ? draft.paymentInstallments : '',
-                });
-              }}
-            >
-              <option value="">Sem forma</option>
-              {paymentMethods.map((method) => (
-                <option key={method.id} value={method.id}>
-                  {method.name}
-                </option>
-              ))}
-              {draft.paymentMethodId && !selectedMethod ? (
-                <option value={draft.paymentMethodId}>Forma gravada</option>
-              ) : null}
-            </select>
+        {locked ? null : (
+          <div className="grid items-end gap-4 md:grid-cols-12">
+            <div className="space-y-1.5 md:col-span-4">
+              <Label htmlFor="service-order-method">Forma de pagamento</Label>
+              <select
+                id="service-order-method"
+                className={selectClass}
+                data-enter-sequence=""
+                value={allocationMethodId}
+                onChange={(event) => {
+                  const nextId = event.target.value;
+                  const method = paymentMethods.find((item) => item.id === nextId);
+                  const stillValid = method?.terms.some(
+                    (term) => String(term.installmentCount) === allocationInstallments,
+                  );
+                  setAllocationMethodId(nextId);
+                  if (!stillValid) setAllocationInstallments('');
+                }}
+              >
+                <option value="">Selecione</option>
+                {paymentMethods.map((method) => (
+                  <option key={method.id} value={method.id}>
+                    {method.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5 md:col-span-3">
+              <Label htmlFor="service-order-installments">Condição</Label>
+              <select
+                id="service-order-installments"
+                className={selectClass}
+                data-enter-sequence=""
+                value={allocationInstallments}
+                disabled={!allocationMethodId}
+                onChange={(event) => setAllocationInstallments(event.target.value)}
+              >
+                <option value="">Selecione</option>
+                {allocationTerms.map((term) => (
+                  <option key={term.installmentCount} value={term.installmentCount}>
+                    {term.installmentCount === 1 && term.firstDueDays === 0
+                      ? 'À vista'
+                      : `${term.installmentCount}x`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5 md:col-span-3">
+              <Label htmlFor="service-order-allocation">Valor</Label>
+              <Input
+                id="service-order-allocation"
+                data-enter-sequence=""
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="0,00"
+                value={allocationAmount}
+                onChange={(event) => {
+                  amountTouched.current = true;
+                  setAllocationAmount(maskCurrencyInput(event.target.value));
+                }}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Button
+                type="button"
+                className="w-full"
+                disabled={remainingAmount <= 0}
+                onClick={addPaymentGroup}
+              >
+                Adicionar
+              </Button>
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="service-order-installments">Condição</Label>
-            <select
-              id="service-order-installments"
-              className={selectClass}
-              data-enter-sequence=""
-              value={draft.paymentInstallments}
-              disabled={locked || !draft.paymentMethodId}
-              onChange={(event) => patch({ paymentInstallments: event.target.value })}
-            >
-              <option value="">Sem condição</option>
-              {terms.map((term) => (
-                <option key={term.installmentCount} value={term.installmentCount}>
-                  {term.installmentCount === 1 && term.firstDueDays === 0
-                    ? 'À vista'
-                    : `${term.installmentCount}x`}
-                </option>
-              ))}
-            </select>
+        )}
+        {draft.payments.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full table-fixed text-sm">
+              <thead>
+                <tr className="border-b text-left text-zinc-500">
+                  <th className="py-2 font-medium">Forma</th>
+                  <th className="w-44 py-2 font-medium">Vencimento</th>
+                  <th className="w-36 py-2 font-medium">Valor</th>
+                  <th className="w-10" />
+                </tr>
+              </thead>
+              <tbody>
+                {draft.payments.map((row) => (
+                  <tr key={row.key} className="border-b">
+                    <td className="py-2 pr-2">{row.methodName}</td>
+                    <td className="py-2 pr-2">
+                      <Input
+                        type="date"
+                        aria-label={`Vencimento de ${row.methodName}`}
+                        value={row.dueOn}
+                        disabled={locked}
+                        onChange={(event) => patchPayment(row.key, { dueOn: event.target.value })}
+                      />
+                    </td>
+                    <td className="py-2 pr-2">
+                      <Input
+                        aria-label={`Valor de ${row.methodName}`}
+                        inputMode="numeric"
+                        autoComplete="off"
+                        value={row.amount}
+                        disabled={locked}
+                        onChange={(event) =>
+                          patchPayment(row.key, {
+                            amount: maskCurrencyInput(event.target.value),
+                          })
+                        }
+                      />
+                    </td>
+                    <td className="py-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Remover parcela de ${row.methodName}`}
+                        disabled={locked}
+                        onClick={() => removePayment(row.key)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+        ) : (
+          <p className="text-sm text-zinc-500">Nenhuma parcela.</p>
+        )}
       </section>
 
       <section className="space-y-4 rounded-lg border bg-white p-6">

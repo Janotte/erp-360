@@ -6,6 +6,7 @@ import {
   paymentIntegrationTypeEnum,
   paymentInterestTypeEnum,
   paymentMethods,
+  paymentPlans,
   paymentReceiptKindEnum,
 } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
@@ -198,6 +199,8 @@ export const serviceOrders = pgTable(
     totalAmount: integer('total_amount').default(0).notNull(),
     paymentMethodId: uuid('payment_method_id'),
     paymentInstallments: integer('payment_installments'),
+    /** Plano com uma ou mais formas. Convive com a cópia antiga de uma forma só. */
+    paymentPlanId: uuid('payment_plan_id'),
     meansOfPaymentId: uuid('means_of_payment_id').references(() => meansOfPayment.id, {
       onDelete: 'restrict',
     }),
@@ -239,6 +242,11 @@ export const serviceOrders = pgTable(
       name: 'service_orders_payment_method_tenant_fk',
       columns: [table.paymentMethodId, table.tenantId],
       foreignColumns: [paymentMethods.id, paymentMethods.tenantId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'service_orders_payment_plan_tenant_fk',
+      columns: [table.paymentPlanId, table.tenantId],
+      foreignColumns: [paymentPlans.id, paymentPlans.tenantId],
     }).onDelete('restrict'),
     foreignKey({
       name: 'service_orders_acquirer_tenant_fk',
