@@ -351,6 +351,13 @@
       "when": 1793448659934,
       "tag": "0049_omniscient_betty_brant",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793748729028,
+      "tag": "0050_cheerful_norrin_radd",
+      "breakpoints": true
     }
   ]
 }

@@ -22,6 +22,7 @@ import { Dashboard } from './components/Dashboard';
 import { ListBankAccounts } from './components/Financial/BankAccounts/ListBankAccounts';
 import { ListCashBook } from './components/Financial/CashBook/ListCashBook';
 import { CashFlowView } from './components/Financial/CashFlow/CashFlowView';
+import { CompanyCardsPage } from './components/Financial/CompanyCards/CompanyCardsPage';
 import { IncomeStatementView } from './components/Financial/IncomeStatement/IncomeStatementView';
 import { PayableList } from './components/Financial/Payables/PayableList';
 import { ListPaymentMethods } from './components/Financial/PaymentMethods/ListPaymentMethods';
@@ -49,6 +50,7 @@ const rotasPorHash: Record<string, string> = {
   '#payment-methods': '/payment-methods',
   '#cash-book': '/cash-book',
   '#bank-accounts': '/bank-accounts',
+  '#company-cards': '/company-cards',
   '#cash-flow': '/cash-flow',
   '#income-statement': '/income-statement',
   '#inbound': '/inbound',
@@ -228,6 +230,14 @@ function App() {
               element={
                 <Pagina>
                   <ListBankAccounts />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/company-cards"
+              element={
+                <Pagina>
+                  <CompanyCardsPage />
                 </Pagina>
               }
             />

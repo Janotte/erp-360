@@ -13,6 +13,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
+import { companyCards } from './company_cards.ts';
 import { planAccounts } from './plan_accounts.ts';
 
 export const statusPayableEnum = pgEnum('status_payable', [
@@ -48,6 +49,8 @@ export const payables = pgTable(
     planAccountId: uuid('plan_account_id'),
     /** Título original em caso de restante de baixa parcial */
     originalTitleId: uuid('original_title_id'),
+    /** Preenchido quando a obrigação é parcela de cartão da empresa. */
+    companyCardId: uuid('company_card_id'),
     /** Status do pagamento */
     status: statusPayableEnum('status').default('pendente').notNull(),
   },
@@ -68,6 +71,11 @@ export const payables = pgTable(
       name: 'payables_original_title_tenant_fk',
       columns: [table.originalTitleId, table.tenantId],
       foreignColumns: [table.id, table.tenantId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'payables_company_card_tenant_fk',
+      columns: [table.companyCardId, table.tenantId],
+      foreignColumns: [companyCards.id, companyCards.tenantId],
     }).onDelete('restrict'),
   ],
 );

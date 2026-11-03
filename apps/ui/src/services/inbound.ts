@@ -60,6 +60,16 @@ export interface InboundInstallment {
   amount: number;
 }
 
+export type InboundFinancialStatus = 'pending' | 'classified' | 'waived';
+export type InboundPaymentKind = 'supplier' | 'card';
+
+export interface InboundFinance {
+  financialStatus: InboundFinancialStatus;
+  paymentKind: InboundPaymentKind | null;
+  companyCardId: string | null;
+  waiverReason: string | null;
+}
+
 export interface InboundDocument {
   id: string;
   status: InboundStatus;
@@ -76,6 +86,12 @@ export interface InboundDocument {
   natureId: string | null;
   hasProtocol: boolean;
   totalAmount: number;
+  xmlPaymentCode: string | null;
+  xmlPaymentAmount: number;
+  financialStatus: InboundFinancialStatus;
+  paymentKind: InboundPaymentKind | null;
+  waiverReason: string | null;
+  companyCardId: string | null;
   recipientManifestation: RecipientManifestation;
   authorizationStatus: NfeAuthorizationStatus;
   discoveryAction: DiscoveryAction;
@@ -239,6 +255,7 @@ export interface InboundDraft {
   issueOn: string;
   lines: InboundDraftLine[];
   installments: { number: string; dueOn: string; amount: number }[];
+  finance?: InboundFinance;
 }
 
 async function readBody(res: Response) {

@@ -30,6 +30,11 @@ export interface ParsedInboundInstallment {
   amount: number;
 }
 
+export interface DeclaredPayment {
+  code: string;
+  amount: number;
+}
+
 export interface ParsedNfe {
   accessKey: string;
   number: string;
@@ -43,6 +48,8 @@ export interface ParsedNfe {
   totalAmount: number;
   lines: ParsedInboundLine[];
   installments: ParsedInboundInstallment[];
+  /** Pagamento declarado no XML, inclusive tPag 90. Não vira parcela. */
+  declaredPayment: DeclaredPayment | null;
 }
 
 const parser = new XMLParser({
@@ -123,6 +130,20 @@ export function billingInstallments(
       dueOn: issueOn,
       amount,
     }));
+}
+
+/** tPag e a soma de vPag. O código 90 permanece declarado e não vira parcela. */
+export function declaredPayment(
+  pag: Record<string, unknown> | null | undefined,
+): DeclaredPayment | null {
+  const rows = asArray(
+    pag?.detPag as Record<string, unknown> | Record<string, unknown>[],
+  );
+  if (rows.length === 0) return null;
+  const code = text(rows[0]?.tPag);
+  if (!/^[0-9]{2}$/.test(code)) return null;
+  const amount = rows.reduce((sum, row) => sum + moneyToCents(row.vPag as string), 0);
+  return { code, amount: Math.max(0, amount) };
 }
 
 function civilFromDateTime(value: string) {
@@ -244,9 +265,10 @@ export function parseNfeXml(xml: string): ParsedNfe {
 
   const issueSource = text(ide.dhEmi) || text(ide.dEmi);
   const issueOn = civilFromDateTime(issueSource);
+  const pag = (inf.pag ?? null) as Record<string, unknown> | null;
   const installments = billingInstallments(
     (inf.cobr ?? null) as Record<string, unknown> | null,
-    (inf.pag ?? null) as Record<string, unknown> | null,
+    pag,
     issueOn,
   );
   return {
@@ -264,5 +286,6 @@ export function parseNfeXml(xml: string): ParsedNfe {
     totalAmount: moneyToCents(total.vNF as string),
     lines,
     installments,
+    declaredPayment: declaredPayment(pag),
   };
 }

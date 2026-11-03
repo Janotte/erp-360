@@ -26,10 +26,12 @@ const uniqueMessages: Record<string, string> = {
     'Já existe um certificado ativo neste ambiente.',
   inbound_documents_tenant_access_key_unique: 'Esta nota já está na entrada.',
   operation_natures_tenant_code_unique: 'Já existe uma natureza com este código.',
-  cfop_entry_rules_identity_unique: 'Já existe uma regra para este CFOP e esta finalidade.',
+  cfop_entry_rules_identity_unique:
+    'Já existe uma regra para este CFOP e esta finalidade.',
   catalog_items_tenant_barcode_unique: 'Já existe um item com este código de barras.',
   payment_methods_tenant_code_unique: 'Já existe uma forma de pagamento com este código.',
   payment_methods_tenant_name_unique: 'Já existe uma forma de pagamento com este nome.',
+  company_cards_tenant_name_unique: 'Já existe um cartão com este nome.',
   payment_method_terms_method_count_unique:
     'Cada quantidade de parcelas só pode aparecer uma vez.',
 };
@@ -131,7 +133,10 @@ function checkMessage(error: unknown): string | null {
   if (name.includes('payment_methods_settlement_days_kind')) {
     return 'O prazo de crédito da credenciadora só vale para recebível da adquirente.';
   }
-  if (name.includes('payment_methods_acquirer') || name.includes('payment_methods_integrated')) {
+  if (
+    name.includes('payment_methods_acquirer') ||
+    name.includes('payment_methods_integrated')
+  ) {
     return 'Informe a credenciadora.';
   }
   if (name.includes('payment_method_terms_interval')) {

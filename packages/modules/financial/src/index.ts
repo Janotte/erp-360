@@ -1,6 +1,7 @@
 export * from './db/bank_accounts.ts';
 export * from './db/bank_entries.ts';
 export * from './db/card_brands.ts';
+export * from './db/company_cards.ts';
 export * from './db/cash_entries.ts';
 export * from './db/financial_settings.ts';
 export * from './db/means_of_payment.ts';

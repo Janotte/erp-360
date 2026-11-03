@@ -34,6 +34,7 @@ import {
 import { discoveryAction } from './dfe-note.ts';
 import { certificateMaterial } from './dfe-sync.ts';
 import { InboundError } from './errors.ts';
+import { normalizeInboundFinance } from './finance.ts';
 import { parseNfeXml } from './nfe.ts';
 import { getOrCreateNfeSettings } from './nfe-settings.ts';
 import { persistParsedNfe } from './persist-nfe.ts';
@@ -85,6 +86,13 @@ const installmentInput = z.object({
   amount: z.number().int().positive(),
 });
 
+const financeInput = z.object({
+  financialStatus: z.enum(['pending', 'classified', 'waived']),
+  paymentKind: z.enum(['supplier', 'card']).nullable(),
+  companyCardId: z.string().uuid().nullable(),
+  waiverReason: z.string().max(255).nullable(),
+});
+
 const manifestBody = z.object({
   kind: z.enum(['aware', 'confirmed', 'unaware', 'not_performed']),
   justification: z.string().trim().max(255).optional(),
@@ -98,6 +106,7 @@ const draftBody = z.object({
   issueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   lines: z.array(lineInput).min(1),
   installments: z.array(installmentInput),
+  finance: financeInput.optional(),
 });
 
 function lineRecord(
@@ -347,6 +356,12 @@ async function loadDocument(tenantId: string, documentId: string) {
       natureId: inboundDocuments.natureId,
       hasProtocol: inboundDocuments.hasProtocol,
       totalAmount: inboundDocuments.totalAmount,
+      xmlPaymentCode: inboundDocuments.xmlPaymentCode,
+      xmlPaymentAmount: inboundDocuments.xmlPaymentAmount,
+      financialStatus: inboundDocuments.financialStatus,
+      paymentKind: inboundDocuments.paymentKind,
+      waiverReason: inboundDocuments.waiverReason,
+      companyCardId: inboundDocuments.companyCardId,
       recipientManifestation: inboundDocuments.recipientManifestation,
       authorizationStatus: inboundDocuments.authorizationStatus,
       supplierActive: persons.isActive,
@@ -438,10 +453,16 @@ async function loadDocument(tenantId: string, documentId: string) {
       (total, installment) => total + installment.amount,
       0,
     );
-    if (document.totalAmount > 0 && installments.length === 0) {
-      blockers.push('A nota não tem parcelas.');
-    } else if (document.totalAmount > 0 && Math.abs(sum - document.totalAmount) > 1) {
-      blockers.push('A soma das parcelas não fecha com o total da nota.');
+    if (document.totalAmount > 0 && document.financialStatus === 'pending') {
+      blockers.push('Classifique o pagamento.');
+    } else if (document.totalAmount > 0 && document.financialStatus !== 'waived') {
+      if (installments.length === 0) {
+        blockers.push('Classifique o pagamento.');
+      } else if (Math.abs(sum - document.totalAmount) > 1) {
+        blockers.push('A soma das parcelas não fecha com o total da nota.');
+      } else if (document.paymentKind === 'card' && !document.companyCardId) {
+        blockers.push('Informe o cartão.');
+      }
     }
   }
 
@@ -792,6 +813,14 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
         (sum, line) => sum + moneyToCents(line.commercialQty * line.unitPrice),
         0,
       );
+      const finance = body.finance
+        ? await normalizeInboundFinance(
+            tenantId,
+            body.finance,
+            body.installments,
+            totalAmount,
+          )
+        : null;
       await db.transaction(async (tx) => {
         await tx
           .update(inboundDocuments)
@@ -802,6 +831,14 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
             series: body.series,
             issueOn: body.issueOn,
             totalAmount,
+            ...(finance
+              ? {
+                  financialStatus: finance.financialStatus,
+                  paymentKind: finance.paymentKind,
+                  companyCardId: finance.companyCardId,
+                  waiverReason: finance.waiverReason,
+                }
+              : {}),
           })
           .where(eq(inboundDocuments.id, id));
         await tx
@@ -813,13 +850,14 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
         await tx
           .insert(inboundDocumentLines)
           .values(body.lines.map((line) => lineRecord(tenantId, id, line, true)));
-        const installments =
-          body.installments.length > 0
+        const installments = finance
+          ? finance.installments
+          : body.installments.length > 0
             ? body.installments
             : totalAmount > 0
               ? [{ number: '001', dueOn: body.issueOn, amount: totalAmount }]
               : [];
-        if (installments.length > 0) {
+        if (installments.length > 0 && installments[0].amount > 0) {
           await tx.insert(inboundDocumentInstallments).values(
             installments.map((installment) => ({
               tenantId,
@@ -833,7 +871,37 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
       });
     }
 
-    if (document.accessKey && body.installments.length > 0) {
+    if (document.accessKey && body.finance) {
+      const normalized = await normalizeInboundFinance(
+        tenantId,
+        body.finance,
+        body.installments,
+        document.totalAmount,
+      );
+      await db
+        .update(inboundDocuments)
+        .set({
+          financialStatus: normalized.financialStatus,
+          paymentKind: normalized.paymentKind,
+          companyCardId: normalized.companyCardId,
+          waiverReason: normalized.waiverReason,
+        })
+        .where(eq(inboundDocuments.id, id));
+      await db
+        .delete(inboundDocumentInstallments)
+        .where(eq(inboundDocumentInstallments.documentId, id));
+      if (normalized.installments.length > 0) {
+        await db.insert(inboundDocumentInstallments).values(
+          normalized.installments.map((installment) => ({
+            tenantId,
+            documentId: id,
+            number: installment.number,
+            dueOn: installment.dueOn,
+            amount: installment.amount,
+          })),
+        );
+      }
+    } else if (document.accessKey && body.installments.length > 0) {
       await db
         .delete(inboundDocumentInstallments)
         .where(eq(inboundDocumentInstallments.documentId, id));

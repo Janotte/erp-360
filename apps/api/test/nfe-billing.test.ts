@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { billingInstallments } from '../src/modules/inbound/nfe.ts';
+import { billingInstallments, declaredPayment } from '../src/modules/inbound/nfe.ts';
 
 describe('parcelas da NF-e', () => {
   it('usa as duplicatas quando a nota traz o vencimento', () => {
@@ -38,5 +38,16 @@ describe('parcelas da NF-e', () => {
     assert.deepEqual(installments, [
       { number: '001', dueOn: '2026-10-23', amount: 5000 },
     ]);
+  });
+
+  it('guarda o tPag 90 sem criar parcela', () => {
+    const payment = declaredPayment({ detPag: { tPag: '90', vPag: '0.00' } });
+    const installments = billingInstallments(
+      null,
+      { detPag: { tPag: '90', vPag: '0.00' } },
+      '2026-09-15',
+    );
+    assert.deepEqual(payment, { code: '90', amount: 0 });
+    assert.deepEqual(installments, []);
   });
 });

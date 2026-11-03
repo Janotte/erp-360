@@ -34,6 +34,44 @@ export function addCivilDays(isoDate: string, days: number) {
   return `${nextYear}-${nextMonth}-${nextDay}`;
 }
 
+/** Vencimentos de fatura. O primeiro cai no dia informado depois da compra. */
+export function statementDueDates(issueOn: string, dueDay: number, count: number) {
+  if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 28) {
+    throw new Error('Dia de vencimento inválido.');
+  }
+  if (!Number.isInteger(count) || count < 1 || count > 48) {
+    throw new Error('Condição inválida.');
+  }
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(issueOn);
+  if (!match) throw new Error('Data inválida.');
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const issue = new Date(Date.UTC(year, month - 1, day));
+  if (
+    issue.getUTCFullYear() !== year ||
+    issue.getUTCMonth() !== month - 1 ||
+    issue.getUTCDate() !== day
+  ) {
+    throw new Error('Data inválida.');
+  }
+  let cursorMonth = month;
+  let cursorYear = year;
+  if (day >= dueDay) {
+    cursorMonth += 1;
+    if (cursorMonth > 12) {
+      cursorMonth = 1;
+      cursorYear += 1;
+    }
+  }
+  return Array.from({ length: count }, (_, index) => {
+    const shifted = cursorMonth - 1 + index;
+    const nextYear = cursorYear + Math.floor(shifted / 12);
+    const nextMonth = (shifted % 12) + 1;
+    return `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
+  });
+}
+
 /** Vencimentos a partir da data em que o plano é montado. */
 export function installmentDueDates(
   baseIso: string,

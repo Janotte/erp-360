@@ -1,5 +1,5 @@
 import { catalogItems } from '@erp-360/mod-catalog';
-import { payables } from '@erp-360/mod-financial';
+import { companyCards, payables } from '@erp-360/mod-financial';
 import {
   inboundDocumentInstallments,
   inboundDocumentLines,
@@ -104,7 +104,18 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
         );
       }
     }
-    if (nature.createsPayable && (document.totalAmount > 0 || installments.length > 0)) {
+    if (
+      nature.createsPayable &&
+      document.financialStatus === 'pending' &&
+      document.totalAmount > 0
+    ) {
+      throw new InboundError(400, 'Classifique o pagamento.');
+    }
+    if (
+      nature.createsPayable &&
+      document.financialStatus !== 'waived' &&
+      (document.totalAmount > 0 || installments.length > 0)
+    ) {
       const sum = installments.reduce(
         (total, installment) => total + installment.amount,
         0,
@@ -115,6 +126,34 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
       if (Math.abs(sum - document.totalAmount) > 1) {
         throw new InboundError(400, 'A soma das parcelas não fecha com o total da nota.');
       }
+    }
+
+    let card: { id: string; issuerId: string; name: string } | null = null;
+    if (
+      nature.createsPayable &&
+      document.paymentKind === 'card' &&
+      document.financialStatus !== 'waived'
+    ) {
+      if (!document.companyCardId) throw new InboundError(400, 'Informe o cartão.');
+      const [found] = await tx
+        .select({
+          id: companyCards.id,
+          issuerId: companyCards.issuerId,
+          name: companyCards.name,
+        })
+        .from(companyCards)
+        .where(
+          and(
+            eq(companyCards.id, document.companyCardId),
+            eq(companyCards.tenantId, tenantId),
+            eq(companyCards.isActive, true),
+          ),
+        )
+        .limit(1);
+      if (!found) {
+        throw new InboundError(400, 'O cartão informado não existe ou está inativo.');
+      }
+      card = found;
     }
 
     const inboundOn = civilDate();
@@ -231,16 +270,24 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
       }
     }
 
-    if (nature.createsPayable) {
+    const createsPayable = nature.createsPayable && document.financialStatus !== 'waived';
+    if (createsPayable) {
+      const creditorId = card?.issuerId ?? document.supplierId;
+      if (!creditorId) {
+        throw new InboundError(400, 'Informe o fornecedor antes de lançar.');
+      }
       for (const installment of installments) {
         const [payable] = await tx
           .insert(payables)
           .values({
             tenantId,
-            creditorId: document.supplierId,
+            creditorId,
+            companyCardId: card?.id ?? null,
             documentNumber: payableDocumentNumber(document.number, document.series),
-            description:
-              `Entrada NF ${document.number} parcela ${installment.number}`.slice(0, 255),
+            description: (card
+              ? `Entrada NF ${document.number} parcela ${installment.number} · ${card.name}`
+              : `Entrada NF ${document.number} parcela ${installment.number}`
+            ).slice(0, 255),
             issueOn: document.issueOn,
             dueOn: installment.dueOn,
             installmentAmount: installment.amount,
@@ -262,7 +309,7 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
         inboundOn,
         postedAt: new Date(),
         movesStock: nature.movesStock,
-        createsPayable: nature.createsPayable,
+        createsPayable,
         updatesAverageCost: nature.updatesAverageCost,
       })
       .where(eq(inboundDocuments.id, documentId));

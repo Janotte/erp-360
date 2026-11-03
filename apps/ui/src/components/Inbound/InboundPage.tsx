@@ -1,4 +1,11 @@
-import { civilDate, formatCurrency, formatRawDate } from '@erp-360/shared';
+import {
+  civilDate,
+  formatCurrency,
+  formatRawDate,
+  installmentDueDates,
+  splitInstallmentAmounts,
+  statementDueDates,
+} from '@erp-360/shared';
 import {
   keepPreviousData,
   useMutation,
@@ -7,6 +14,7 @@ import {
 } from '@tanstack/react-query';
 import { Plus, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import { toast } from 'sonner';
 
 import { FormItem } from '@/components/Catalog/Items/FormItem';
@@ -36,11 +44,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { companyCardService } from '@/services/companyCards';
 import { dfeService, type DfeSyncResult } from '@/services/dfe';
 import {
   discoveryConfirm,
   type InboundDocument,
   type InboundDraft,
+  type InboundFinance,
   type InboundListFilter,
   type InboundListItem,
   inboundService,
@@ -87,6 +97,26 @@ function syncMessage(result: DfeSyncResult) {
     : `${result.received} documentos recebidos.`;
 }
 
+function asksPayment(document: InboundDocument) {
+  if (document.totalAmount <= 0) return false;
+  return (
+    document.xmlPaymentCode === '90' ||
+    document.financialStatus === 'pending' ||
+    document.financialStatus === 'waived' ||
+    document.paymentKind === 'card' ||
+    document.installments.length === 0
+  );
+}
+
+function financeFrom(document: InboundDocument): InboundFinance {
+  return {
+    financialStatus: document.financialStatus,
+    paymentKind: document.paymentKind,
+    companyCardId: document.companyCardId,
+    waiverReason: document.waiverReason,
+  };
+}
+
 function draftFrom(document: InboundDocument): InboundDraft {
   return {
     supplierId: document.supplierId,
@@ -114,6 +144,7 @@ function draftFrom(document: InboundDocument): InboundDraft {
       dueOn: installment.dueOn,
       amount: installment.amount,
     })),
+    finance: asksPayment(document) ? financeFrom(document) : undefined,
   };
 }
 
@@ -139,10 +170,15 @@ export function InboundPage() {
     x: number;
     y: number;
   } | null>(null);
+  const [installmentCount, setInstallmentCount] = useState('1');
 
   const natures = useQuery({
     queryKey: ['inbound', 'natures'],
     queryFn: inboundService.natures,
+  });
+  const cards = useQuery({
+    queryKey: ['company-cards'],
+    queryFn: companyCardService.list,
   });
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchText.trim()), 500);
@@ -649,7 +685,226 @@ export function InboundPage() {
             </div>
           </div>
 
-          {draft.installments.length > 0 ? (
+          {draft && document && asksPayment(document) ? (
+            <div className="space-y-3">
+              <Label>Pagamento</Label>
+              {document.xmlPaymentCode ? (
+                <p className="text-sm text-zinc-500">
+                  No XML:{' '}
+                  {document.xmlPaymentCode === '90'
+                    ? '90 — Sem pagamento'
+                    : document.xmlPaymentCode}{' '}
+                  · {formatCurrency(document.xmlPaymentAmount)}
+                </p>
+              ) : null}
+              <select
+                className="flex h-9 w-full max-w-sm rounded-md border px-3 text-sm"
+                value={
+                  draft.finance?.financialStatus === 'waived'
+                    ? 'waived'
+                    : (draft.finance?.paymentKind ?? '')
+                }
+                disabled={locked}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === 'waived') {
+                    setDraft({
+                      ...draft,
+                      installments: [],
+                      finance: {
+                        financialStatus: 'waived',
+                        paymentKind: null,
+                        companyCardId: null,
+                        waiverReason: draft.finance?.waiverReason ?? '',
+                      },
+                    });
+                    return;
+                  }
+                  if (value === 'card') {
+                    setDraft({
+                      ...draft,
+                      installments:
+                        draft.finance?.paymentKind === 'card' ? draft.installments : [],
+                      finance: {
+                        financialStatus: 'classified',
+                        paymentKind: 'card',
+                        companyCardId: draft.finance?.companyCardId ?? null,
+                        waiverReason: null,
+                      },
+                    });
+                    return;
+                  }
+                  if (value === 'supplier') {
+                    setDraft({
+                      ...draft,
+                      installments:
+                        draft.finance?.paymentKind === 'supplier' &&
+                        draft.installments.length > 0
+                          ? draft.installments
+                          : [
+                              {
+                                number: '001',
+                                dueOn: draft.issueOn,
+                                amount: document.totalAmount,
+                              },
+                            ],
+                      finance: {
+                        financialStatus: 'classified',
+                        paymentKind: 'supplier',
+                        companyCardId: null,
+                        waiverReason: null,
+                      },
+                    });
+                    return;
+                  }
+                  setDraft({
+                    ...draft,
+                    installments: [],
+                    finance: {
+                      financialStatus: 'pending',
+                      paymentKind: null,
+                      companyCardId: null,
+                      waiverReason: null,
+                    },
+                  });
+                }}
+              >
+                <option value="">Selecione como a compra foi paga</option>
+                <option value="supplier">Prazo com o fornecedor</option>
+                <option value="card">Cartão de crédito</option>
+                <option value="waived">Sem obrigação financeira</option>
+              </select>
+              {draft.finance?.paymentKind === 'card' ? (
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <select
+                    className="flex h-9 w-full rounded-md border px-3 text-sm"
+                    value={draft.finance.companyCardId ?? ''}
+                    disabled={locked}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        finance: {
+                          ...draft.finance!,
+                          companyCardId: event.target.value || null,
+                        },
+                      })
+                    }
+                  >
+                    <option value="">Selecione o cartão</option>
+                    {(cards.data ?? [])
+                      .filter((card) => card.isActive)
+                      .map((card) => (
+                        <option key={card.id} value={card.id}>
+                          {card.name}
+                        </option>
+                      ))}
+                  </select>
+                  {(cards.isSuccess ? cards.data : []).filter((card) => card.isActive)
+                    .length === 0 ? (
+                    <p className="text-sm text-zinc-500 sm:col-span-2">
+                      <Link to="/company-cards" className="underline">
+                        Cadastre um cartão da empresa
+                      </Link>{' '}
+                      antes de classificar.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              {draft.finance?.financialStatus === 'waived' ? (
+                <Input
+                  value={draft.finance.waiverReason ?? ''}
+                  disabled={locked}
+                  placeholder="Motivo da dispensa"
+                  onChange={(event) =>
+                    setDraft({
+                      ...draft,
+                      finance: {
+                        ...draft.finance!,
+                        waiverReason: event.target.value,
+                      },
+                    })
+                  }
+                />
+              ) : null}
+              {draft.finance?.financialStatus === 'classified' ? (
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="space-y-1">
+                    <Label>Parcelas</Label>
+                    <Input
+                      className="w-24"
+                      value={installmentCount}
+                      disabled={locked}
+                      inputMode="numeric"
+                      onChange={(event) =>
+                        setInstallmentCount(
+                          event.target.value.replace(/\D/g, '').slice(0, 2),
+                        )
+                      }
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={locked}
+                    onClick={() => {
+                      const count = Number(installmentCount);
+                      if (!Number.isInteger(count) || count < 1 || count > 48) {
+                        toast.error('A quantidade de parcelas vai de 1 a 48.');
+                        return;
+                      }
+                      const card = (cards.data ?? []).find(
+                        (item) => item.id === draft.finance?.companyCardId,
+                      );
+                      if (draft.finance?.paymentKind === 'card' && !card) {
+                        toast.error('Informe o cartão.');
+                        return;
+                      }
+                      const amounts = splitInstallmentAmounts(
+                        document.totalAmount,
+                        count,
+                      );
+                      const dues =
+                        draft.finance?.paymentKind === 'card' && card
+                          ? statementDueDates(draft.issueOn, card.dueDay, count)
+                          : installmentDueDates(draft.issueOn, 0, 30, count);
+                      setDraft({
+                        ...draft,
+                        installments: amounts.map((amount, index) => ({
+                          number: String(index + 1).padStart(3, '0'),
+                          dueOn: dues[index],
+                          amount,
+                        })),
+                      });
+                    }}
+                  >
+                    Gerar parcelas
+                  </Button>
+                </div>
+              ) : null}
+              {draft.installments.map((installment, index) => (
+                <div
+                  key={installment.number}
+                  className="grid items-center gap-2 sm:grid-cols-3"
+                >
+                  <p className="text-sm text-zinc-700">Parcela {installment.number}</p>
+                  <Input
+                    type="date"
+                    value={installment.dueOn}
+                    disabled={locked}
+                    aria-label={`Vencimento da parcela ${installment.number}`}
+                    onChange={(event) => {
+                      const installments = [...draft.installments];
+                      installments[index] = { ...installment, dueOn: event.target.value };
+                      setDraft({ ...draft, installments });
+                    }}
+                  />
+                  <p className="text-sm tabular-nums text-zinc-700">
+                    {formatCurrency(installment.amount)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : draft && draft.installments.length > 0 ? (
             <div className="space-y-2">
               <Label>Parcelas</Label>
               {draft.installments.map((installment, index) => (

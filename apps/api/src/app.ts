@@ -34,6 +34,7 @@ import { emitterRoutes } from './modules/tenants/emitter.ts';
 import { payablesRoutes } from './modules/titles/payables.ts';
 import { receivablesRoutes } from './modules/titles/receivables.ts';
 import { treasuryRoutes } from './modules/treasury/treasury.ts';
+import { companyCardRoutes } from './modules/treasury/company-cards.ts';
 
 export function buildApp(options?: { logger?: boolean }) {
   const fastify = Fastify({
@@ -81,6 +82,7 @@ export function buildApp(options?: { logger?: boolean }) {
   fastify.register(financialCatalogRoutes, { prefix: '/financial' });
   fastify.register(paymentMethodRoutes, { prefix: '/payment-methods' });
   fastify.register(treasuryRoutes, { prefix: '/financial' });
+  fastify.register(companyCardRoutes, { prefix: '/financial' });
   fastify.register(emitterRoutes, { prefix: '/settings' });
   fastify.register(nfeSettingsRoutes, { prefix: '/settings' });
   fastify.register(serviceOrderSettingsRoutes, { prefix: '/settings' });

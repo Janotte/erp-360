@@ -3,6 +3,7 @@ import { randomInt, randomUUID } from 'node:crypto';
 import { tenants, users } from '@erp-360/mod-core';
 import {
   cashEntries,
+  companyCards,
   financialSettings,
   payables,
   receivables,
@@ -16,7 +17,11 @@ import { db } from '../src/db/index.ts';
 const amount = 150_000;
 const dueOn = '2026-10-16';
 
-export function settlementInput(kind: 'payable' | 'receivable', tenantId: string, titleId: string) {
+export function settlementInput(
+  kind: 'payable' | 'receivable',
+  tenantId: string,
+  titleId: string,
+) {
   return {
     kind,
     tenantId,
@@ -106,6 +111,7 @@ export async function removeCompany(tenantId: string) {
   await db.delete(cashEntries).where(eq(cashEntries.tenantId, tenantId));
   await db.delete(settlements).where(eq(settlements.tenantId, tenantId));
   await db.delete(payables).where(eq(payables.tenantId, tenantId));
+  await db.delete(companyCards).where(eq(companyCards.tenantId, tenantId));
   await db.delete(receivables).where(eq(receivables.tenantId, tenantId));
   await db.delete(persons).where(eq(persons.tenantId, tenantId));
   await db.delete(financialSettings).where(eq(financialSettings.tenantId, tenantId));

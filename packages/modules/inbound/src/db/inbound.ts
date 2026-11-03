@@ -1,6 +1,6 @@
 import { catalogItems } from '@erp-360/mod-catalog';
 import { tenantColumns } from '@erp-360/mod-core';
-import { payables, planAccounts } from '@erp-360/mod-financial';
+import { companyCards, payables, planAccounts } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
 import { sql } from 'drizzle-orm';
 import {
@@ -39,6 +39,17 @@ export const fiscalPurposeEnum = pgEnum('fiscal_purpose', [
 ]);
 
 export const cfopScopeEnum = pgEnum('cfop_scope', ['internal', 'interstate', 'import']);
+
+export const inboundFinancialStatusEnum = pgEnum('inbound_financial_status', [
+  'pending',
+  'classified',
+  'waived',
+]);
+
+export const inboundPaymentKindEnum = pgEnum('inbound_payment_kind', [
+  'supplier',
+  'card',
+]);
 
 export const inboundStatusEnum = pgEnum('inbound_status', [
   'pending',
@@ -118,7 +129,10 @@ export const cfopEntryRules = pgTable(
       table.scope,
       table.fiscalPurpose,
     ),
-    check('cfop_entry_rules_digits', sql`${table.sourceCfop} ~ '^[0-9]{4}$' and ${table.entryCfop} ~ '^[0-9]{4}$'`),
+    check(
+      'cfop_entry_rules_digits',
+      sql`${table.sourceCfop} ~ '^[0-9]{4}$' and ${table.entryCfop} ~ '^[0-9]{4}$'`,
+    ),
   ],
 );
 
@@ -182,6 +196,17 @@ export const inboundDocuments = pgTable(
       .default('authorized')
       .notNull(),
     totalAmount: integer('total_amount').notNull(),
+    /** tPag declarado no XML. Não é reescrito quando o usuário classifica o pagamento. */
+    xmlPaymentCode: varchar('xml_payment_code', { length: 2 }),
+    /** Soma de vPag em centavos. No tPag 90 permanece zero. */
+    xmlPaymentAmount: integer('xml_payment_amount').default(0).notNull(),
+    financialStatus: inboundFinancialStatusEnum('financial_status')
+      .default('classified')
+      .notNull(),
+    paymentKind: inboundPaymentKindEnum('payment_kind').default('supplier'),
+    /** Obrigatório quando o financeiro é dispensado. */
+    waiverReason: varchar('waiver_reason', { length: 255 }),
+    companyCardId: uuid('company_card_id'),
     movesStock: boolean('moves_stock'),
     createsPayable: boolean('creates_payable'),
     updatesAverageCost: boolean('updates_average_cost'),
@@ -203,12 +228,52 @@ export const inboundDocuments = pgTable(
       columns: [table.natureId, table.tenantId],
       foreignColumns: [operationNatures.id, operationNatures.tenantId],
     }).onDelete('restrict'),
-    index('inbound_documents_tenant_status_idx').on(table.tenantId, table.status, table.issueOn),
+    foreignKey({
+      name: 'inbound_documents_company_card_tenant_fk',
+      columns: [table.companyCardId, table.tenantId],
+      foreignColumns: [companyCards.id, companyCards.tenantId],
+    }).onDelete('restrict'),
+    check(
+      'inbound_documents_finance_check',
+      sql`(
+        ${table.financialStatus} = 'pending'
+        and ${table.paymentKind} is null
+        and ${table.companyCardId} is null
+        and ${table.waiverReason} is null
+      ) or (
+        ${table.financialStatus} = 'classified'
+        and ${table.paymentKind} = 'supplier'
+        and ${table.companyCardId} is null
+      ) or (
+        ${table.financialStatus} = 'classified'
+        and ${table.paymentKind} = 'card'
+        and ${table.companyCardId} is not null
+      ) or (
+        ${table.financialStatus} = 'waived'
+        and ${table.paymentKind} is null
+        and ${table.companyCardId} is null
+        and ${table.waiverReason} is not null
+        and length(trim(${table.waiverReason})) > 0
+      )`,
+    ),
+    index('inbound_documents_tenant_status_idx').on(
+      table.tenantId,
+      table.status,
+      table.issueOn,
+    ),
     check(
       'inbound_documents_access_key_digits',
       sql`${table.accessKey} is null or ${table.accessKey} ~ '^[0-9]{44}$'`,
     ),
     check('inbound_documents_total_non_negative', sql`${table.totalAmount} >= 0`),
+    check(
+      'inbound_documents_xml_payment_code_check',
+      sql`${table.xmlPaymentCode} is null or ${table.xmlPaymentCode} ~ '^[0-9]{2}$'`,
+    ),
+    check(
+      'inbound_documents_xml_payment_amount_check',
+      sql`${table.xmlPaymentAmount} >= 0`,
+    ),
   ],
 );
 
@@ -330,7 +395,9 @@ export const stockBalances = pgTable(
     ...tenantColumns,
     itemId: uuid('item_id').notNull(),
     quantity: numeric('quantity', { precision: 18, scale: 4 }).default('0').notNull(),
-    averageCost: numeric('average_cost', { precision: 15, scale: 4 }).default('0').notNull(),
+    averageCost: numeric('average_cost', { precision: 15, scale: 4 })
+      .default('0')
+      .notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.tenantId, table.itemId] }),

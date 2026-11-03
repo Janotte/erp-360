@@ -13,6 +13,7 @@ import { and, eq } from 'drizzle-orm';
 
 import type { DbClient } from '../../db/index.ts';
 import { InboundError } from './errors.ts';
+import { initialInboundFinance } from './finance.ts';
 import type { ParsedNfe } from './nfe.ts';
 
 const occupied = 'Esta nota já está na entrada.';
@@ -106,7 +107,13 @@ export async function persistParsedNfe(
     .where(and(eq(persons.tenantId, tenantId), eq(persons.taxId, parsed.supplierTaxId)))
     .limit(1);
   const supplierId = supplier?.id ?? null;
-  const values = documentValues(tenantId, parsed, supplierId);
+  const finance = initialInboundFinance(parsed);
+  const values = {
+    ...documentValues(tenantId, parsed, supplierId),
+    xmlPaymentCode: parsed.declaredPayment?.code ?? null,
+    xmlPaymentAmount: parsed.declaredPayment?.amount ?? 0,
+    ...finance,
+  };
 
   let id = documentId;
   if (!id) {
