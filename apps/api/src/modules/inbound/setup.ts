@@ -2,14 +2,16 @@ import { cfopEntryRules, operationNatures } from '@erp-360/mod-inbound';
 import { eq } from 'drizzle-orm';
 
 import { db } from '../../db/index.ts';
+import { findPgError } from '../../lib/postgres-errors.ts';
 
-type Purpose = 'resale' | 'industrialization' | 'consumption' | 'fixed_asset' | 'service';
+type Purpose = 'resale' | 'industrialization' | 'consumption' | 'fixed_asset' | 'service' | 'repair';
 
 const natures: Array<{
   code: string;
   name: string;
   fiscalPurpose: Purpose;
   movesStock: boolean;
+  createsPayable?: boolean;
   updatesAverageCost: boolean;
   recordsEntryPrice: boolean;
   suggestsListPrice: boolean;
@@ -71,6 +73,18 @@ const natures: Array<{
     ipiInCost: false,
     stInCost: false,
   },
+  {
+    code: 'repair',
+    name: 'Remessa e retorno de conserto',
+    fiscalPurpose: 'repair',
+    movesStock: false,
+    createsPayable: false,
+    updatesAverageCost: false,
+    recordsEntryPrice: false,
+    suggestsListPrice: false,
+    ipiInCost: false,
+    stInCost: false,
+  },
 ];
 
 const cfopRules: Array<{
@@ -89,6 +103,10 @@ const cfopRules: Array<{
   { sourceCfop: '6102', scope: 'interstate', fiscalPurpose: 'fixed_asset', entryCfop: '2551' },
   { sourceCfop: '5405', scope: 'internal', fiscalPurpose: 'resale', entryCfop: '1403' },
   { sourceCfop: '6405', scope: 'interstate', fiscalPurpose: 'resale', entryCfop: '2403' },
+  { sourceCfop: '5915', scope: 'internal', fiscalPurpose: 'repair', entryCfop: '1915' },
+  { sourceCfop: '6915', scope: 'interstate', fiscalPurpose: 'repair', entryCfop: '2915' },
+  { sourceCfop: '5916', scope: 'internal', fiscalPurpose: 'repair', entryCfop: '1916' },
+  { sourceCfop: '6916', scope: 'interstate', fiscalPurpose: 'repair', entryCfop: '2916' },
 ];
 
 export async function ensureInboundSetup(tenantId: string) {
@@ -97,35 +115,84 @@ export async function ensureInboundSetup(tenantId: string) {
     .from(operationNatures)
     .where(eq(operationNatures.tenantId, tenantId))
     .limit(1);
-  if (existing) return;
+  if (!existing) {
+    await db
+      .insert(operationNatures)
+      .values(
+        natures.map((nature) => ({
+          tenantId,
+          direction: 'in' as const,
+          createsPayable: true,
+          freightInCost: true,
+          insuranceInCost: true,
+          otherInCost: true,
+          discountInCost: true,
+          icmsInCost: false,
+          ...nature,
+        })),
+      )
+      .onConflictDoNothing({ target: [operationNatures.tenantId, operationNatures.code] });
+    await db
+      .insert(cfopEntryRules)
+      .values(cfopRules.map((rule) => ({ tenantId, ...rule })))
+      .onConflictDoNothing({
+        target: [
+          cfopEntryRules.tenantId,
+          cfopEntryRules.sourceCfop,
+          cfopEntryRules.scope,
+          cfopEntryRules.fiscalPurpose,
+        ],
+      });
+    return;
+  }
 
-  await db
-    .insert(operationNatures)
-    .values(
-      natures.map((nature) => ({
+  await ensureRepairSetup(tenantId);
+}
+
+/** A conexão aberta antes da migração não enxerga o valor novo do enum. A lista segue sem ele. */
+async function ensureRepairSetup(tenantId: string) {
+  try {
+    await db
+      .insert(operationNatures)
+      .values({
         tenantId,
-        direction: 'in' as const,
-        createsPayable: true,
-        freightInCost: true,
-        insuranceInCost: true,
-        otherInCost: true,
-        discountInCost: true,
+        direction: 'in',
+        code: 'repair',
+        name: 'Remessa e retorno de conserto',
+        fiscalPurpose: 'repair',
+        movesStock: false,
+        createsPayable: false,
+        updatesAverageCost: false,
+        recordsEntryPrice: false,
+        suggestsListPrice: false,
+        freightInCost: false,
+        insuranceInCost: false,
+        otherInCost: false,
+        discountInCost: false,
+        ipiInCost: false,
+        stInCost: false,
         icmsInCost: false,
-        ...nature,
-      })),
-    )
-    .onConflictDoNothing({ target: [operationNatures.tenantId, operationNatures.code] });
-  await db
-    .insert(cfopEntryRules)
-    .values(cfopRules.map((rule) => ({ tenantId, ...rule })))
-    .onConflictDoNothing({
-      target: [
-        cfopEntryRules.tenantId,
-        cfopEntryRules.sourceCfop,
-        cfopEntryRules.scope,
-        cfopEntryRules.fiscalPurpose,
-      ],
-    });
+      })
+      .onConflictDoNothing({ target: [operationNatures.tenantId, operationNatures.code] });
+    await db
+      .insert(cfopEntryRules)
+      .values(
+        cfopRules
+          .filter((rule) => rule.fiscalPurpose === 'repair')
+          .map((rule) => ({ tenantId, ...rule })),
+      )
+      .onConflictDoNothing({
+        target: [
+          cfopEntryRules.tenantId,
+          cfopEntryRules.sourceCfop,
+          cfopEntryRules.scope,
+          cfopEntryRules.fiscalPurpose,
+        ],
+      });
+  } catch (error) {
+    if (findPgError(error, '22P02')) return;
+    throw error;
+  }
 }
 
 export function cfopScope(cfop: string): 'internal' | 'interstate' | 'import' | null {

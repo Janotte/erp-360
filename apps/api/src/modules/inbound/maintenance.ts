@@ -15,6 +15,7 @@ const purposes = [
   'consumption',
   'fixed_asset',
   'service',
+  'repair',
 ] as const;
 
 const natureBody = z.object({

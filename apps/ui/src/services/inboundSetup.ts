@@ -5,7 +5,8 @@ export type FiscalPurpose =
   | 'industrialization'
   | 'consumption'
   | 'fixed_asset'
-  | 'service';
+  | 'service'
+  | 'repair';
 
 export type CfopScope = 'internal' | 'interstate' | 'import';
 

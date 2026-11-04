@@ -36,6 +36,7 @@ export const fiscalPurposeEnum = pgEnum('fiscal_purpose', [
   'consumption',
   'fixed_asset',
   'service',
+  'repair',
 ]);
 
 export const cfopScopeEnum = pgEnum('cfop_scope', ['internal', 'interstate', 'import']);

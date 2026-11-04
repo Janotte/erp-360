@@ -168,7 +168,7 @@ async function entryCfopFor(
         eq(
           cfopEntryRules.fiscalPurpose,
           purpose as
-            'resale' | 'industrialization' | 'consumption' | 'fixed_asset' | 'service',
+            'resale' | 'industrialization' | 'consumption' | 'fixed_asset' | 'service' | 'repair',
         ),
       ),
     )

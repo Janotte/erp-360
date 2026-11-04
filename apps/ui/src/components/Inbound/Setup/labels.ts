@@ -6,6 +6,7 @@ export const fiscalPurposes: FiscalPurpose[] = [
   'consumption',
   'fixed_asset',
   'service',
+  'repair',
 ];
 
 export const fiscalPurposeLabels: Record<FiscalPurpose, string> = {
@@ -14,6 +15,7 @@ export const fiscalPurposeLabels: Record<FiscalPurpose, string> = {
   consumption: 'Consumo',
   fixed_asset: 'Imobilizado',
   service: 'Serviço',
+  repair: 'Conserto',
 };
 
 export const cfopScopeLabels: Record<CfopScope, string> = {

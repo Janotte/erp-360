@@ -1,0 +1,1 @@
+ALTER TYPE "public"."fiscal_purpose" ADD VALUE 'repair';
