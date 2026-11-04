@@ -342,7 +342,14 @@ export const inboundService = {
     });
     return parse(res, 'Falha ao salvar a nota.');
   },
-  createSupplier: async (id: string): Promise<InboundDocument> => {
+  createSupplier: async (
+    id: string,
+  ): Promise<
+    InboundDocument & {
+      supplierRegistration?: 'linked' | 'complete' | 'basic';
+      addressSaved?: boolean;
+    }
+  > => {
     const res = await apiFetch(`/inbound/${id}/supplier`, { method: 'POST' });
     return parse(res, 'Falha ao cadastrar o fornecedor.');
   },

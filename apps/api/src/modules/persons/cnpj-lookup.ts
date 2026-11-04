@@ -48,7 +48,10 @@ const CNPJ_SOURCES = [
   (cnpj: string) => `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`,
   (cnpj: string) => `https://www.receitaws.com.br/v1/cnpj/${cnpj}`,
 ];
-const cache = new Map<string, { at: number; data: Omit<CnpjLookupResult, 'existingPersonId'> }>();
+const cache = new Map<
+  string,
+  { at: number; data: Omit<CnpjLookupResult, 'existingPersonId'> }
+>();
 const CACHE_MS = 60 * 60 * 1000;
 
 function clip(value: string | null | undefined, max: number) {
@@ -108,7 +111,9 @@ function pickStateRegistration(row: Record<string, unknown>, uf: string): string
     return entry.ativo === true && stateAbbreviationOf(entry) === wanted;
   }) as Record<string, unknown> | undefined;
   if (!activeInState) return null;
-  return normalizeStateRegistration(readString(activeInState, 'inscricao_estadual', 'numero'));
+  return normalizeStateRegistration(
+    readString(activeInState, 'inscricao_estadual', 'numero'),
+  );
 }
 
 async function lookupStateRegistration(cnpj: string, uf: string) {
@@ -201,7 +206,7 @@ async function fetchPublicCnpj(cnpj: string) {
         continue;
       }
       if (status >= 200 && status < 300 && hasCompanyName(body)) {
-        return body;
+        return enrichPublicCnpj(body, cnpj);
       }
       sawTransient = true;
     } catch {
@@ -212,7 +217,99 @@ async function fetchPublicCnpj(cnpj: string) {
   if (sawNotFound && !sawTransient) {
     throw new CnpjLookupError(404, 'CNPJ não encontrado na base pública.');
   }
-  throw new CnpjLookupError(502, 'Não foi possível consultar o CNPJ agora. Tente de novo.');
+  throw new CnpjLookupError(
+    502,
+    'Não foi possível consultar o CNPJ agora. Tente de novo.',
+  );
+}
+
+function hasText(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) return true;
+  if (typeof value !== 'string') return false;
+  return value.trim().length > 0;
+}
+
+/** A primeira base às vezes vem sem rua, telefone ou inscrição. A segunda completa o que falta. */
+export function overlayCnpjDetail(
+  primary: Record<string, unknown>,
+  detail: Record<string, unknown>,
+) {
+  const office = detail.estabelecimento;
+  const source =
+    office && typeof office === 'object' && !Array.isArray(office)
+      ? (office as Record<string, unknown>)
+      : detail;
+  const city =
+    source.cidade && typeof source.cidade === 'object'
+      ? (source.cidade as Record<string, unknown>)
+      : {};
+  const state =
+    source.estado && typeof source.estado === 'object'
+      ? (source.estado as Record<string, unknown>)
+      : {};
+  const phone = [readString(source, 'ddd1'), readString(source, 'telefone1')]
+    .filter(Boolean)
+    .join('');
+  const activity = source.atividade_principal;
+  const cnae =
+    activity && typeof activity === 'object' && !Array.isArray(activity)
+      ? readString(activity as Record<string, unknown>, 'id', 'subclasse')
+      : '';
+  const extra: Record<string, unknown> = {
+    nome_fantasia: readString(source, 'nome_fantasia'),
+    data_inicio_atividade: readString(source, 'data_inicio_atividade'),
+    email: readString(source, 'email'),
+    ddd_telefone_1: phone,
+    cnae_fiscal: cnae,
+    municipio: readString(city, 'nome'),
+    uf: readString(state, 'sigla'),
+    codigo_municipio_ibge: readString(city, 'ibge_id'),
+    descricao_tipo_de_logradouro: readString(source, 'tipo_logradouro'),
+    logradouro: readString(source, 'logradouro'),
+    numero: readString(source, 'numero'),
+    complemento: readString(source, 'complemento'),
+    bairro: readString(source, 'bairro'),
+    cep: readString(source, 'cep'),
+    inscricoes_estaduais: source.inscricoes_estaduais,
+  };
+  const next = { ...primary };
+  for (const [key, value] of Object.entries(extra)) {
+    if (!hasText(next[key]) && !Array.isArray(next[key]) && hasText(value)) {
+      next[key] = value;
+    }
+    if (
+      key === 'inscricoes_estaduais' &&
+      !Array.isArray(next[key]) &&
+      Array.isArray(value)
+    ) {
+      next[key] = value;
+    }
+  }
+  return next;
+}
+
+async function enrichPublicCnpj(body: Record<string, unknown>, cnpj: string) {
+  const base =
+    body.estabelecimento && typeof body.estabelecimento === 'object'
+      ? overlayCnpjDetail(body, body)
+      : body;
+  const uf = readString(base, 'uf');
+  const incomplete =
+    !readString(base, 'logradouro') ||
+    !readString(base, 'ddd_telefone_1', 'telefone') ||
+    !readString(base, 'email') ||
+    !pickStateRegistration(base, uf);
+  if (!incomplete) return base;
+
+  try {
+    const { status, body: detail } = await fetchJson(
+      `https://publica.cnpj.ws/cnpj/${cnpj}`,
+    );
+    if (status < 200 || status >= 300) return base;
+    return overlayCnpjDetail(base, detail);
+  } catch {
+    return base;
+  }
 }
 
 async function resolveCity(params: { ibge: string; cityName: string; uf: string }) {
@@ -251,7 +348,10 @@ async function resolveCity(params: { ibge: string; cityName: string; uf: string 
   return byName ?? null;
 }
 
-export async function lookupCnpj(params: { tenantId: string; cnpj: string }): Promise<CnpjLookupResult> {
+export async function lookupCnpj(params: {
+  tenantId: string;
+  cnpj: string;
+}): Promise<CnpjLookupResult> {
   const taxId = normalizeTaxId('company', params.cnpj);
   if (!isValidCnpj(taxId)) {
     throw new CnpjLookupError(400, 'CNPJ inválido.');
@@ -267,7 +367,8 @@ export async function lookupCnpj(params: { tenantId: string; cnpj: string }): Pr
       throw new CnpjLookupError(404, 'CNPJ encontrado, mas sem razão social.');
     }
 
-    const birthDate = parseActivityDate(readString(raw, 'data_inicio_atividade', 'abertura')) || null;
+    const birthDate =
+      parseActivityDate(readString(raw, 'data_inicio_atividade', 'abertura')) || null;
     const nfeEmail = emptyToNull(normalizeEmail(readString(raw, 'email')));
     const tradeName = clip(readString(raw, 'nome_fantasia', 'fantasia'), 60);
     const phone = readPhone(raw);

@@ -13,7 +13,7 @@ import {
   supplierItemLinks,
 } from '@erp-360/mod-inbound';
 import { persons } from '@erp-360/mod-persons';
-import { escapeIlike, isValidCnpj, onlyDigits, toTitleCasePtBr } from '@erp-360/shared';
+import { escapeIlike, isValidCnpj, onlyDigits } from '@erp-360/shared';
 import { and, asc, desc, eq, gte, ilike, like, lte, ne, or } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -22,6 +22,7 @@ import { db } from '../../db/index.ts';
 import { uniqueViolation } from '../../lib/postgres-errors.ts';
 import { postCertificate } from '../certificates/probe.ts';
 import { connectionTimeoutMs } from '../certificates/sefaz.ts';
+import { CnpjLookupError, lookupCnpj } from '../persons/cnpj-lookup.ts';
 import { moneyToCents } from './cost.ts';
 import { discoverInboundDocument } from './dfe-discover.ts';
 import {
@@ -38,6 +39,7 @@ import { normalizeInboundFinance } from './finance.ts';
 import { parseNfeXml } from './nfe.ts';
 import { getOrCreateNfeSettings } from './nfe-settings.ts';
 import { persistParsedNfe } from './persist-nfe.ts';
+import { registerInboundSupplier } from './register-supplier.ts';
 import {
   deleteInboundDocument,
   postInboundDocument,
@@ -944,45 +946,29 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
     if (!document?.supplierTaxId || !document.supplierName) {
       throw new InboundError(400, 'Esta nota não tem dados do emitente para cadastrar.');
     }
-    const [existing] = await db
-      .select({ id: persons.id })
-      .from(persons)
-      .where(
-        and(eq(persons.tenantId, tenantId), eq(persons.taxId, document.supplierTaxId)),
-      )
-      .limit(1);
-    let supplierId = existing?.id;
-    if (!supplierId) {
-      const name = toTitleCasePtBr(document.supplierName).slice(0, 120);
-      try {
-        const [created] = await db
-          .insert(persons)
-          .values({
-            tenantId,
-            type: 'company',
-            name,
-            taxId: onlyDigits(document.supplierTaxId).slice(0, 14),
-            isSupplier: true,
-          })
-          .returning({ id: persons.id });
-        supplierId = created.id;
-      } catch (error) {
-        if (uniqueViolation(error)) {
-          throw new InboundError(
-            409,
-            'Já existe uma pessoa com este nome ou CNPJ. Vincule o fornecedor manualmente.',
-          );
+    const registered = await registerInboundSupplier({
+      tenantId,
+      supplierTaxId: document.supplierTaxId,
+      supplierName: document.supplierName,
+      lookup: async () => {
+        try {
+          return await lookupCnpj({ tenantId, cnpj: document.supplierTaxId as string });
+        } catch (error) {
+          if (error instanceof CnpjLookupError) return null;
+          throw error;
         }
-        throw error;
-      }
-    }
-    await markSupplier(tenantId, supplierId);
+      },
+    });
     await db
       .update(inboundDocuments)
-      .set({ supplierId })
+      .set({ supplierId: registered.supplierId })
       .where(eq(inboundDocuments.id, id));
     await alignDraft(tenantId, id, null);
-    return loadDocument(tenantId, id);
+    return {
+      ...(await loadDocument(tenantId, id)),
+      supplierRegistration: registered.registration,
+      addressSaved: registered.addressSaved,
+    };
   });
 
   fastify.post('/:id/discover', async (request) => {

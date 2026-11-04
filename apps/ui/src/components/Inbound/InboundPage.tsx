@@ -259,7 +259,23 @@ export function InboundPage() {
     mutationFn: () => inboundService.createSupplier(selectedId as string),
     onSuccess: (document) => {
       void refresh(document);
-      toast.success('Fornecedor vinculado.');
+      if (document.supplierRegistration === 'basic') {
+        toast.success(
+          'Fornecedor cadastrado com CNPJ e razão social. A consulta do CNPJ não respondeu.',
+        );
+        return;
+      }
+      if (document.supplierRegistration === 'complete' && !document.addressSaved) {
+        toast.success(
+          'Fornecedor cadastrado com os dados do CNPJ. O endereço ficou sem cidade.',
+        );
+        return;
+      }
+      toast.success(
+        document.supplierRegistration === 'complete'
+          ? 'Fornecedor cadastrado com os dados do CNPJ.'
+          : 'Fornecedor vinculado.',
+      );
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -635,14 +651,23 @@ export function InboundPage() {
                 {document.supplierTaxId ? ` · ${document.supplierTaxId}` : ''}
               </p>
               {!document.supplierId && document.supplierTaxId ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => createSupplier.mutate()}
-                >
-                  Cadastrar fornecedor
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={createSupplier.isPending}
+                    onClick={() => createSupplier.mutate()}
+                  >
+                    {createSupplier.isPending
+                      ? 'Consultando CNPJ...'
+                      : 'Cadastrar fornecedor'}
+                  </Button>
+                  <p className="text-xs text-zinc-500">
+                    A consulta do CNPJ preenche razão social, inscrição, endereço e
+                    contato.
+                  </p>
+                </>
               ) : null}
               {!locked && !document.supplierId ? (
                 <>
