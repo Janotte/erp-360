@@ -19,6 +19,16 @@ import { toast } from 'sonner';
 
 import { FormItem } from '@/components/Catalog/Items/FormItem';
 import { InboundNoteMenu } from '@/components/Inbound/InboundNoteMenu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -164,6 +174,7 @@ export function InboundPage() {
     y: number;
   } | null>(null);
   const [installmentCount, setInstallmentCount] = useState('1');
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const natures = useQuery({
     queryKey: ['inbound', 'natures'],
@@ -293,6 +304,7 @@ export function InboundPage() {
   const removeDocument = useMutation({
     mutationFn: () => inboundService.remove(selectedId as string),
     onSuccess: async () => {
+      setConfirmDelete(false);
       setSelectedId(null);
       setDraft(null);
       await queryClient.invalidateQueries({ queryKey: ['inbound', 'list'] });
@@ -1172,16 +1184,7 @@ export function InboundPage() {
                 type="button"
                 variant="outline"
                 disabled={removeDocument.isPending}
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      'Excluir esta nota? As parcelas ligadas a ela também saem do pagar.',
-                    )
-                  ) {
-                    return;
-                  }
-                  removeDocument.mutate();
-                }}
+                onClick={() => setConfirmDelete(true)}
               >
                 Excluir
               </Button>
@@ -1239,6 +1242,29 @@ export function InboundPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir nota</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja excluir esta nota? As parcelas ligadas a ela também saem do pagar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={removeDocument.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                removeDocument.mutate();
+              }}
+            >
+              {removeDocument.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <InboundNoteMenu
         cursor={noteMenu}
         onClose={() => setNoteMenu(null)}
