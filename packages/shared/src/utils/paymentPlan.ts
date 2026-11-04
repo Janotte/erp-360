@@ -34,8 +34,30 @@ export function addCivilDays(isoDate: string, days: number) {
   return `${nextYear}-${nextMonth}-${nextDay}`;
 }
 
-/** Vencimentos de fatura. O primeiro cai no dia informado depois da compra. */
-export function statementDueDates(issueOn: string, dueDay: number, count: number) {
+function shiftMonth(year: number, month: number, delta: number) {
+  const shifted = month - 1 + delta;
+  return {
+    year: year + Math.floor(shifted / 12),
+    month: (shifted % 12) + 1,
+  };
+}
+
+/**
+ * Vencimentos da fatura do cartão.
+ * Compra até o dia do fechamento entra na fatura daquele mês.
+ * Compra posterior entra no fechamento seguinte.
+ * O vencimento cai depois do fechamento: no mesmo mês, se o dia é maior;
+ * no mês seguinte, se o dia é menor ou igual.
+ */
+export function statementDueDates(
+  issueOn: string,
+  closingDay: number,
+  dueDay: number,
+  count: number,
+) {
+  if (!Number.isInteger(closingDay) || closingDay < 1 || closingDay > 28) {
+    throw new Error('Dia de fechamento inválido.');
+  }
   if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 28) {
     throw new Error('Dia de vencimento inválido.');
   }
@@ -55,20 +77,11 @@ export function statementDueDates(issueOn: string, dueDay: number, count: number
   ) {
     throw new Error('Data inválida.');
   }
-  let cursorMonth = month;
-  let cursorYear = year;
-  if (day >= dueDay) {
-    cursorMonth += 1;
-    if (cursorMonth > 12) {
-      cursorMonth = 1;
-      cursorYear += 1;
-    }
-  }
+  const closing = shiftMonth(year, month, day > closingDay ? 1 : 0);
+  const firstDue = shiftMonth(closing.year, closing.month, dueDay <= closingDay ? 1 : 0);
   return Array.from({ length: count }, (_, index) => {
-    const shifted = cursorMonth - 1 + index;
-    const nextYear = cursorYear + Math.floor(shifted / 12);
-    const nextMonth = (shifted % 12) + 1;
-    return `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
+    const due = shiftMonth(firstDue.year, firstDue.month, index);
+    return `${due.year}-${String(due.month).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
   });
 }
 

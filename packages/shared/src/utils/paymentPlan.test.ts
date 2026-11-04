@@ -26,16 +26,18 @@ describe('plano de pagamento', () => {
     ]);
   });
 
-  it('joga a primeira fatura para o vencimento seguinte quando a compra passa do dia', () => {
-    assert.deepEqual(statementDueDates('2026-09-15', 10, 3), [
-      '2026-10-10',
-      '2026-11-10',
-      '2026-12-10',
+  it('manda a compra posterior ao fechamento para a fatura seguinte', () => {
+    assert.deepEqual(statementDueDates('2026-09-29', 28, 13, 1), ['2026-11-13']);
+    assert.deepEqual(statementDueDates('2026-09-28', 28, 13, 1), ['2026-10-13']);
+    assert.deepEqual(statementDueDates('2026-09-15', 28, 13, 2), [
+      '2026-10-13',
+      '2026-11-13',
     ]);
-    assert.deepEqual(statementDueDates('2026-09-05', 10, 1), ['2026-09-10']);
-    assert.deepEqual(statementDueDates('2026-12-15', 10, 2), [
-      '2027-01-10',
-      '2027-02-10',
+    assert.deepEqual(statementDueDates('2026-09-03', 5, 13, 1), ['2026-09-13']);
+    assert.deepEqual(statementDueDates('2026-09-06', 5, 13, 1), ['2026-10-13']);
+    assert.deepEqual(statementDueDates('2026-12-29', 28, 13, 2), [
+      '2027-02-13',
+      '2027-03-13',
     ]);
   });
 });

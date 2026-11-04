@@ -787,15 +787,39 @@ export function InboundPage() {
                     className="flex h-9 w-full rounded-md border px-3 text-sm"
                     value={draft.finance.companyCardId ?? ''}
                     disabled={locked}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const companyCardId = event.target.value || null;
+                      const card = (cards.data ?? []).find(
+                        (item) => item.id === companyCardId,
+                      );
+                      const count = Number(installmentCount);
+                      const dues =
+                        card && Number.isInteger(count) && count >= 1 && count <= 48
+                          ? statementDueDates(
+                              draft.issueOn,
+                              card.closingDay,
+                              card.dueDay,
+                              count,
+                            )
+                          : null;
                       setDraft({
                         ...draft,
+                        installments: dues
+                          ? splitInstallmentAmounts(
+                              document.totalAmount,
+                              dues.length,
+                            ).map((amount, index) => ({
+                              number: String(index + 1).padStart(3, '0'),
+                              dueOn: dues[index] ?? draft.issueOn,
+                              amount,
+                            }))
+                          : [],
                         finance: {
                           ...draft.finance!,
-                          companyCardId: event.target.value || null,
+                          companyCardId,
                         },
-                      })
-                    }
+                      });
+                    }}
                   >
                     <option value="">Selecione o cartão</option>
                     {(cards.data ?? [])
@@ -872,7 +896,12 @@ export function InboundPage() {
                       );
                       const dues =
                         draft.finance?.paymentKind === 'card' && card
-                          ? statementDueDates(draft.issueOn, card.dueDay, count)
+                          ? statementDueDates(
+                              draft.issueOn,
+                              card.closingDay,
+                              card.dueDay,
+                              count,
+                            )
                           : installmentDueDates(draft.issueOn, 0, 30, count);
                       setDraft({
                         ...draft,
