@@ -124,7 +124,7 @@ async function nextItemCode(
 function buildItemValues(
   data: ItemBody,
 ): { values: ReturnType<typeof itemValues> } | { message: string } {
-  const name = data.name.trim();
+  const name = data.name.trim().toUpperCase();
   const sku = data.sku?.trim() ?? '';
   if (!name) return { message: 'Informe o nome.' };
   if (data.type === 'service' && data.fiscalItemType !== 'service') {

@@ -44,7 +44,7 @@ describe('confirmação da entrada', () => {
         fiscalItemType: 'resale',
         tracksStock: true,
         measureId: measure.id,
-        name: 'Item de teste',
+        name: 'ITEM DE TESTE',
         grossMargin: '50.0000',
       })
       .returning({ id: catalogItems.id });
@@ -164,7 +164,7 @@ describe('confirmação da entrada', () => {
         fiscalItemType: 'consumable',
         tracksStock: false,
         measureId: measure.id,
-        name: 'Kit de impressao',
+        name: 'KIT DE IMPRESSAO',
       })
       .returning({ id: catalogItems.id });
     const [issuer] = await db
@@ -280,7 +280,7 @@ describe('confirmação da entrada', () => {
         fiscalItemType: 'consumable',
         tracksStock: false,
         measureId: measure.id,
-        name: 'Item pendente',
+        name: 'ITEM PENDENTE',
       })
       .returning({ id: catalogItems.id });
     await ensureInboundSetup(company.tenantId);
@@ -354,7 +354,7 @@ describe('confirmação da entrada', () => {
         fiscalItemType: 'consumable',
         tracksStock: false,
         measureId: measure.id,
-        name: 'Item dispensado',
+        name: 'ITEM DISPENSADO',
       })
       .returning({ id: catalogItems.id });
     await ensureInboundSetup(company.tenantId);

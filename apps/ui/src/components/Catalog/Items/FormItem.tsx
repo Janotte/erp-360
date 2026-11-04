@@ -119,7 +119,7 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
   const [itemId, setItemId] = useState(itemToUpdate?.id);
   const [code, setCode] = useState(itemToUpdate?.code ?? '');
   const [sku, setSku] = useState(itemToUpdate?.sku ?? '');
-  const [name, setName] = useState(itemToUpdate?.name ?? seed?.name ?? '');
+  const [name, setName] = useState((itemToUpdate?.name ?? seed?.name ?? '').toUpperCase());
   const [type, setType] = useState<CatalogItemType>(itemToUpdate?.type ?? 'product');
   const [fiscalItemType, setFiscalItemType] = useState<FiscalItemType>(
     itemToUpdate?.fiscalItemType ?? 'resale',
@@ -180,7 +180,7 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
     const item = { ...itemToUpdate, ...loaded };
     setCode(item.code ?? '');
     setSku(item.sku ?? '');
-    setName(item.name ?? '');
+    setName((item.name ?? '').toUpperCase());
     setType(item.type === 'service' ? 'service' : 'product');
     setFiscalItemType(parseFiscalType(item.fiscalItemType ?? 'resale'));
     setTracksStock(item.tracksStock !== false);
@@ -336,7 +336,8 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
           data-item-field
           value={name}
           maxLength={120}
-          onChange={(event) => setName(event.target.value)}
+          className="uppercase"
+          onChange={(event) => setName(event.target.value.toUpperCase())}
           required
         />
       </div>

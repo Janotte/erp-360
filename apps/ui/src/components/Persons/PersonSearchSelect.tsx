@@ -1,12 +1,27 @@
 import { formatTaxId, parsePersonKind } from '@erp-360/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronRight, ChevronsUpDown, Search, X } from 'lucide-react';
+import { Check, ChevronRight, ChevronsUpDown, Plus, Search, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { type Person, personsService } from '@/services/persons';
+
+function CreatePersonButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className="flex h-full w-9 shrink-0 items-center justify-center border-l border-input text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+      aria-label="Cadastrar pessoa"
+      title="Cadastrar pessoa"
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onClick}
+    >
+      <Plus className="h-4 w-4" />
+    </button>
+  );
+}
 
 function focusNextSequence(current: HTMLElement) {
   const form = current.closest('form');
@@ -32,6 +47,8 @@ interface PersonSearchSelectProps {
   disabled?: boolean;
   /** Inclui o campo na sequência de Enter do formulário. */
   enterSequence?: boolean;
+  /** Atalho para cadastrar uma pessoa quando a busca não encontra. */
+  onCreate?: () => void;
 }
 
 export function PersonSearchSelect({
@@ -43,6 +60,7 @@ export function PersonSearchSelect({
   required = false,
   disabled = false,
   enterSequence = false,
+  onCreate,
 }: PersonSearchSelectProps) {
   const types = Array.isArray(type) ? type : [type];
   const listId = useId();
@@ -208,10 +226,10 @@ export function PersonSearchSelect({
   return (
     <div ref={rootRef} className="relative">
       {value && !open ? (
-        <div className="flex h-9 items-center gap-1 rounded-md border border-input bg-transparent px-2 shadow-sm">
+        <div className="flex h-9 items-stretch overflow-hidden rounded-md border border-input bg-transparent shadow-sm">
           <button
             type="button"
-            className="flex min-w-0 flex-1 items-center gap-2 px-1 text-left text-sm"
+            className="flex min-w-0 flex-1 items-center gap-2 px-2 text-left text-sm"
             data-enter-sequence={enterSequence ? '' : undefined}
             onClick={() => {
               setSearchText('');
@@ -230,36 +248,56 @@ export function PersonSearchSelect({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-7 w-7 shrink-0"
+              className="h-full w-7 shrink-0 rounded-none"
               onClick={clear}
               aria-label="Limpar seleção"
             >
               <X className="h-4 w-4" />
             </Button>
           )}
+          {onCreate ? <CreatePersonButton onClick={onCreate} /> : null}
         </div>
       ) : (
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
-          <Input
-            ref={inputRef}
-            value={searchText}
-            placeholder={placeholder}
-            className="pl-9"
-            required={required && !value}
-            role="combobox"
-            aria-expanded={open}
-            aria-controls={listId}
-            aria-activedescendant={highlighted >= 0 ? `${listId}-option-${highlighted}` : undefined}
-            autoComplete="off"
-            data-enter-sequence={enterSequence ? '' : undefined}
-            onFocus={() => setOpen(true)}
-            onChange={(e) => {
-              setSearchText(e.target.value);
-              setOpen(true);
-            }}
-            onKeyDown={onSearchKeyDown}
-          />
+        <div
+          className={cn(
+            'relative',
+            onCreate &&
+              'flex h-9 items-stretch overflow-hidden rounded-md border border-input bg-transparent shadow-sm focus-within:ring-1 focus-within:ring-ring',
+          )}
+        >
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
+            <Input
+              ref={inputRef}
+              value={searchText}
+              placeholder={placeholder}
+              className={cn('pl-9', onCreate && 'h-full rounded-none border-0 shadow-none focus-visible:ring-0')}
+              required={required && !value}
+              role="combobox"
+              aria-expanded={open}
+              aria-controls={listId}
+              aria-activedescendant={
+                highlighted >= 0 ? `${listId}-option-${highlighted}` : undefined
+              }
+              autoComplete="off"
+              data-enter-sequence={enterSequence ? '' : undefined}
+              onFocus={() => setOpen(true)}
+              onChange={(e) => {
+                setSearchText(e.target.value);
+                setOpen(true);
+              }}
+              onKeyDown={onSearchKeyDown}
+            />
+          </div>
+          {onCreate ? (
+            <CreatePersonButton
+              onClick={() => {
+                inputRef.current?.blur();
+                setOpen(false);
+                onCreate();
+              }}
+            />
+          ) : null}
         </div>
       )}
 

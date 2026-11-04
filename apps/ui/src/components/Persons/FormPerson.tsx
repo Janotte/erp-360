@@ -75,9 +75,15 @@ function taxIdMaxLength(kind: PersonKind) {
 interface FormPersonProps {
   personToUpdate?: Person | null;
   onPersisted?: (person: Person) => void;
+  /** Marca o perfil de cliente ao abrir um cadastro novo. */
+  defaultClient?: boolean;
 }
 
-export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
+export function FormPerson({
+  personToUpdate,
+  onPersisted,
+  defaultClient = false,
+}: FormPersonProps) {
   const queryClient = useQueryClient();
   const [personId, setPersonId] = useState(personToUpdate?.id);
   const [personKind, setPersonKind] = useState<PersonKind>('individual');
@@ -94,7 +100,7 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
   const [isRuralProducer, setIsRuralProducer] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [isVisible, setIsVisible] = useState(true);
-  const [isClient, setIsClient] = useState(false);
+  const [isClient, setIsClient] = useState(defaultClient);
   const [isSupplier, setIsSupplier] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false);
   const [isFinancialInstitution, setIsFinancialInstitution] = useState(false);

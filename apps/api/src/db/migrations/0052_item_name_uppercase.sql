@@ -1,0 +1,2 @@
+UPDATE "catalog_items" SET "name" = upper("name") WHERE "name" <> upper("name");--> statement-breakpoint
+ALTER TABLE "catalog_items" ADD CONSTRAINT "catalog_items_name_uppercase" CHECK ("catalog_items"."name" = upper("catalog_items"."name"));

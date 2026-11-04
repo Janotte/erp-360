@@ -116,6 +116,10 @@ export const catalogItems = pgTable(
     ),
     check('catalog_items_name_not_blank', sql`length(trim(${table.name})) > 0`),
     check(
+      'catalog_items_name_uppercase',
+      sql`${table.name} = upper(${table.name})`,
+    ),
+    check(
       'catalog_items_barcode_check',
       sql`${table.barcode} is null or ${table.barcode} ~ '^[0-9]{8}$|^[0-9]{12,14}$'`,
     ),

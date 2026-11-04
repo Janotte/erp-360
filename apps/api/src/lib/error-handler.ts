@@ -121,6 +121,9 @@ function checkMessage(error: unknown): string | null {
   if (name.includes('catalog_items_code_format')) {
     return 'O código do item precisa ter 6 dígitos.';
   }
+  if (name.includes('catalog_items_name_uppercase')) {
+    return 'O nome do item deve estar em maiúsculas.';
+  }
   if (name.includes('catalog_items_name')) return 'Informe o nome.';
   if (name.includes('cfop_entry_rules_digits')) return 'O CFOP precisa ter 4 dígitos.';
   if (name.includes('payment_methods_code_format')) {

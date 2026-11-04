@@ -334,7 +334,7 @@ describe('gravação da ordem de serviço', { concurrency: false }, () => {
         fiscalItemType: 'resale',
         tracksStock: true,
         measureId: measure.id,
-        name: 'Peça',
+        name: 'PEÇA',
         listPrice: '10.0000',
       })
       .returning({ id: catalogItems.id });
@@ -345,7 +345,7 @@ describe('gravação da ordem de serviço', { concurrency: false }, () => {
       fiscalItemType: 'service',
       tracksStock: false,
       measureId: measure.id,
-      name: 'Mão de obra',
+      name: 'MÃO DE OBRA',
     });
     productId = product.id;
 
