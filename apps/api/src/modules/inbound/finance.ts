@@ -20,7 +20,7 @@ export interface FinanceInstallment {
   amount: number;
 }
 
-/** Duplicata no XML classifica como prazo do fornecedor. Sem cobrança, fica pendente. */
+/** Parcela do XML sugere prazo do fornecedor. Na conferência dá para trocar para cartão. */
 export function initialInboundFinance(input: {
   installments: unknown[];
   totalAmount: number;

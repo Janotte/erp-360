@@ -98,14 +98,7 @@ function syncMessage(result: DfeSyncResult) {
 }
 
 function asksPayment(document: InboundDocument) {
-  if (document.totalAmount <= 0) return false;
-  return (
-    document.xmlPaymentCode === '90' ||
-    document.financialStatus === 'pending' ||
-    document.financialStatus === 'waived' ||
-    document.paymentKind === 'card' ||
-    document.installments.length === 0
-  );
+  return document.totalAmount > 0;
 }
 
 function financeFrom(document: InboundDocument): InboundFinance {
@@ -688,15 +681,22 @@ export function InboundPage() {
           {draft && document && asksPayment(document) ? (
             <div className="space-y-3">
               <Label>Pagamento</Label>
-              {document.xmlPaymentCode ? (
-                <p className="text-sm text-zinc-500">
-                  No XML:{' '}
-                  {document.xmlPaymentCode === '90'
-                    ? '90 — Sem pagamento'
-                    : document.xmlPaymentCode}{' '}
-                  · {formatCurrency(document.xmlPaymentAmount)}
-                </p>
-              ) : null}
+              <p className="text-sm text-zinc-500">
+                {document.xmlPaymentCode
+                  ? `O XML sugere ${
+                      document.xmlPaymentCode === '90'
+                        ? 'sem pagamento'
+                        : `o meio ${document.xmlPaymentCode}`
+                    }${
+                      document.xmlPaymentAmount > 0
+                        ? `, ${formatCurrency(document.xmlPaymentAmount)}`
+                        : ''
+                    }. `
+                  : 'O XML sugere estas parcelas para o fornecedor. '}
+                {locked
+                  ? 'Esta foi a classificação usada no lançamento.'
+                  : 'Dá para manter ou trocar para cartão antes de lançar.'}
+              </p>
               <select
                 className="flex h-9 w-full max-w-sm rounded-md border px-3 text-sm"
                 value={
@@ -735,12 +735,19 @@ export function InboundPage() {
                     return;
                   }
                   if (value === 'supplier') {
+                    const suggested =
+                      document.paymentKind === 'card'
+                        ? []
+                        : document.installments.map((installment) => ({
+                            number: installment.number,
+                            dueOn: installment.dueOn,
+                            amount: installment.amount,
+                          }));
                     setDraft({
                       ...draft,
                       installments:
-                        draft.finance?.paymentKind === 'supplier' &&
-                        draft.installments.length > 0
-                          ? draft.installments
+                        suggested.length > 0
+                          ? suggested
                           : [
                               {
                                 number: '001',
