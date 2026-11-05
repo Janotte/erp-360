@@ -124,7 +124,7 @@ async function nextItemCode(
 function buildItemValues(
   data: ItemBody,
 ): { values: ReturnType<typeof itemValues> } | { message: string } {
-  const name = data.name.trim();
+  const name = data.name.trim().toLocaleUpperCase('pt-BR');
   const sku = data.sku?.trim() ?? '';
   if (!name) return { message: 'Informe o nome.' };
   if (data.type === 'service' && data.fiscalItemType !== 'service') {
@@ -169,7 +169,7 @@ function buildItemValues(
   const heightCm = parseDecimal(data.heightCm, 2, 8);
   if (!heightCm.ok) return { message: 'Informe a altura com até 2 casas decimais.' };
 
-  const description = data.description?.trim() ?? '';
+  const description = (data.description?.trim() ?? '').toLocaleUpperCase('pt-BR');
   return {
     values: itemValues({
       sku: sku || null,

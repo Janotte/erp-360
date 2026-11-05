@@ -119,7 +119,9 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
   const [itemId, setItemId] = useState(itemToUpdate?.id);
   const [code, setCode] = useState(itemToUpdate?.code ?? '');
   const [sku, setSku] = useState(itemToUpdate?.sku ?? '');
-  const [name, setName] = useState(itemToUpdate?.name ?? seed?.name ?? '');
+  const [name, setName] = useState(
+    (itemToUpdate?.name ?? seed?.name ?? '').toLocaleUpperCase('pt-BR'),
+  );
   const [type, setType] = useState<CatalogItemType>(itemToUpdate?.type ?? 'product');
   const [fiscalItemType, setFiscalItemType] = useState<FiscalItemType>(
     itemToUpdate?.fiscalItemType ?? 'resale',
@@ -128,7 +130,7 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
   const [categoryId, setCategoryId] = useState(itemToUpdate?.categoryId ?? '');
   const [measureId, setMeasureId] = useState(itemToUpdate?.measureId ?? '');
   const [description, setDescription] = useState(
-    itemToUpdate?.description ?? seed?.description ?? '',
+    (itemToUpdate?.description ?? seed?.description ?? '').toLocaleUpperCase('pt-BR'),
   );
   const [barcode, setBarcode] = useState(itemToUpdate?.barcode ?? seed?.barcode ?? '');
   const [listPrice, setListPrice] = useState(formatListPrice(itemToUpdate?.listPrice));
@@ -180,13 +182,13 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
     const item = { ...itemToUpdate, ...loaded };
     setCode(item.code ?? '');
     setSku(item.sku ?? '');
-    setName(item.name ?? '');
+    setName((item.name ?? '').toLocaleUpperCase('pt-BR'));
     setType(item.type === 'service' ? 'service' : 'product');
     setFiscalItemType(parseFiscalType(item.fiscalItemType ?? 'resale'));
     setTracksStock(item.tracksStock !== false);
     setCategoryId(item.categoryId ?? '');
     setMeasureId(item.measureId ?? '');
-    setDescription(item.description ?? '');
+    setDescription((item.description ?? '').toLocaleUpperCase('pt-BR'));
     setBarcode(item.barcode ?? '');
     setListPrice(formatListPrice(item.listPrice));
     setGrossMargin(formatPercent(item.grossMargin));
@@ -336,7 +338,7 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
           data-item-field
           value={name}
           maxLength={120}
-          onChange={(event) => setName(event.target.value)}
+          onChange={(event) => setName(event.target.value.toLocaleUpperCase('pt-BR'))}
           required
         />
       </div>
@@ -472,7 +474,9 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
           value={description}
           maxLength={2000}
           rows={2}
-          onChange={(event) => setDescription(event.target.value)}
+          onChange={(event) =>
+            setDescription(event.target.value.toLocaleUpperCase('pt-BR'))
+          }
           className="flex min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
       </div>
