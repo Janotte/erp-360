@@ -614,7 +614,6 @@ export function FormServiceOrder() {
       queryClient.setQueryData(['service-order', saved.id], saved);
       void queryClient.invalidateQueries({ queryKey: ['service-orders'] });
       toast.success(saved.status === 'delivered' ? 'Ordem entregue.' : 'Ordem salva.');
-      if (!id) navigate(`/service-orders/${saved.id}`, { replace: true });
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Falha ao salvar a ordem.');
@@ -890,9 +889,13 @@ export function FormServiceOrder() {
     return true;
   }
 
-  function submit(status: ServiceOrderStatus) {
+  function submit(status: ServiceOrderStatus, backToList = false) {
     if (!canSubmit(status)) return;
-    save.mutate(status);
+    save.mutate(status, {
+      onSuccess: () => {
+        if (backToList) navigate('/service-orders');
+      },
+    });
   }
 
   async function printSheet() {
@@ -937,7 +940,7 @@ export function FormServiceOrder() {
       onKeyDown={onEnterSequence}
       onSubmit={(event) => {
         event.preventDefault();
-        submit(draft.status);
+        submit(draft.status, true);
       }}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
