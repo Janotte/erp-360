@@ -75,13 +75,20 @@ function taxIdMaxLength(kind: PersonKind) {
 interface FormPersonProps {
   personToUpdate?: Person | null;
   onPersisted?: (person: Person) => void;
+  initialName?: string;
+  createAs?: {
+    isClient?: boolean;
+    isSupplier?: boolean;
+    isEmployee?: boolean;
+    isFinancialInstitution?: boolean;
+  };
 }
 
-export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
+export function FormPerson({ personToUpdate, onPersisted, initialName = '', createAs }: FormPersonProps) {
   const queryClient = useQueryClient();
   const [personId, setPersonId] = useState(personToUpdate?.id);
   const [personKind, setPersonKind] = useState<PersonKind>('individual');
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initialName);
   const [preserveNameCasing, setPreserveNameCasing] = useState(false);
   const [taxId, setTaxId] = useState('');
   const [taxIdError, setTaxIdError] = useState('');
@@ -94,10 +101,12 @@ export function FormPerson({ personToUpdate, onPersisted }: FormPersonProps) {
   const [isRuralProducer, setIsRuralProducer] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [isVisible, setIsVisible] = useState(true);
-  const [isClient, setIsClient] = useState(false);
-  const [isSupplier, setIsSupplier] = useState(false);
-  const [isEmployee, setIsEmployee] = useState(false);
-  const [isFinancialInstitution, setIsFinancialInstitution] = useState(false);
+  const [isClient, setIsClient] = useState(Boolean(createAs?.isClient));
+  const [isSupplier, setIsSupplier] = useState(Boolean(createAs?.isSupplier));
+  const [isEmployee, setIsEmployee] = useState(Boolean(createAs?.isEmployee));
+  const [isFinancialInstitution, setIsFinancialInstitution] = useState(
+    Boolean(createAs?.isFinancialInstitution),
+  );
   const [pendingAddress, setPendingAddress] = useState<CnpjLookupAddress | null>(null);
   const pendingAddressRef = useRef<CnpjLookupAddress | null>(null);
   pendingAddressRef.current = pendingAddress;

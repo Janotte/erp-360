@@ -3,7 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronRight, ChevronsUpDown, Search, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 
+import { FormPerson } from '@/components/Persons/FormPerson';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { type Person, personsService } from '@/services/persons';
@@ -32,6 +39,8 @@ interface PersonSearchSelectProps {
   disabled?: boolean;
   /** Inclui o campo na sequência de Enter do formulário. */
   enterSequence?: boolean;
+  /** Abre o cadastro de pessoa e seleciona quem for gravado. */
+  allowCreate?: boolean;
 }
 
 export function PersonSearchSelect({
@@ -43,6 +52,7 @@ export function PersonSearchSelect({
   required = false,
   disabled = false,
   enterSequence = false,
+  allowCreate = false,
 }: PersonSearchSelectProps) {
   const types = Array.isArray(type) ? type : [type];
   const listId = useId();
@@ -55,6 +65,7 @@ export function PersonSearchSelect({
   const [selectedLabel, setSelectedLabel] = useState('');
   const [labelPending, setLabelPending] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchText.trim()), 400);
@@ -321,11 +332,44 @@ export function PersonSearchSelect({
             </p>
           )}
         </div>
-          <p className="border-t border-zinc-100 px-3 py-1.5 text-xs text-zinc-400">
-            ↑ ↓ navega · Enter seleciona
-          </p>
+          <div className="flex items-center justify-between gap-2 border-t border-zinc-100 px-3 py-1.5">
+            <p className="text-xs text-zinc-400">↑ ↓ navega · Enter seleciona</p>
+            {allowCreate ? (
+              <button
+                type="button"
+                className="text-xs font-medium text-zinc-900 hover:underline"
+                onClick={() => {
+                  setOpen(false);
+                  setCreating(true);
+                }}
+              >
+                Incluir pessoa
+              </button>
+            ) : null}
+          </div>
         </div>
       )}
+      <Dialog open={creating} onOpenChange={setCreating}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Cadastrar nova pessoa</DialogTitle>
+          </DialogHeader>
+          <FormPerson
+            key={creating ? search.trim() : 'closed'}
+            initialName={/[a-z]/i.test(search) ? search : ''}
+            createAs={{
+              isClient: types.includes('cliente'),
+              isSupplier: types.includes('fornecedor'),
+              isEmployee: types.includes('colaborador'),
+              isFinancialInstitution: types.includes('instituicao'),
+            }}
+            onPersisted={(person) => {
+              pick(person);
+              setCreating(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

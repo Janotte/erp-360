@@ -967,6 +967,7 @@ export function FormServiceOrder() {
               placeholder="Buscar cliente ativo..."
               disabled={locked}
               enterSequence
+              allowCreate
             />
           </div>
           <div className="col-span-6 space-y-1.5 md:col-span-2">
