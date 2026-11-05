@@ -1,6 +1,6 @@
 import { formatTaxId, parsePersonKind } from '@erp-360/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronRight, ChevronsUpDown, Search, X } from 'lucide-react';
+import { Check, ChevronRight, ChevronsUpDown, Plus, Search, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 
 import { FormPerson } from '@/components/Persons/FormPerson';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -66,6 +67,7 @@ export function PersonSearchSelect({
   const [labelPending, setLabelPending] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [creating, setCreating] = useState(false);
+  const [createdPerson, setCreatedPerson] = useState<Person | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchText.trim()), 400);
@@ -145,6 +147,18 @@ export function PersonSearchSelect({
     setOpen(false);
   };
 
+  const closeCreate = (person: Person | null = createdPerson) => {
+    if (person) pick(person);
+    setCreatedPerson(null);
+    setCreating(false);
+  };
+
+  const startCreate = () => {
+    setOpen(false);
+    setCreatedPerson(null);
+    setCreating(true);
+  };
+
   const clear = () => {
     onChange('');
     setSelectedLabel('');
@@ -216,13 +230,34 @@ export function PersonSearchSelect({
     );
   }
 
+  const createButton = allowCreate ? (
+    <button
+      type="button"
+      className="flex w-9 shrink-0 items-center justify-center border-l border-input text-zinc-700 hover:bg-zinc-50"
+      aria-label="Incluir pessoa"
+      title="Incluir pessoa"
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={startCreate}
+    >
+      <Plus className="h-4 w-4" />
+    </button>
+  ) : null;
+
   return (
     <div ref={rootRef} className="relative">
       {value && !open ? (
-        <div className="flex h-9 items-center gap-1 rounded-md border border-input bg-transparent px-2 shadow-sm">
+        <div
+          className={cn(
+            'flex h-9 rounded-md border border-input bg-transparent shadow-sm',
+            allowCreate ? 'overflow-hidden' : 'items-center gap-1 px-2',
+          )}
+        >
           <button
             type="button"
-            className="flex min-w-0 flex-1 items-center gap-2 px-1 text-left text-sm"
+            className={cn(
+              'flex min-w-0 flex-1 items-center gap-2 text-left text-sm',
+              allowCreate ? 'h-full px-3' : 'px-1',
+            )}
             data-enter-sequence={enterSequence ? '' : undefined}
             onClick={() => {
               setSearchText('');
@@ -248,6 +283,31 @@ export function PersonSearchSelect({
               <X className="h-4 w-4" />
             </Button>
           )}
+          {createButton}
+        </div>
+      ) : allowCreate ? (
+        <div className="flex h-9 overflow-hidden rounded-md border border-input bg-transparent shadow-sm focus-within:ring-1 focus-within:ring-ring">
+          <Search className="pointer-events-none my-auto ml-2.5 h-4 w-4 shrink-0 text-zinc-400" />
+          <Input
+            ref={inputRef}
+            value={searchText}
+            placeholder={placeholder}
+            className="h-full w-auto min-w-0 flex-1 rounded-none border-0 px-2 shadow-none focus-visible:ring-0"
+            required={required && !value}
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={listId}
+            aria-activedescendant={highlighted >= 0 ? `${listId}-option-${highlighted}` : undefined}
+            autoComplete="off"
+            data-enter-sequence={enterSequence ? '' : undefined}
+            onFocus={() => setOpen(true)}
+            onChange={(e) => {
+              setSearchText(e.target.value);
+              setOpen(true);
+            }}
+            onKeyDown={onSearchKeyDown}
+          />
+          {createButton}
         </div>
       ) : (
         <div className="relative">
@@ -332,42 +392,56 @@ export function PersonSearchSelect({
             </p>
           )}
         </div>
-          <div className="flex items-center justify-between gap-2 border-t border-zinc-100 px-3 py-1.5">
+          <div className="border-t border-zinc-100 px-3 py-1.5">
             <p className="text-xs text-zinc-400">↑ ↓ navega · Enter seleciona</p>
-            {allowCreate ? (
-              <button
-                type="button"
-                className="text-xs font-medium text-zinc-900 hover:underline"
-                onClick={() => {
-                  setOpen(false);
-                  setCreating(true);
-                }}
-              >
-                Incluir pessoa
-              </button>
-            ) : null}
           </div>
         </div>
       )}
-      <Dialog open={creating} onOpenChange={setCreating}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+      <Dialog
+        open={creating}
+        onOpenChange={(open) => {
+          if (open) {
+            setCreating(true);
+            return;
+          }
+          closeCreate();
+        }}
+      >
+        <DialogContent className="flex max-h-[90vh] flex-col gap-4 overflow-hidden sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Cadastrar nova pessoa</DialogTitle>
+            <DialogTitle>
+              {createdPerson ? 'Completar cadastro' : 'Cadastrar nova pessoa'}
+            </DialogTitle>
+            <DialogDescription>
+              {createdPerson
+                ? 'Inclua endereço e contato. Depois volte para a ordem.'
+                : 'Salve a pessoa para liberar endereço e contato antes de voltar à ordem.'}
+            </DialogDescription>
           </DialogHeader>
-          <FormPerson
-            key={creating ? search.trim() : 'closed'}
-            initialName={/[a-z]/i.test(search) ? search : ''}
-            createAs={{
-              isClient: types.includes('cliente'),
-              isSupplier: types.includes('fornecedor'),
-              isEmployee: types.includes('colaborador'),
-              isFinancialInstitution: types.includes('instituicao'),
-            }}
-            onPersisted={(person) => {
-              pick(person);
-              setCreating(false);
-            }}
-          />
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            <FormPerson
+              key={creating ? search.trim() || 'new' : 'closed'}
+              initialName={/[a-z]/i.test(search) ? search : ''}
+              stayAfterCreate
+              createAs={{
+                isClient: types.includes('cliente'),
+                isSupplier: types.includes('fornecedor'),
+                isEmployee: types.includes('colaborador'),
+                isFinancialInstitution: types.includes('instituicao'),
+              }}
+              onPersisted={(person) => {
+                setCreatedPerson(person);
+                setSelectedLabel(person.name);
+              }}
+            />
+          </div>
+          {createdPerson ? (
+            <div className="flex justify-end border-t border-zinc-200 pt-4">
+              <Button type="button" onClick={() => closeCreate(createdPerson)}>
+                Voltar para a ordem
+              </Button>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

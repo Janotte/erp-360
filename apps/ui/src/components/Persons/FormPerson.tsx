@@ -76,6 +76,8 @@ interface FormPersonProps {
   personToUpdate?: Person | null;
   onPersisted?: (person: Person) => void;
   initialName?: string;
+  /** Após o primeiro salvamento, rola até endereço e contato em vez de encerrar o cadastro. */
+  stayAfterCreate?: boolean;
   createAs?: {
     isClient?: boolean;
     isSupplier?: boolean;
@@ -84,8 +86,15 @@ interface FormPersonProps {
   };
 }
 
-export function FormPerson({ personToUpdate, onPersisted, initialName = '', createAs }: FormPersonProps) {
+export function FormPerson({
+  personToUpdate,
+  onPersisted,
+  initialName = '',
+  stayAfterCreate = false,
+  createAs,
+}: FormPersonProps) {
   const queryClient = useQueryClient();
+  const detailsRef = useRef<HTMLDivElement>(null);
   const [personId, setPersonId] = useState(personToUpdate?.id);
   const [personKind, setPersonKind] = useState<PersonKind>('individual');
   const [name, setName] = useState(initialName);
@@ -198,8 +207,17 @@ export function FormPerson({ personToUpdate, onPersisted, initialName = '', crea
 
       onPersisted?.(saved);
       toast.success(
-        created ? 'Pessoa cadastrada com sucesso!' : 'Pessoa atualizada com sucesso!',
+        created
+          ? stayAfterCreate
+            ? 'Pessoa cadastrada. Inclua endereço e contato antes de voltar.'
+            : 'Pessoa cadastrada com sucesso!'
+          : 'Pessoa atualizada com sucesso!',
       );
+      if (created && stayAfterCreate) {
+        requestAnimationFrame(() => {
+          detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
     },
     onError: (error) => {
       toast.error(`Falha ao salvar: ${error.message || 'Erro inesperado'}`);
@@ -560,14 +578,22 @@ export function FormPerson({ personToUpdate, onPersisted, initialName = '', crea
         ) : null}
 
         <Button type="submit" className="w-full mt-4" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Salvando...' : 'Salvar'}
+          {mutation.isPending
+            ? 'Salvando...'
+            : stayAfterCreate
+              ? personId
+                ? 'Salvar alterações'
+                : 'Salvar pessoa'
+              : 'Salvar'}
         </Button>
       </form>
 
-      <Separator />
-      <PersonAddresses personId={personId} />
-      <Separator />
-      <PersonContacts personId={personId} />
+      <div ref={detailsRef} className="space-y-6">
+        <Separator />
+        <PersonAddresses personId={personId} />
+        <Separator />
+        <PersonContacts personId={personId} />
+      </div>
     </div>
   );
 }
