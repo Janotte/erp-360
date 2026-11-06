@@ -10,10 +10,11 @@ import {
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FormEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -156,10 +157,15 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
     queryFn: () => itemsService.get(itemId!),
   });
 
-  const { data: categories = [] } = useQuery({
+  const categoriesQuery = useQuery({
     queryKey: ['categories', 'options', null],
     queryFn: () => categoriesService.options(),
   });
+  const categories = categoriesQuery.data ?? [];
+  const categoryOptions = useMemo(
+    () => categories.map((category) => ({ id: category.id, label: category.path })),
+    [categories],
+  );
 
   const { data: measureOptions = [], isLoading: measuresLoading } = useQuery({
     queryKey: ['measures', 'options', type],
@@ -377,22 +383,18 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
             ))}
           </select>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1" data-item-field>
           <Label htmlFor="itemCategory">Categoria</Label>
-          <select
+          <CatalogSearchSelect
             id="itemCategory"
-            data-item-field
             value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
-            className={selectClassName}
-          >
-            <option value="">Nenhuma</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.path}
-              </option>
-            ))}
-          </select>
+            onChange={setCategoryId}
+            options={categoryOptions}
+            placeholder="Buscar categoria..."
+            emptyMessage="Nenhuma categoria cadastrada."
+            allowClear
+            isLoading={categoriesQuery.isLoading}
+          />
         </div>
       </div>
 
