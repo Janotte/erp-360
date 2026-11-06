@@ -17,16 +17,14 @@ import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 
-import { FormPerson } from '@/components/Persons/FormPerson';
 import { PersonSearchSelect } from '@/components/Persons/PersonSearchSelect';
 import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { type CatalogItem, itemsService } from '@/services/items';
 import { paymentMethodsService } from '@/services/paymentMethods';
-import { type Person, personsService } from '@/services/persons';
+import { personsService } from '@/services/persons';
 import {
   type ServiceOrderAttendance,
   type ServiceOrderDetail,
@@ -535,10 +533,7 @@ export function FormServiceOrder() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const createdId = useRef<string | null>(null);
-  const linkedPersonId = useRef<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [registerPersonOpen, setRegisterPersonOpen] = useState(false);
-  const [registerPersonKey, setRegisterPersonKey] = useState(0);
   const [productPicker, setProductPicker] = useState(0);
   const [servicePicker, setServicePicker] = useState(0);
   const [allocationMethodId, setAllocationMethodId] = useState('');
@@ -812,24 +807,6 @@ export function FormServiceOrder() {
     );
   }
 
-  function openPersonRegistration() {
-    linkedPersonId.current = null;
-    setRegisterPersonKey((current) => current + 1);
-    setRegisterPersonOpen(true);
-  }
-
-  function onPersonRegistered(person: Person) {
-    linkedPersonId.current = person.id;
-  }
-
-  function onRegisterPersonOpenChange(open: boolean) {
-    setRegisterPersonOpen(open);
-    if (open) return;
-    const personId = linkedPersonId.current;
-    linkedPersonId.current = null;
-    if (personId) void choosePerson(personId);
-  }
-
   async function choosePerson(personId: string) {
     patch({ personId });
     if (!personId) return;
@@ -912,10 +889,12 @@ export function FormServiceOrder() {
     return true;
   }
 
-  function submit(status: ServiceOrderStatus) {
+  function submit(status: ServiceOrderStatus, backToList = false) {
     if (!canSubmit(status)) return;
     save.mutate(status, {
-      onSuccess: () => navigate('/service-orders'),
+      onSuccess: () => {
+        if (backToList) navigate('/service-orders');
+      },
     });
   }
 
@@ -961,7 +940,7 @@ export function FormServiceOrder() {
       onKeyDown={onEnterSequence}
       onSubmit={(event) => {
         event.preventDefault();
-        submit(draft.status);
+        submit(draft.status, true);
       }}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -991,20 +970,8 @@ export function FormServiceOrder() {
               placeholder="Buscar cliente ativo..."
               disabled={locked}
               enterSequence
-              onCreate={locked ? undefined : openPersonRegistration}
+              allowCreate={!locked}
             />
-            <Dialog open={registerPersonOpen} onOpenChange={onRegisterPersonOpenChange}>
-              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>Cadastrar Nova Pessoa</DialogTitle>
-                </DialogHeader>
-                <FormPerson
-                  key={registerPersonKey}
-                  defaultClient
-                  onPersisted={onPersonRegistered}
-                />
-              </DialogContent>
-            </Dialog>
           </div>
           <div className="col-span-6 space-y-1.5 md:col-span-2">
             <Label htmlFor="service-order-attendance">Tipo de atendimento</Label>

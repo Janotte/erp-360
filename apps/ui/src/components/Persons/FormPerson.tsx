@@ -75,19 +75,29 @@ function taxIdMaxLength(kind: PersonKind) {
 interface FormPersonProps {
   personToUpdate?: Person | null;
   onPersisted?: (person: Person) => void;
-  /** Marca o perfil de cliente ao abrir um cadastro novo. */
-  defaultClient?: boolean;
+  initialName?: string;
+  /** Após o primeiro salvamento, rola até endereço e contato em vez de encerrar o cadastro. */
+  stayAfterCreate?: boolean;
+  createAs?: {
+    isClient?: boolean;
+    isSupplier?: boolean;
+    isEmployee?: boolean;
+    isFinancialInstitution?: boolean;
+  };
 }
 
 export function FormPerson({
   personToUpdate,
   onPersisted,
-  defaultClient = false,
+  initialName = '',
+  stayAfterCreate = false,
+  createAs,
 }: FormPersonProps) {
   const queryClient = useQueryClient();
+  const detailsRef = useRef<HTMLDivElement>(null);
   const [personId, setPersonId] = useState(personToUpdate?.id);
   const [personKind, setPersonKind] = useState<PersonKind>('individual');
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initialName);
   const [preserveNameCasing, setPreserveNameCasing] = useState(false);
   const [taxId, setTaxId] = useState('');
   const [taxIdError, setTaxIdError] = useState('');
@@ -100,10 +110,12 @@ export function FormPerson({
   const [isRuralProducer, setIsRuralProducer] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [isVisible, setIsVisible] = useState(true);
-  const [isClient, setIsClient] = useState(defaultClient);
-  const [isSupplier, setIsSupplier] = useState(false);
-  const [isEmployee, setIsEmployee] = useState(false);
-  const [isFinancialInstitution, setIsFinancialInstitution] = useState(false);
+  const [isClient, setIsClient] = useState(Boolean(createAs?.isClient));
+  const [isSupplier, setIsSupplier] = useState(Boolean(createAs?.isSupplier));
+  const [isEmployee, setIsEmployee] = useState(Boolean(createAs?.isEmployee));
+  const [isFinancialInstitution, setIsFinancialInstitution] = useState(
+    Boolean(createAs?.isFinancialInstitution),
+  );
   const [pendingAddress, setPendingAddress] = useState<CnpjLookupAddress | null>(null);
   const pendingAddressRef = useRef<CnpjLookupAddress | null>(null);
   pendingAddressRef.current = pendingAddress;
@@ -195,8 +207,17 @@ export function FormPerson({
 
       onPersisted?.(saved);
       toast.success(
-        created ? 'Pessoa cadastrada com sucesso!' : 'Pessoa atualizada com sucesso!',
+        created
+          ? stayAfterCreate
+            ? 'Pessoa cadastrada. Inclua endereço e contato antes de voltar.'
+            : 'Pessoa cadastrada com sucesso!'
+          : 'Pessoa atualizada com sucesso!',
       );
+      if (created && stayAfterCreate) {
+        requestAnimationFrame(() => {
+          detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
     },
     onError: (error) => {
       toast.error(`Falha ao salvar: ${error.message || 'Erro inesperado'}`);
@@ -557,14 +578,22 @@ export function FormPerson({
         ) : null}
 
         <Button type="submit" className="w-full mt-4" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Salvando...' : 'Salvar'}
+          {mutation.isPending
+            ? 'Salvando...'
+            : stayAfterCreate
+              ? personId
+                ? 'Salvar alterações'
+                : 'Salvar pessoa'
+              : 'Salvar'}
         </Button>
       </form>
 
-      <Separator />
-      <PersonAddresses personId={personId} />
-      <Separator />
-      <PersonContacts personId={personId} />
+      <div ref={detailsRef} className="space-y-6">
+        <Separator />
+        <PersonAddresses personId={personId} />
+        <Separator />
+        <PersonContacts personId={personId} />
+      </div>
     </div>
   );
 }

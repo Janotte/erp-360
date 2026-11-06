@@ -6,6 +6,10 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { CatalogOption } from '@/services/financials';
 
+function fold(value: string) {
+  return value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase('pt-BR');
+}
+
 interface CatalogSearchSelectProps {
   value: string;
   onChange: (id: string) => void;
@@ -16,6 +20,7 @@ interface CatalogSearchSelectProps {
   required?: boolean;
   isLoading?: boolean;
   disabled?: boolean;
+  id?: string;
 }
 
 export function CatalogSearchSelect({
@@ -28,6 +33,7 @@ export function CatalogSearchSelect({
   required = false,
   isLoading = false,
   disabled = false,
+  id,
 }: CatalogSearchSelectProps) {
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -55,9 +61,9 @@ export function CatalogSearchSelect({
   }, []);
 
   const results = useMemo(() => {
-    const term = searchText.trim().toLowerCase();
+    const term = fold(searchText.trim());
     if (!term) return options;
-    return options.filter((item) => item.label.toLowerCase().includes(term));
+    return options.filter((item) => fold(item.label).includes(term));
   }, [options, searchText]);
 
   const pick = (item: CatalogOption) => {
@@ -87,6 +93,7 @@ export function CatalogSearchSelect({
         <div className="flex h-9 items-center gap-1 rounded-md border border-input bg-transparent px-2 shadow-sm">
           <button
             type="button"
+            id={id}
             className="flex min-w-0 flex-1 items-center gap-2 px-1 text-left text-sm"
             onClick={() => setOpen(true)}
           >
@@ -110,6 +117,7 @@ export function CatalogSearchSelect({
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
           <Input
+            id={id}
             value={searchText}
             placeholder={placeholder}
             className="pl-9"
@@ -119,9 +127,26 @@ export function CatalogSearchSelect({
             aria-controls={listId}
             autoComplete="off"
             onFocus={() => setOpen(true)}
+            onBlur={() => {
+              window.setTimeout(() => setOpen(false), 150);
+            }}
             onChange={(e) => {
               setSearchText(e.target.value);
               setOpen(true);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                setOpen(false);
+                return;
+              }
+              if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+              const match = results[0];
+              if (!open || !searchText.trim() || !match) return;
+              event.preventDefault();
+              event.stopPropagation();
+              pick(match);
             }}
           />
         </div>
@@ -146,6 +171,7 @@ export function CatalogSearchSelect({
                   'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-100',
                   item.id === value && 'bg-zinc-50',
                 )}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => pick(item)}
               >
                 <Check

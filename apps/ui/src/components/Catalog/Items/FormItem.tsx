@@ -10,10 +10,11 @@ import {
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FormEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -119,7 +120,9 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
   const [itemId, setItemId] = useState(itemToUpdate?.id);
   const [code, setCode] = useState(itemToUpdate?.code ?? '');
   const [sku, setSku] = useState(itemToUpdate?.sku ?? '');
-  const [name, setName] = useState((itemToUpdate?.name ?? seed?.name ?? '').toUpperCase());
+  const [name, setName] = useState(
+    (itemToUpdate?.name ?? seed?.name ?? '').toLocaleUpperCase('pt-BR'),
+  );
   const [type, setType] = useState<CatalogItemType>(itemToUpdate?.type ?? 'product');
   const [fiscalItemType, setFiscalItemType] = useState<FiscalItemType>(
     itemToUpdate?.fiscalItemType ?? 'resale',
@@ -128,7 +131,7 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
   const [categoryId, setCategoryId] = useState(itemToUpdate?.categoryId ?? '');
   const [measureId, setMeasureId] = useState(itemToUpdate?.measureId ?? '');
   const [description, setDescription] = useState(
-    itemToUpdate?.description ?? seed?.description ?? '',
+    (itemToUpdate?.description ?? seed?.description ?? '').toLocaleUpperCase('pt-BR'),
   );
   const [barcode, setBarcode] = useState(itemToUpdate?.barcode ?? seed?.barcode ?? '');
   const [listPrice, setListPrice] = useState(formatListPrice(itemToUpdate?.listPrice));
@@ -154,10 +157,15 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
     queryFn: () => itemsService.get(itemId!),
   });
 
-  const { data: categories = [] } = useQuery({
+  const categoriesQuery = useQuery({
     queryKey: ['categories', 'options', null],
     queryFn: () => categoriesService.options(),
   });
+  const categories = categoriesQuery.data ?? [];
+  const categoryOptions = useMemo(
+    () => categories.map((category) => ({ id: category.id, label: category.path })),
+    [categories],
+  );
 
   const { data: measureOptions = [], isLoading: measuresLoading } = useQuery({
     queryKey: ['measures', 'options', type],
@@ -180,13 +188,13 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
     const item = { ...itemToUpdate, ...loaded };
     setCode(item.code ?? '');
     setSku(item.sku ?? '');
-    setName((item.name ?? '').toUpperCase());
+    setName((item.name ?? '').toLocaleUpperCase('pt-BR'));
     setType(item.type === 'service' ? 'service' : 'product');
     setFiscalItemType(parseFiscalType(item.fiscalItemType ?? 'resale'));
     setTracksStock(item.tracksStock !== false);
     setCategoryId(item.categoryId ?? '');
     setMeasureId(item.measureId ?? '');
-    setDescription(item.description ?? '');
+    setDescription((item.description ?? '').toLocaleUpperCase('pt-BR'));
     setBarcode(item.barcode ?? '');
     setListPrice(formatListPrice(item.listPrice));
     setGrossMargin(formatPercent(item.grossMargin));
@@ -337,7 +345,7 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
           value={name}
           maxLength={120}
           className="uppercase"
-          onChange={(event) => setName(event.target.value.toUpperCase())}
+          onChange={(event) => setName(event.target.value.toLocaleUpperCase('pt-BR'))}
           required
         />
       </div>
@@ -376,22 +384,18 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
             ))}
           </select>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1" data-item-field>
           <Label htmlFor="itemCategory">Categoria</Label>
-          <select
+          <CatalogSearchSelect
             id="itemCategory"
-            data-item-field
             value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
-            className={selectClassName}
-          >
-            <option value="">Nenhuma</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.path}
-              </option>
-            ))}
-          </select>
+            onChange={setCategoryId}
+            options={categoryOptions}
+            placeholder="Buscar categoria..."
+            emptyMessage="Nenhuma categoria cadastrada."
+            allowClear
+            isLoading={categoriesQuery.isLoading}
+          />
         </div>
       </div>
 
@@ -473,7 +477,9 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
           value={description}
           maxLength={2000}
           rows={2}
-          onChange={(event) => setDescription(event.target.value)}
+          onChange={(event) =>
+            setDescription(event.target.value.toLocaleUpperCase('pt-BR'))
+          }
           className="flex min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
       </div>
