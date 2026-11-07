@@ -15,6 +15,7 @@ import {
   Package,
   PackagePlus,
   Ruler,
+  ScrollText,
   Settings,
   Users,
   Wallet,
@@ -55,6 +56,7 @@ const itensMenu: ItemMenu[] = [
   { title: 'Dashboard', icon: LayoutDashboard, url: '/dashboard' },
   { title: 'Pessoas', icon: Users, url: '/persons' },
   { title: 'Ordens de serviço', icon: ClipboardList, url: '/service-orders' },
+  { title: 'Contratos', icon: ScrollText, url: '/contracts' },
   {
     title: 'Catálogo',
     icon: Package,
@@ -178,9 +180,8 @@ export function AppSidebar() {
                       asChild
                       tooltip={item.title}
                       isActive={
-                        item.url === '/service-orders'
-                          ? pathAtivo === '/service-orders' ||
-                            pathAtivo.startsWith('/service-orders/')
+                        item.url === '/service-orders' || item.url === '/contracts'
+                          ? pathAtivo === item.url || pathAtivo.startsWith(`${item.url}/`)
                           : pathAtivo === item.url
                       }
                     >

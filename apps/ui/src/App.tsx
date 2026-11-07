@@ -18,6 +18,8 @@ import { Register } from './components/Auth/Register';
 import { ListCategories } from './components/Catalog/Categories/ListCategories';
 import { ListItems } from './components/Catalog/Items/ListItems';
 import { ListMeasures } from './components/Catalog/Measures/ListMeasures';
+import { FormContract } from './components/Contracts/FormContract';
+import { ListContracts } from './components/Contracts/ListContracts';
 import { Dashboard } from './components/Dashboard';
 import { ListBankAccounts } from './components/Financial/BankAccounts/ListBankAccounts';
 import { ListCashBook } from './components/Financial/CashBook/ListCashBook';
@@ -57,6 +59,7 @@ const rotasPorHash: Record<string, string> = {
   '#inbound-setup': '/inbound/setup',
   '#settings': '/settings',
   '#service-orders': '/service-orders',
+  '#contracts': '/contracts',
 };
 
 function destinoDoHash(hash: string, autenticado: boolean) {
@@ -270,6 +273,30 @@ function App() {
               element={
                 <Pagina>
                   <InboundSetupPage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/contracts"
+              element={
+                <Pagina>
+                  <ListContracts />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/contracts/new"
+              element={
+                <Pagina>
+                  <FormContract />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/contracts/:id"
+              element={
+                <Pagina>
+                  <FormContract />
                 </Pagina>
               }
             />
