@@ -55,7 +55,7 @@ function formatDate(value: string | null) {
 
 function termLabel(row: ContractListItem) {
   const start = formatDate(row.startedOn);
-  if (!row.endedOn) return start;
+  if (!row.endedOn) return `${start} · indeterminado`;
   return `${start} – ${formatDate(row.endedOn)}`;
 }
 

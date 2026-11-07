@@ -115,7 +115,6 @@ export const contracts = pgTable(
         ${table.billingKind} <> 'none'
         and ${table.periodAmount} > 0
         and ${table.dueDay} between 1 and 28
-        and ${table.endedOn} is not null
         and ${table.billingCompetence} is not null
       )`,
     ),

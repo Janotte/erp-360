@@ -82,21 +82,17 @@ export function assertBilling(input: ContractBilling) {
   }
   if (
     input.dueDay === null ||
-    input.endedOn === null ||
     input.billingCompetence === null ||
     !Number.isInteger(input.periodAmount) ||
     input.periodAmount <= 0
   ) {
-    reject('A cobrança recorrente precisa de valor, dia, competência e fim da vigência.');
+    reject('A cobrança recorrente precisa de valor, dia e competência.');
   }
 }
 
-/** Período já cobrado precisa continuar dentro do fim informado. */
+/** Fim vazio segue em aberto. Um fim preenchido não pode deixar período já cobrado de fora. */
 export function assertTermKeepsBilledPeriods(endedOn: string | null, competences: string[]) {
-  if (competences.length === 0) return;
-  if (!endedOn) {
-    reject('A vigência não pode deixar de fora um período que já tem título.');
-  }
+  if (competences.length === 0 || !endedOn) return;
   const end = yearMonth(endedOn);
   for (const competence of competences) {
     if (yearMonth(competence) > end) {

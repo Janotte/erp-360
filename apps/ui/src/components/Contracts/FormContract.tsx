@@ -177,12 +177,12 @@ function toInput(draft: Draft): ContractInput {
 function scheduleOf(draft: Draft) {
   if (draft.billingKind === 'none') return [];
   const dueDay = Number(draft.dueDay);
-  if (!draft.startedOn || !draft.endedOn || !draft.billingCompetence) return [];
+  if (!draft.startedOn || !draft.billingCompetence) return [];
   if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 28) return [];
   try {
     return contractBillingSchedule({
       startedOn: draft.startedOn,
-      endedOn: draft.endedOn,
+      endedOn: draft.endedOn || null,
       billingKind: draft.billingKind,
       billingCompetence: draft.billingCompetence,
       dueDay,
@@ -372,6 +372,7 @@ export function FormContract() {
               disabled={locked}
               onChange={(event) => patch({ endedOn: event.target.value })}
             />
+            <p className="text-xs text-zinc-500">Em branco, o prazo fica indeterminado.</p>
           </div>
           <div className="col-span-12 space-y-1.5 md:col-span-3">
             <Label htmlFor="contract-kind">Cobrança</Label>
@@ -487,14 +488,19 @@ export function FormContract() {
             <p className="text-sm text-zinc-500">Sem cobrança.</p>
           ) : schedule.length === 0 ? (
             <p className="text-sm text-zinc-500">
-              Informe o fim, a competência e o dia para ver a série.
+              Informe a competência e o dia para ver o vencimento.
             </p>
-          ) : (
+          ) : draft.endedOn ? (
             <ul className="grid gap-1 text-sm text-zinc-700 sm:grid-cols-2 lg:grid-cols-3">
               {schedule.map((row) => (
                 <li key={row.competence}>{formatDate(row.dueOn)}</li>
               ))}
             </ul>
+          ) : (
+            <p className="text-sm text-zinc-700">
+              Próximo vencimento: {formatDate(schedule[0].dueOn)}. Sem data de fim, a cobrança
+              segue um período por vez.
+            </p>
           )}
         </div>
 

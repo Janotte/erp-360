@@ -218,14 +218,34 @@ describe('cadastro do contrato', { concurrency: false }, () => {
     assert.equal(foreign.statusCode, 400);
   });
 
-  it('recusa mensal sem fim e sem cobrança com valor', async () => {
-    const missingEnd = await create(monthlyBody({ endedOn: null }));
-    assert.equal(missingEnd.statusCode, 400);
+  it('aceita mensal sem fim e recusa sem cobrança com valor', async () => {
+    const openRecurring = await open(
+      monthlyBody({ title: 'Já vencido', startedOn: '2024-01-15', endedOn: null }),
+    );
+    assert.equal(openRecurring.endedOn, null);
+    assert.equal(openRecurring.termExpired, false);
+    assert.deepEqual(openRecurring.schedule, [
+      { competence: '2024-01-01', dueOn: '2024-01-20' },
+    ]);
     const priced = await create(noneBody({ periodAmount: 100 }));
     assert.equal(priced.statusCode, 400);
     const openEnded = await open(noneBody());
     assert.equal(openEnded.endedOn, null);
     assert.deepEqual(openEnded.schedule, []);
+  });
+
+  it('apaga o fim de um mensal vigente e passa a mostrar só o próximo vencimento', async () => {
+    const draft = await open(monthlyBody({ title: 'Fica aberto' }));
+    const cleared = await update(draft.id, {
+      ...monthlyBody({ title: 'Fica aberto', endedOn: null }),
+      status: 'active',
+      suspensionReason: null,
+    });
+    assert.equal(cleared.statusCode, 200, cleared.body);
+    const active = cleared.json() as ContractDetail;
+    assert.equal(active.endedOn, null);
+    assert.equal(active.termExpired, false);
+    assert.deepEqual(active.schedule, [{ competence: '2026-11-01', dueOn: '2026-11-20' }]);
   });
 
   it('ativa o mensal e mostra os doze vencimentos', async () => {

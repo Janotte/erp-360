@@ -170,7 +170,6 @@ async function assertPaymentMethod(tenantId: string, paymentMethodId: string) {
 function scheduleFor(billing: ContractBilling) {
   if (
     billing.billingKind === 'none' ||
-    !billing.endedOn ||
     !billing.billingCompetence ||
     billing.dueDay === null
   ) {

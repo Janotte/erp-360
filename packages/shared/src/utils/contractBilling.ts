@@ -48,35 +48,55 @@ function monthIndex(year: number, month: number) {
   return year * 12 + month;
 }
 
-/** Série inteira de vencimentos, alinhada ao mês de início e limitada ao mês do fim. */
+function installmentAt(
+  cursor: { year: number; month: number },
+  span: number,
+  billingCompetence: ContractBillingCompetence,
+  dueDay: number,
+): ContractInstallment {
+  const due =
+    billingCompetence === 'current' ? cursor : shiftMonth(cursor.year, cursor.month, span);
+  return {
+    competence: civilDate(cursor.year, cursor.month, 1),
+    dueOn: civilDate(due.year, due.month, dueDay),
+  };
+}
+
+/**
+ * Série de vencimentos, alinhada ao mês de início.
+ * Com fim, inclui cada período até o mês do fim. Sem fim, devolve só o próximo
+ * período que ainda não foi cobrado; se nenhum foi, o primeiro.
+ */
 export function contractBillingSchedule(input: {
   startedOn: string;
-  endedOn: string;
+  endedOn: string | null;
   billingKind: ContractBillingKind;
   billingCompetence: ContractBillingCompetence;
   dueDay: number;
+  billedCompetences?: readonly string[];
 }): ContractInstallment[] {
   if (!Number.isInteger(input.dueDay) || input.dueDay < 1 || input.dueDay > 28) {
     throw new Error('O dia de vencimento vai de 1 a 28.');
   }
   const start = parseCivilDate(input.startedOn);
-  const end = parseCivilDate(input.endedOn);
   const span = monthsByKind[input.billingKind];
-  const endIndex = monthIndex(end.year, end.month);
-  const rows: ContractInstallment[] = [];
   let cursor = { year: start.year, month: start.month };
 
-  while (monthIndex(cursor.year, cursor.month) <= endIndex) {
-    const due =
-      input.billingCompetence === 'current'
-        ? cursor
-        : shiftMonth(cursor.year, cursor.month, span);
-    rows.push({
-      competence: civilDate(cursor.year, cursor.month, 1),
-      dueOn: civilDate(due.year, due.month, input.dueDay),
-    });
-    cursor = shiftMonth(cursor.year, cursor.month, span);
+  if (input.endedOn === null) {
+    const billed = new Set(input.billedCompetences ?? []);
+    for (;;) {
+      const row = installmentAt(cursor, span, input.billingCompetence, input.dueDay);
+      if (!billed.has(row.competence)) return [row];
+      cursor = shiftMonth(cursor.year, cursor.month, span);
+    }
   }
 
+  const end = parseCivilDate(input.endedOn);
+  const endIndex = monthIndex(end.year, end.month);
+  const rows: ContractInstallment[] = [];
+  while (monthIndex(cursor.year, cursor.month) <= endIndex) {
+    rows.push(installmentAt(cursor, span, input.billingCompetence, input.dueDay));
+    cursor = shiftMonth(cursor.year, cursor.month, span);
+  }
   return rows;
 }

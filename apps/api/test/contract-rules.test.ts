@@ -135,6 +135,40 @@ describe('série de vencimentos', () => {
       [{ competence: '2026-11-01', dueOn: '2026-12-20' }],
     );
   });
+
+  it('sem fim devolve só o próximo período ainda não cobrado', () => {
+    assert.deepEqual(
+      contractBillingSchedule({
+        startedOn: '2026-11-01',
+        endedOn: null,
+        billingKind: 'monthly',
+        billingCompetence: 'current',
+        dueDay: 20,
+      }),
+      [{ competence: '2026-11-01', dueOn: '2026-11-20' }],
+    );
+    assert.deepEqual(
+      contractBillingSchedule({
+        startedOn: '2026-11-01',
+        endedOn: null,
+        billingKind: 'monthly',
+        billingCompetence: 'current',
+        dueDay: 20,
+        billedCompetences: ['2026-11-01', '2026-12-01'],
+      }),
+      [{ competence: '2027-01-01', dueOn: '2027-01-20' }],
+    );
+    assert.deepEqual(
+      contractBillingSchedule({
+        startedOn: '2026-11-01',
+        endedOn: null,
+        billingKind: 'quarterly',
+        billingCompetence: 'previous',
+        dueDay: 20,
+      }),
+      [{ competence: '2026-11-01', dueOn: '2027-02-20' }],
+    );
+  });
 });
 
 describe('número e situação do contrato', () => {
@@ -181,6 +215,16 @@ describe('cobrança do contrato', () => {
         dueDay: 20,
       }),
     );
+    assert.doesNotThrow(() =>
+      assertBilling({
+        startedOn: '2024-01-15',
+        endedOn: null,
+        billingKind: 'monthly',
+        billingCompetence: 'current',
+        periodAmount: 30_000,
+        dueDay: 20,
+      }),
+    );
   });
 
   it('recusa recorrente incompleta, dia 29, valor zero e sem cobrança com valor', () => {
@@ -194,9 +238,8 @@ describe('cobrança do contrato', () => {
     };
     refused(
       () => assertBilling({ ...monthly, dueDay: null }),
-      'A cobrança recorrente precisa de valor, dia, competência e fim da vigência.',
+      'A cobrança recorrente precisa de valor, dia e competência.',
     );
-    refused(() => assertBilling({ ...monthly, endedOn: null }));
     refused(() => assertBilling({ ...monthly, billingCompetence: null }));
     refused(
       () => assertBilling({ ...monthly, dueDay: 29 }),
@@ -224,7 +267,7 @@ describe('cobrança do contrato', () => {
   it('recusa encurtar a vigência até deixar um período já cobrado de fora', () => {
     refused(() => assertTermKeepsBilledPeriods('2026-10-31', ['2026-11-01']));
     assert.doesNotThrow(() => assertTermKeepsBilledPeriods('2026-11-30', ['2026-11-01']));
-    refused(() => assertTermKeepsBilledPeriods(null, ['2026-11-01']));
+    assert.doesNotThrow(() => assertTermKeepsBilledPeriods(null, ['2026-11-01']));
     assert.doesNotThrow(() => assertTermKeepsBilledPeriods(null, []));
     assert.doesNotThrow(() => assertTermKeepsBilledPeriods('2026-11-30', []));
   });

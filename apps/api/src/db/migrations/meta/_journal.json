@@ -379,6 +379,13 @@
       "when": 1794057219313,
       "tag": "0053_deep_darwin",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1794081943787,
+      "tag": "0054_contract_open_ended",
+      "breakpoints": true
     }
   ]
 }
