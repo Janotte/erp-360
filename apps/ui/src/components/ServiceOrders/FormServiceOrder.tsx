@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { contractsService } from '@/services/contracts';
 import { type CatalogItem, itemsService } from '@/services/items';
 import { paymentMethodsService } from '@/services/paymentMethods';
 import { personsService } from '@/services/persons';
@@ -111,6 +112,7 @@ type Draft = {
   attendance: ServiceOrderAttendance;
   location: ServiceOrderLocation;
   originOrderId: string;
+  contractId: string;
   promisedAt: string | null;
   status: ServiceOrderStatus;
   internalNotes: string;
@@ -231,21 +233,23 @@ function joinStreetPostal(street: string, postal: string) {
   if (digits.length !== 8) return line.slice(0, 200);
   const cep = formatPostalCode(digits);
   if (!line) return cep;
-  if (onlyDigits(line).endsWith(digits) && /\d{5}-?\d{3}$/.test(line)) return line.slice(0, 200);
+  if (onlyDigits(line).endsWith(digits) && /\d{5}-?\d{3}$/.test(line))
+    return line.slice(0, 200);
   return `${line}, ${cep}`.slice(0, 200);
 }
 
 function focusNextOsField(form: HTMLFormElement, current: HTMLElement) {
-  const fields = Array.from(form.querySelectorAll<HTMLElement>('[data-enter-sequence]')).filter(
-    (field) => !field.hasAttribute('disabled'),
-  );
+  const fields = Array.from(
+    form.querySelectorAll<HTMLElement>('[data-enter-sequence]'),
+  ).filter((field) => !field.hasAttribute('disabled'));
   const index = fields.findIndex((field) => field === current || field.contains(current));
   if (index < 0) return;
   fields[index + 1]?.focus();
 }
 
 function onEnterSequence(event: KeyboardEvent<HTMLFormElement>) {
-  if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.defaultPrevented) return;
+  if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.defaultPrevented)
+    return;
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
   if (target instanceof HTMLTextAreaElement && event.shiftKey) return;
@@ -275,6 +279,7 @@ function emptyDraft(settings: ServiceOrderSettings): Draft {
     attendance: 'walk_in',
     location: 'remote',
     originOrderId: '',
+    contractId: '',
     promisedAt: null,
     status: 'open',
     internalNotes: '',
@@ -317,6 +322,7 @@ function draftFromOrder(order: ServiceOrderDetail): Draft {
     attendance: order.attendance,
     location: order.location,
     originOrderId: order.originOrderId ?? '',
+    contractId: order.contractId ?? '',
     promisedAt: order.promisedAt,
     status: order.status,
     internalNotes: order.internalNotes,
@@ -390,7 +396,8 @@ function orderTotal(draft: Draft) {
     freightAmount,
     discountAmount,
     surchargeAmount,
-    totalAmount: productAmount + serviceAmount + freightAmount - discountAmount + surchargeAmount,
+    totalAmount:
+      productAmount + serviceAmount + freightAmount - discountAmount + surchargeAmount,
   };
 }
 
@@ -403,6 +410,7 @@ function toWrite(draft: Draft, status: ServiceOrderStatus): ServiceOrderWrite {
     originOrderId: needsOrigin(draft.attendance)
       ? emptyToNull(draft.originOrderId)
       : null,
+    contractId: draft.attendance === 'contract' ? emptyToNull(draft.contractId) : null,
     promisedAt: draft.promisedAt,
     status,
     internalNotes: draft.internalNotes,
@@ -457,6 +465,7 @@ function writeFromDetail(
     attendance: order.attendance,
     location: order.location,
     originOrderId: order.originOrderId,
+    contractId: order.contractId ?? null,
     promisedAt: order.promisedAt,
     status: order.status,
     internalNotes,
@@ -572,6 +581,15 @@ export function FormServiceOrder() {
     queryFn: () => serviceOrdersService.list(),
     enabled: draft ? needsOrigin(draft.attendance) : false,
   });
+  const customerContracts = useQuery({
+    queryKey: ['contracts', 'order-link', draft?.personId ?? ''],
+    queryFn: () =>
+      contractsService.list({
+        personId: draft?.personId,
+        status: 'active',
+      }),
+    enabled: Boolean(draft?.personId) && draft?.attendance === 'contract',
+  });
 
   useEffect(() => {
     if (order.data) setDraft(draftFromOrder(order.data));
@@ -602,6 +620,8 @@ export function FormServiceOrder() {
           originOrderId: needsOrigin(draft.attendance)
             ? emptyToNull(draft.originOrderId)
             : null,
+          contractId:
+            draft.attendance === 'contract' ? emptyToNull(draft.contractId) : null,
           promisedAt: draft.promisedAt,
           internalNotes: draft.internalNotes,
         });
@@ -639,13 +659,34 @@ export function FormServiceOrder() {
     return <p className="text-sm text-zinc-500">Carregando a ordem...</p>;
   }
 
+  const activeContracts = customerContracts.data?.data ?? [];
+  const savedContract = order.data;
+  const keepSavedContract = Boolean(
+    savedContract?.contractId &&
+    draft.contractId === savedContract.contractId &&
+    draft.personId === savedContract.personId &&
+    !activeContracts.some((item) => item.id === savedContract.contractId),
+  );
+  const contractOptions =
+    keepSavedContract && savedContract?.contractId
+      ? [
+          ...activeContracts,
+          {
+            id: savedContract.contractId,
+            numberLabel: savedContract.contractNumberLabel ?? '',
+            title: '',
+          },
+        ]
+      : activeContracts;
   const closed = order.data?.status === 'delivered' || order.data?.status === 'cancelled';
   const locked = closed;
   const currentStatus = order.data?.status ?? 'open';
   const destinations = [currentStatus, ...transitions[currentStatus]];
   const canDeliver = transitions[currentStatus].includes('delivered');
   const activeNoteSlots = new Set(
-    (settings.data?.noteLines ?? []).filter((line) => line.isActive).map((line) => line.slot),
+    (settings.data?.noteLines ?? [])
+      .filter((line) => line.isActive)
+      .map((line) => line.slot),
   );
   const visibleNotes = draft.notes.filter(
     (note) => activeNoteSlots.has(note.slot) && note.body.trim(),
@@ -656,7 +697,9 @@ export function FormServiceOrder() {
   const paymentMethods = (methods.data?.data ?? []).filter(
     (method) => method.receiptKind !== 'store_credit',
   );
-  const allocationMethod = paymentMethods.find((method) => method.id === allocationMethodId);
+  const allocationMethod = paymentMethods.find(
+    (method) => method.id === allocationMethodId,
+  );
   const allocationTerms = [...(allocationMethod?.terms ?? [])].sort(
     (left, right) => left.installmentCount - right.installmentCount,
   );
@@ -808,7 +851,15 @@ export function FormServiceOrder() {
   }
 
   async function choosePerson(personId: string) {
-    patch({ personId });
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            personId,
+            contractId: current.personId === personId ? current.contractId : '',
+          }
+        : current,
+    );
     if (!personId) return;
     try {
       const copy = await copyFromPerson(personId);
@@ -868,7 +919,8 @@ export function FormServiceOrder() {
       toast.error('O pagamento passa do total da ordem.');
       return false;
     }
-    const keepsLegacyMethod = draft.payments.length === 0 && Boolean(draft.paymentMethodId);
+    const keepsLegacyMethod =
+      draft.payments.length === 0 && Boolean(draft.paymentMethodId);
     if (keepsLegacyMethod && !draft.paymentInstallments) {
       toast.error('Informe a forma e a quantidade de parcelas.');
       return false;
@@ -985,7 +1037,13 @@ export function FormServiceOrder() {
                 const attendance = event.target.value as ServiceOrderAttendance;
                 patch({
                   attendance,
-                  originOrderId: needsOrigin(attendance) ? draft.originOrderId : '',
+                  originOrderId:
+                    attendance === 'contract'
+                      ? ''
+                      : needsOrigin(attendance)
+                        ? draft.originOrderId
+                        : '',
+                  contractId: attendance === 'contract' ? draft.contractId : '',
                 });
               }}
             >
@@ -1036,6 +1094,30 @@ export function FormServiceOrder() {
                     </option>
                   ))}
               </select>
+            </div>
+          ) : null}
+          {draft.attendance === 'contract' ? (
+            <div className="col-span-12 space-y-1.5 md:col-span-6">
+              <Label htmlFor="service-order-contract">Contrato</Label>
+              <select
+                id="service-order-contract"
+                className={selectClass}
+                value={draft.contractId}
+                disabled={locked || !draft.personId}
+                onChange={(event) => patch({ contractId: event.target.value })}
+              >
+                <option value="">Sem contrato</option>
+                {contractOptions.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.title
+                      ? `${item.numberLabel} — ${item.title}`
+                      : item.numberLabel}
+                  </option>
+                ))}
+              </select>
+              <p className="text-sm text-zinc-500">
+                A cobrança do período não abate os itens desta ordem.
+              </p>
             </div>
           ) : null}
           <div className="col-span-12 space-y-1.5 md:col-span-6">
@@ -1102,7 +1184,9 @@ export function FormServiceOrder() {
               disabled={locked}
               inputMode="numeric"
               maxLength={15}
-              onChange={(customerPhone) => patch({ customerPhone: formatPhone(customerPhone) })}
+              onChange={(customerPhone) =>
+                patch({ customerPhone: formatPhone(customerPhone) })
+              }
             />
             <CopyField
               id="service-order-customer-mobile"
@@ -1369,7 +1453,9 @@ export function FormServiceOrder() {
                         aria-label={`Vencimento de ${row.methodName}`}
                         value={row.dueOn}
                         disabled={locked}
-                        onChange={(event) => patchPayment(row.key, { dueOn: event.target.value })}
+                        onChange={(event) =>
+                          patchPayment(row.key, { dueOn: event.target.value })
+                        }
                       />
                     </td>
                     <td className="py-2 pr-2">

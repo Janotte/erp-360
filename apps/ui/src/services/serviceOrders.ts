@@ -39,8 +39,7 @@ export interface LabelChange {
 }
 
 export type SaveServiceOrderSettingsResult =
-  | { ok: true; settings: ServiceOrderSettings }
-  | { ok: false; change: LabelChange };
+  { ok: true; settings: ServiceOrderSettings } | { ok: false; change: LabelChange };
 
 export type ServiceOrderStatus =
   | 'open'
@@ -124,6 +123,8 @@ export interface ServiceOrderDetail {
   labelFrozenAt: string | null;
   openedByUserId: string;
   originOrderId: string | null;
+  contractId: string | null;
+  contractNumberLabel: string | null;
   personId: string;
   customerName: string;
   customerTaxId: string | null;
@@ -154,6 +155,7 @@ export interface ServiceOrderWrite {
   attendance: ServiceOrderAttendance;
   location: ServiceOrderLocation;
   originOrderId: string | null;
+  contractId: string | null;
   promisedAt: string | null;
   status: ServiceOrderStatus;
   internalNotes: string;
@@ -189,6 +191,7 @@ export interface OpenServiceOrderInput {
   attendance?: ServiceOrderAttendance;
   location?: ServiceOrderLocation;
   originOrderId?: string | null;
+  contractId?: string | null;
   promisedAt?: string | null;
   internalNotes?: string;
 }
@@ -205,8 +208,14 @@ function messageOf(body: Record<string, unknown>, fallback: string): string {
       : fallback;
 }
 
-function isLabelChange(body: Record<string, unknown>): body is { code: 'label_change'; slots: string[] } {
-  return body.code === 'label_change' && Array.isArray(body.slots) && body.slots.every((slot) => typeof slot === 'string');
+function isLabelChange(
+  body: Record<string, unknown>,
+): body is { code: 'label_change'; slots: string[] } {
+  return (
+    body.code === 'label_change' &&
+    Array.isArray(body.slots) &&
+    body.slots.every((slot) => typeof slot === 'string')
+  );
 }
 
 export const serviceOrdersService = {
@@ -217,7 +226,9 @@ export const serviceOrdersService = {
     return body as unknown as ServiceOrderSettings;
   },
 
-  saveSettings: async (input: ServiceOrderSettingsInput): Promise<SaveServiceOrderSettingsResult> => {
+  saveSettings: async (
+    input: ServiceOrderSettingsInput,
+  ): Promise<SaveServiceOrderSettingsResult> => {
     const res = await apiFetch('/settings/service-order', {
       method: 'PUT',
       body: JSON.stringify(input),
@@ -230,7 +241,10 @@ export const serviceOrdersService = {
     return { ok: true, settings: body as unknown as ServiceOrderSettings };
   },
 
-  list: async (filters?: { q?: string; status?: ServiceOrderStatus }): Promise<{ data: ServiceOrderListItem[] }> => {
+  list: async (filters?: {
+    q?: string;
+    status?: ServiceOrderStatus;
+  }): Promise<{ data: ServiceOrderListItem[] }> => {
     const params = new URLSearchParams();
     if (filters?.q) params.set('q', filters.q);
     if (filters?.status) params.set('status', filters.status);
