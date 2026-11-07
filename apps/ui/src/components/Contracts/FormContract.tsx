@@ -6,7 +6,7 @@ import {
   parseCurrencyToCents,
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { type KeyboardEvent, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 
@@ -27,6 +27,37 @@ import { paymentMethodsService } from '@/services/paymentMethods';
 
 const selectClass =
   'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm';
+
+function focusNextField(form: HTMLFormElement, current: HTMLElement) {
+  const fields = Array.from(
+    form.querySelectorAll<HTMLElement>('[data-enter-sequence]'),
+  ).filter((field) => !field.hasAttribute('disabled'));
+  const index = fields.findIndex((field) => field === current || field.contains(current));
+  if (index < 0) return;
+  fields[index + 1]?.focus();
+}
+
+function onEnterSequence(event: KeyboardEvent<HTMLFormElement>) {
+  if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.defaultPrevented)
+    return;
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (target instanceof HTMLTextAreaElement && event.shiftKey) return;
+  if (target instanceof HTMLButtonElement && target.type === 'submit') return;
+  const field = target.closest<HTMLElement>('[data-enter-sequence]');
+  if (
+    !field &&
+    (target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement)
+  ) {
+    event.preventDefault();
+    return;
+  }
+  if (!field || field.hasAttribute('disabled') || field instanceof HTMLButtonElement) return;
+  event.preventDefault();
+  focusNextField(event.currentTarget, field);
+}
 
 const statusLabels: Record<ContractStatus, string> = {
   draft: 'Rascunho',
@@ -208,6 +239,7 @@ export function FormContract() {
     mutationFn: async (next: {
       status: ContractStatus;
       suspensionReason: string | null;
+      backToList?: boolean;
     }) => {
       if (!draft) throw new Error('O contrato ainda não carregou.');
       if (!draft.personId) throw new Error('Informe o cliente.');
@@ -240,12 +272,16 @@ export function FormContract() {
         throw error;
       }
     },
-    onSuccess: (saved) => {
+    onSuccess: (saved, next) => {
       queryClient.setQueryData(['contract', saved.id], saved);
       void queryClient.invalidateQueries({ queryKey: ['contracts'] });
       setSuspending(false);
       setReason('');
       toast.success('Contrato salvo.');
+      if (next.backToList) {
+        navigate('/contracts');
+        return;
+      }
       if (!id) navigate(`/contracts/${saved.id}`);
     },
     onError: (error: Error) => {
@@ -271,7 +307,11 @@ export function FormContract() {
   }
 
   return (
-    <div className="space-y-6">
+    <form
+      className="space-y-6"
+      onKeyDown={onEnterSequence}
+      onSubmit={(event) => event.preventDefault()}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-zinc-900">
@@ -297,12 +337,14 @@ export function FormContract() {
               type="cliente"
               placeholder="Buscar cliente ativo..."
               disabled={locked || frozen}
+              enterSequence
             />
           </div>
           <div className="col-span-12 space-y-1.5 md:col-span-4">
             <Label htmlFor="contract-title">Título</Label>
             <Input
               id="contract-title"
+              data-enter-sequence=""
               value={draft.title}
               disabled={locked}
               maxLength={120}
@@ -313,6 +355,7 @@ export function FormContract() {
             <Label htmlFor="contract-start">Início</Label>
             <Input
               id="contract-start"
+              data-enter-sequence=""
               type="date"
               value={draft.startedOn}
               disabled={locked || frozen}
@@ -323,6 +366,7 @@ export function FormContract() {
             <Label htmlFor="contract-end">Fim</Label>
             <Input
               id="contract-end"
+              data-enter-sequence=""
               type="date"
               value={draft.endedOn}
               disabled={locked}
@@ -333,6 +377,7 @@ export function FormContract() {
             <Label htmlFor="contract-kind">Cobrança</Label>
             <select
               id="contract-kind"
+              data-enter-sequence=""
               className={selectClass}
               value={draft.billingKind}
               disabled={locked || frozen}
@@ -361,6 +406,7 @@ export function FormContract() {
                 <Label htmlFor="contract-competence">Competência</Label>
                 <select
                   id="contract-competence"
+                  data-enter-sequence=""
                   className={selectClass}
                   value={draft.billingCompetence}
                   disabled={locked || frozen}
@@ -380,6 +426,7 @@ export function FormContract() {
                 <Label htmlFor="contract-amount">Valor do período</Label>
                 <Input
                   id="contract-amount"
+                  data-enter-sequence=""
                   value={draft.amount}
                   disabled={locked}
                   inputMode="numeric"
@@ -392,6 +439,7 @@ export function FormContract() {
                 <Label htmlFor="contract-due-day">Dia</Label>
                 <Input
                   id="contract-due-day"
+                  data-enter-sequence=""
                   value={draft.dueDay}
                   disabled={locked}
                   inputMode="numeric"
@@ -404,6 +452,7 @@ export function FormContract() {
                 <Label htmlFor="contract-method">Forma</Label>
                 <select
                   id="contract-method"
+                  data-enter-sequence=""
                   className={selectClass}
                   value={draft.paymentMethodId}
                   disabled={locked || frozen}
@@ -423,6 +472,7 @@ export function FormContract() {
             <Label htmlFor="contract-notes">Observação</Label>
             <textarea
               id="contract-notes"
+              data-enter-sequence=""
               className="min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
               value={draft.notes}
               disabled={locked}
@@ -460,6 +510,7 @@ export function FormContract() {
               <Label htmlFor="contract-reason">Motivo da suspensão</Label>
               <Input
                 id="contract-reason"
+                data-enter-sequence=""
                 value={reason}
                 maxLength={200}
                 onChange={(event) => setReason(event.target.value)}
@@ -481,12 +532,14 @@ export function FormContract() {
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
+              data-enter-sequence=""
               disabled={save.isPending}
               onClick={() =>
                 save.mutate({
                   status: draft.status,
                   suspensionReason:
                     draft.status === 'suspended' ? draft.suspensionReason : null,
+                  backToList: true,
                 })
               }
             >
@@ -611,6 +664,6 @@ export function FormContract() {
           </section>
         </>
       ) : null}
-    </div>
+    </form>
   );
 }
