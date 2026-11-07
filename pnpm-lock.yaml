@@ -196,6 +196,9 @@ importers:
       '@erp-360/mod-catalog':
         specifier: workspace:*
         version: link:../../packages/modules/catalog
+      '@erp-360/mod-contracts':
+        specifier: workspace:*
+        version: link:../../packages/modules/contracts
       '@erp-360/mod-core':
         specifier: workspace:*
         version: link:../../packages/modules/core
@@ -437,6 +440,31 @@ importers:
         specifier: ~6.0.2
         version: 6.0.3
 
+  packages/modules/contracts:
+    dependencies:
+      '@erp-360/mod-core':
+        specifier: workspace:*
+        version: link:../core
+      '@erp-360/mod-financial':
+        specifier: workspace:*
+        version: link:../financial
+      '@erp-360/mod-persons':
+        specifier: workspace:*
+        version: link:../persons
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)
+    devDependencies:
+      '@erp-360/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      eslint:
+        specifier: ^10.10.0
+        version: 10.10.0(jiti@2.7.0)(supports-color@5.5.0)
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
+
   packages/modules/core:
     dependencies:
       drizzle-orm:
@@ -530,6 +558,9 @@ importers:
       '@erp-360/mod-catalog':
         specifier: workspace:*
         version: link:../catalog
+      '@erp-360/mod-contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@erp-360/mod-core':
         specifier: workspace:*
         version: link:../core

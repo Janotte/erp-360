@@ -1,4 +1,5 @@
 import { catalogItems } from '@erp-360/mod-catalog';
+import { contracts } from '@erp-360/mod-contracts';
 import { tenantColumns, tenants, users } from '@erp-360/mod-core';
 import {
   cardBrands,
@@ -178,6 +179,7 @@ export const serviceOrders = pgTable(
     deliveredAt: timestamp('delivered_at', { withTimezone: true }),
     openedByUserId: uuid('opened_by_user_id').notNull(),
     originOrderId: uuid('origin_order_id'),
+    contractId: uuid('contract_id'),
     personId: uuid('person_id').notNull(),
     customerName: varchar('customer_name', { length: 120 }).notNull(),
     customerTaxId: varchar('customer_tax_id', { length: 19 }),
@@ -239,6 +241,11 @@ export const serviceOrders = pgTable(
       foreignColumns: [table.id, table.tenantId],
     }).onDelete('restrict'),
     foreignKey({
+      name: 'service_orders_contract_tenant_fk',
+      columns: [table.contractId, table.tenantId],
+      foreignColumns: [contracts.id, contracts.tenantId],
+    }).onDelete('restrict'),
+    foreignKey({
       name: 'service_orders_payment_method_tenant_fk',
       columns: [table.paymentMethodId, table.tenantId],
       foreignColumns: [paymentMethods.id, paymentMethods.tenantId],
@@ -271,6 +278,10 @@ export const serviceOrders = pgTable(
     check(
       'service_orders_origin_attendance_check',
       sql`${table.originOrderId} is null or ${table.attendance} in ('warranty', 'rework')`,
+    ),
+    check(
+      'service_orders_contract_attendance_check',
+      sql`${table.contractId} is null or ${table.attendance} = 'contract'`,
     ),
     check(
       'service_orders_origin_not_self_check',

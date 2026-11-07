@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@erp-360/mod-catalog": "workspace:*",
+    "@erp-360/mod-contracts": "workspace:*",
     "@erp-360/mod-core": "workspace:*",
     "@erp-360/mod-financial": "workspace:*",
     "@erp-360/mod-inbound": "workspace:*",

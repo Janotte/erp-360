@@ -1,4 +1,5 @@
 import * as catalogSchema from '@erp-360/mod-catalog';
+import * as contractSchema from '@erp-360/mod-contracts';
 import * as coreSchema from '@erp-360/mod-core';
 import * as financialSchema from '@erp-360/mod-financial';
 import * as inboundSchema from '@erp-360/mod-inbound';
@@ -17,6 +18,7 @@ const schema = {
   ...personsSchema,
   ...financialSchema,
   ...catalogSchema,
+  ...contractSchema,
   ...inboundSchema,
   ...serviceOrderSchema,
 };
