@@ -57,6 +57,7 @@ const child = spawn(
     'test/title-list-status.test.ts',
     'test/statement-order.test.ts',
     'test/contract-rules.test.ts',
+    'test/contract.integration.test.ts',
     'test/service-order-rules.test.ts',
     'test/service-order.integration.test.ts',
     '../ui/src/components/ServiceOrders/serviceOrderDocument.test.ts',
