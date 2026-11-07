@@ -17,7 +17,7 @@
 Estes pontos fecham o que a spec deixa para o código decidir. A implementação segue esta leitura.
 
 - A máscara do número tem pelo menos seis dígitos, em grupos de três: `1` vira `000.001`. Depois de `999.999` continua, como a ordem: `1.000.000`. O contador não reaproveita número.
-- `billingSchedule` devolve a série inteira. Cada parcela traz `competence` (`YYYY-MM-01`, dia 1 do mês inicial do período) e `dueOn`. Sem cobrança, a série é vazia. A parcela não é gravada nesta entrega.
+- `contractBillingSchedule` devolve a série inteira quando há fim. Sem fim, devolve só o período mais antigo cuja `competence` não está em `billedCompetences`; lista vazia significa o primeiro período. Cada parcela traz `competence` (`YYYY-MM-01`, dia 1 do mês inicial do período) e `dueOn`. Sem cobrança, a série é vazia. A parcela não é gravada nesta entrega. Um vencimento é passado quando `dueOn` é anterior a hoje. A fila não começa no mês corrente e não pula esses vencimentos.
 - Uma gravação produz no máximo uma linha `status` e no máximo uma linha `billing`. Valor e dia mudados juntos geram uma linha só. A linha guarda a cobrança depois da gravação e a situação anterior e a nova. A abertura é a linha `status` com `from_status` nulo e `to_status = draft`.
 - Rascunho edita cliente, título, datas, cobrança, periodicidade, competência, forma e observação. Vigente e Suspenso editam título, fim da vigência, observação, valor do período e dia. Cliente, início, número, periodicidade, competência e forma não mudam depois da ativação.
 - Encerrado e Cancelado recusam corpo diferente do que está gravado. Corpo idêntico devolve o contrato e não grava evento.
@@ -25,7 +25,7 @@ Estes pontos fecham o que a spec deixa para o código decidir. A implementação
 - Hoje, no encerramento e no aviso de vigência vencida, sai de `civilDate` com o fuso da cidade da empresa. Sem cidade ou com fuso inválido, `America/Sao_Paulo`, no mesmo gesto de `print-model.ts`.
 - A forma, quando vem, é da empresa, está ativa, tem `useInServiceOrder` e o `receipt_kind` não é `store_credit`. O contrato guarda só `payment_method_id`. Não copia condição nem parcelas.
 - Cliente na criação e no rascunho é pessoa ativa com `isClient`. Depois da ativação a pessoa pode deixar de ser cliente ativo e o vínculo permanece.
-- Encurtar a vigência chama `assertTermKeepsBilledPeriods`. Nesta entrega a lista de competências já cobradas vai vazia. A função recusa quando alguma competência cair fora do novo fim, para a entrega 2 passar a lista real.
+- Encurtar a vigência chama `assertTermKeepsBilledPeriods`. Nesta entrega a lista de competências já cobradas vai vazia. Fim nulo passa, mesmo com competências: apagar o fim não deixa período de fora. Um fim preenchido recusa quando alguma competência cair fora dele, para a entrega 2 passar a lista real.
 - A lista de contratos aceita `q`, `status` e `personId`. A ordem usa `personId` com `status=active`.
 - No comprovante, o número do contrato entra na célula do tipo, na linha de baixo, no mesmo lugar em que a origem aparece. O rótulo continua "Contrato". Não entra na aba dos onze campos.
 - Ordem Entregue ou Cancelada compara `contractId` dentro de `sameExceptInternalNotes`. Trocar o vínculo responde a mesma recusa da nota interna.
@@ -208,7 +208,7 @@ git commit -m "Cria as tabelas do contrato."
 
 Registrar `test/contract-rules.test.ts` em `run-tests.ts`.
 
-`contractBillingSchedule` recebe início, fim, periodicidade, competência e dia. As datas são `YYYY-MM-DD`. O primeiro período começa no mês de `startedOn`. O seguinte começa depois dos meses da periodicidade: 1, 3, 6 ou 12. Entra o período cujo mês inicial é o mês do início ou posterior, e o mês do fim ou anterior.
+`contractBillingSchedule` recebe início, fim, periodicidade, competência e dia, e uma lista opcional de competências já cobradas. As datas são `YYYY-MM-DD`. O primeiro período começa no mês de `startedOn`. O seguinte começa depois dos meses da periodicidade: 1, 3, 6 ou 12. Com fim, entra o período cujo mês inicial é o mês do início ou posterior, e o mês do fim ou anterior. Sem fim, devolve uma parcela: a primeira `competence` que não está na lista já cobrada.
 
 Competência Atual vence no `dueDay` do primeiro mês do período. Anterior vence no `dueDay` do mês seguinte ao último mês do período. `competence` é o dia 1 do mês inicial.
 
@@ -233,9 +233,11 @@ De `2026-11-15` a `2026-11-20`, mensal, dia 20: uma parcela, `competence` `2026-
 
 `assertTransition`: Rascunho segue para Vigente e Cancelado. Vigente segue para Suspenso e Encerrado. Suspenso segue para Vigente e Encerrado. Encerrado e Cancelado recusam qualquer saída. A mesma situação passa.
 
-`assertBilling` aceita `none` com valor 0, dia nulo, competência nula e fim nulo. Aceita `monthly` com valor positivo, dia 20, competência `current` e fim igual ou posterior ao início. Recusa mensal sem dia, sem fim ou sem competência, dia 29, valor 0, e `none` com valor positivo.
+`assertBilling` aceita `none` com valor 0, dia nulo, competência nula e fim nulo. Aceita `monthly` com valor positivo, dia 20, competência `current` e fim igual ou posterior ao início, e também com fim nulo. Recusa mensal sem dia ou sem competência, dia 29, valor 0, e `none` com valor positivo.
 
-`assertTermKeepsBilledPeriods('2026-10-31', ['2026-11-01'])` recusa. `assertTermKeepsBilledPeriods('2026-11-30', ['2026-11-01'])` passa. Fim nulo com alguma competência recusa. Lista vazia passa, com ou sem fim.
+`assertTermKeepsBilledPeriods('2026-10-31', ['2026-11-01'])` recusa. `assertTermKeepsBilledPeriods('2026-11-30', ['2026-11-01'])` passa. Fim nulo passa com ou sem competências. Lista vazia passa, com ou sem fim.
+
+Sem fim, mensal atual, dia 20, início `2026-11-01` e sem competência cobrada, devolve `competence` `2026-11-01` e `dueOn` `2026-11-20`. Com `billedCompetences` `2026-11-01` e `2026-12-01`, devolve `2027-01-01` e `2027-01-20`. Trimestral anterior, sem fim e sem competência cobrada, vence `2027-02-20`.
 
 `termExpired('active', '2026-10-31', '2026-11-07')` é verdadeiro. Suspenso com fim anterior a hoje também. Vigente com fim hoje ou futuro é falso. Fim nulo é falso. Encerrado com fim anterior é falso.
 
@@ -246,7 +248,7 @@ De `2026-11-15` a `2026-11-20`, mensal, dia 20: uma parcela, `competence` `2026-
 As recusas lançam `Error` com `status` 400, no mesmo gesto de `assertTransition` da ordem. Mensagens:
 
 - situação: `Esta situação não pode seguir para a escolhida.`
-- recorrente incompleta: `A cobrança recorrente precisa de valor, dia, competência e fim da vigência.`
+- recorrente incompleta: `A cobrança recorrente precisa de valor, dia e competência.`
 - sem cobrança com valor, dia ou competência: `Contrato sem cobrança não leva valor, dia nem competência.`
 - fim anterior ao início: `O fim da vigência não pode ser anterior ao início.`
 - dia fora de 1 a 28: `O dia de vencimento vai de 1 a 28.`
@@ -272,7 +274,7 @@ A soma de meses usa data UTC, no mesmo cuidado de `shiftMonth` em `packages/shar
 
 `assertTransition` usa um mapa constante, uma lista de destinos por situação. A mesma situação retorna.
 
-`assertBilling` olha o conjunto. `assertMutable` compara o gravado com o corpo e, fora do rascunho, só deixa passar título, fim, observação, valor, dia e a situação. `assertTermKeepsBilledPeriods` compara o mês da competência com o mês do fim.
+`assertBilling` olha o conjunto e não exige fim na recorrente. `assertMutable` compara o gravado com o corpo e, fora do rascunho, só deixa passar título, fim, observação, valor, dia e a situação. `assertTermKeepsBilledPeriods` retorna quando o fim é nulo. Com fim, compara o mês da competência com o mês do fim.
 
 `assertContractLink` fica ao lado de `assertOrigin`.
 
@@ -310,7 +312,8 @@ Cobrir:
 - Dois contratos seguidos recebem `000.001` e `000.002`. Cancelar o primeiro e abrir o terceiro entrega `000.003`.
 - A abertura grava Rascunho e uma linha `status` com `from_status` nulo, `to_status` `draft` e o usuário da sessão.
 - Pessoa inativa, pessoa sem `isClient`, ou pessoa de outra empresa responde 400.
-- Mensal sem fim responde 400. `none` com valor responde 400. `none` sem fim grava e a série vem vazia.
+- Mensal sem fim, início `2024-01-15`, grava, `termExpired` vem falso e a série traz só `competence` `2024-01-01` e `dueOn` `2024-01-20`. `none` com valor responde 400. `none` sem fim grava e a série vem vazia.
+- Apagar o fim de um mensal de `2026-11-01` a `2027-10-31` e ativar devolve só `2026-11-20`.
 - Ativar mensal de `2026-11-01` a `2027-10-31`, dia 20, competência `current`, devolve doze vencimentos, o primeiro em `2026-11-20` e o último em `2027-10-20`.
 - No rascunho, trocar de mensal atual para trimestral anterior grava uma linha `billing` e a série passa a ser `2027-02-20`, `2027-05-20`, `2027-08-20`, `2027-11-20`.
 - Vigente recusa troca de cliente, início, periodicidade, competência e forma. Aceita título, observação, valor e dia, e a troca de valor grava uma linha `billing` com o valor novo. O valor anterior permanece na linha de ativação.
@@ -445,7 +448,7 @@ O item ativo do menu trata `/contracts` como `/service-orders`: a lista e a fich
 
 - [ ] **Step 2: Lista**
 
-Colunas: número formatado, cliente, título, situação, vigência e a cobrança. A cobrança mostra "Sem cobrança" ou o valor com a periodicidade: Mensal, Trimestral, Semestral, Anual. Vigência vencida aparece na linha quando `termExpired` vem verdadeiro. A mais recente primeiro. Busca e filtro de situação disparam `q` e `status`. Linha vazia explica que ainda não há contrato.
+Colunas: número formatado, cliente, título, situação, vigência e a cobrança. A cobrança mostra "Sem cobrança" ou o valor com a periodicidade: Mensal, Trimestral, Semestral, Anual. Sem fim, a vigência mostra o início seguido de "indeterminado". Vigência vencida aparece na linha quando `termExpired` vem verdadeiro. A mais recente primeiro. Busca e filtro de situação disparam `q` e `status`. Linha vazia explica que ainda não há contrato.
 
 Rótulos: Rascunho, Vigente, Suspenso, Encerrado, Cancelado.
 
@@ -457,7 +460,7 @@ Campos: título, início, fim, periodicidade, competência, valor do período, d
 
 Periodicidade `none` esconde competência, valor, dia e forma, e o salvamento manda valor 0, dia nulo e competência nula. As outras periodicidades exigem competência Atual ou Anterior.
 
-A série vem de `contractBillingSchedule` e aparece assim que início, fim, periodicidade, competência e dia fecham uma cobrança válida. Cada data sai em `dd/MM/yyyy`. Sem cobrança, a ficha diz "Sem cobrança".
+A série vem de `contractBillingSchedule` e aparece assim que início, periodicidade, competência e dia fecham uma cobrança válida. O fim é opcional. Abaixo dele, o texto "Em branco, o prazo fica indeterminado." Com fim, cada data sai em `dd/MM/yyyy`. Sem fim, a ficha mostra "Próximo vencimento" com essa data e "Sem data de fim, a cobrança segue um período por vez." Sem cobrança, a ficha diz "Sem cobrança". Salvar volta à lista.
 
 Rascunho mostra Salvar, Ativar e Cancelar. Vigente mostra Salvar, Suspender e Encerrar. Suspenso mostra Salvar, Retomar e Encerrar. Suspender pede o motivo antes de enviar. Encerrado e Cancelado deixam os campos desabilitados.
 
@@ -496,7 +499,7 @@ Com `pnpm dev` no ar, percorrer:
 
 - O menu mostra Contratos abaixo de Ordens de serviço. A lista vazia explica que ainda não há contrato.
 - Abrir um rascunho sem cobrança, com início e sem fim. O número sai `000.001`.
-- Trocar para mensal, competência Atual, dia 20, vigência de 01/11/2026 a 31/10/2027. A série mostra doze vencimentos, de 20/11/2026 a 20/10/2027. Ativar.
+- Trocar para mensal, competência Atual, dia 20, vigência de 01/11/2026 a 31/10/2027. A série mostra doze vencimentos, de 20/11/2026 a 20/10/2027. Apagar o fim: a ficha mostra só o próximo vencimento, 20/11/2026, e o texto de um período por vez. A lista, depois de salvar, mostra o início seguido de "indeterminado". Ativar com o fim preenchido de novo.
 - Trocar a competência para Anterior e ver a recusa. Trocar o valor e ver o histórico guardar o valor anterior e o novo.
 - Suspender sem motivo é recusado. Suspender com motivo, retomar e ver o motivo sumir da ficha e permanecer no histórico.
 - Encerrar. A ficha fica só leitura.

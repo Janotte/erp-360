@@ -46,7 +46,7 @@ O propósito do produto já cita o setor de serviços: contrato, recorrência e 
 - Cobrança da ordem e cobrança do contrato não se misturam. Ligar a ordem ao contrato não zera item, não abate o valor do período e não gera título.
 - A cobrança recorrente, quando existir, gera um título em `receivables` por período. O recebimento continua no financeiro. Faturada não é situação da ordem nem do contrato.
 - A periodicidade é mensal, trimestral, semestral ou anual. A competência é Atual ou Anterior. As duas nascem com o contrato e não mudam depois da ativação.
-- Atual vence no dia informado, no primeiro mês de cada período. Anterior vence no dia informado, no mês seguinte ao fim de cada período. A ficha mostra a série inteira. A geração cria a próxima parcela dessa série.
+- Atual vence no dia informado, no primeiro mês de cada período. Anterior vence no dia informado, no mês seguinte ao fim de cada período. Com fim, a ficha mostra a série inteira. Sem fim, mostra só o próximo vencimento ainda sem título. A geração cria essa parcela, mesmo que a data já tenha passado.
 - Vigência vencida é um aviso calculado pelas datas. A situação continua Vigente até alguém encerrar.
 - Cancelar só cabe no rascunho. Depois de ativar, o caminho é suspender ou encerrar. Encerrar não apaga título já gerado.
 - Troca do valor do período ou do dia de vencimento em contrato vigente grava o valor anterior no histórico e vale dali para a frente. Título já emitido permanece.
@@ -61,8 +61,8 @@ Entra:
 - lista e ficha do contrato
 - número sequencial da empresa
 - cliente, título, vigência, observação
-- cobrança nenhuma ou valor fixo do período, com periodicidade mensal, trimestral, semestral ou anual, competência Atual ou Anterior, dia de vencimento, fim de vigência e forma comercial opcional
-- a série de vencimentos calculada na ficha, ainda sem título
+- cobrança nenhuma ou valor fixo do período, com periodicidade mensal, trimestral, semestral ou anual, competência Atual ou Anterior, dia de vencimento, fim de vigência opcional e forma comercial opcional
+- a série de vencimentos calculada na ficha, ainda sem título; sem fim, só o próximo vencimento
 - situações Rascunho, Vigente, Suspenso, Encerrado e Cancelado, com histórico
 - na ordem, o tipo Contrato escolhe um contrato vigente do mesmo cliente
 
@@ -168,7 +168,7 @@ A cobrança recorrente exige valor, dia e competência. O fim é opcional. Com f
 
 ### Como a série é montada
 
-O primeiro período começa no mês de `startedOn`. Cada período seguinte começa depois do número de meses da periodicidade. Entra na série o período cujo mês inicial é o mês de `startedOn` ou posterior, e o mês de `endedOn` ou anterior.
+O primeiro período começa no mês de `startedOn`. Cada período seguinte começa depois do número de meses da periodicidade. Com fim, entra na série o período cujo mês inicial é o mês de `startedOn` ou posterior, e o mês de `endedOn` ou anterior. Sem fim, a leitura devolve um período só: o mais antigo cuja `competence` ainda não tem título. Se nenhum foi cobrado, é o primeiro.
 
 Contrato de 01/11/2026 a 31/10/2027, dia 20:
 
@@ -185,13 +185,17 @@ Contrato de 01/11/2026 a 31/10/2027, dia 20:
 
 Na competência Anterior o último vencimento pode cair depois de `endedOn`. No exemplo, a vigência termina em 31/10/2027 e o último título vence em 20/11/2027. Esse título permanece na série.
 
-Alongar `endedOn` acrescenta períodos no fim da série. Encurtar remove períodos ainda sem título cujo mês inicial ficou depois do novo fim. Encurtar de modo a deixar de fora um período que já tem título é recusado.
+Alongar `endedOn` acrescenta períodos no fim da série. Encurtar remove períodos ainda sem título cujo mês inicial ficou depois do novo fim. Encurtar de modo a deixar de fora um período que já tem título é recusado. Apagar o fim não é encurtar: os títulos permanecem e a cobrança segue.
+
+Um vencimento é passado quando `dueOn` é anterior a hoje. A fila não começa no mês corrente e não pula esses vencimentos. O próximo é sempre o período mais antigo sem título, mesmo que a data já tenha passado. A ficha nomeia só esse. Os outros vencidos não aparecem enquanto ele não for gerado.
+
+Contrato mensal, competência Anterior, dia 15, início em 01/01/2026 e sem fim, lido em 07/11/2026, com nada cobrado: o próximo vencimento é 15/02/2026. Também já passaram 15/03, 15/04, 15/05, 15/06, 15/07, 15/08, 15/09 e 15/10. O período de outubro vence em 15/11 e ainda não venceu. O período de novembro vence em 15/12.
 
 Trocar o dia ou o valor recalcula as parcelas ainda sem título. Parcela já gerada guarda o vencimento e o valor da geração.
 
 ### Geração da parcela
 
-O botão "Gerar próxima cobrança" aparece em contrato Vigente com cobrança recorrente e com alguma parcela ainda sem título. Ele gera só a primeira parcela da série que ainda não tem cobrança. Não pula parcela e não escolhe outro vencimento.
+O botão "Gerar próxima cobrança" aparece em contrato Vigente com cobrança recorrente e com alguma parcela ainda sem título. Ele gera só a primeira parcela da fila que ainda não tem cobrança, tenha o vencimento passado ou não. Não pula parcela e não escolhe outro vencimento. Sem fim, essa fila não acaba enquanto o contrato estiver Vigente.
 
 Suspenso, Encerrado, Cancelado e Rascunho não geram. Título já criado permanece se o contrato for suspenso ou encerrado depois. Se o vencimento já passou, o título nasce vencido.
 
@@ -317,7 +321,7 @@ A abertura grava `kind = status`, `from_status` nulo e `to_status = draft`.
 | Ordem Contrato sem contrato                                                     | 400                                              |
 | Ordem de outro tipo com contrato                                                | 400                                              |
 | Contrato de outro cliente, de outra empresa, ou que não está vigente na escolha | 400                                              |
-| Gerar parcela que não é a próxima da série, ou quando a série já foi gerada     | 400                                              |
+| Gerar parcela que não é a próxima da fila, ou quando o fim existe e a série já foi gerada | 400                                              |
 | Repetir a geração da parcela que já tem título                                  | 409, devolve a cobrança existente                |
 | Gerar com contrato que não está vigente                                         | 400                                              |
 
@@ -325,9 +329,9 @@ A abertura grava `kind = status`, `from_status` nulo e `to_status = draft`.
 
 O menu ganha Contratos ao lado de Ordens de serviço.
 
-A lista tem busca por número, título e nome do cliente, e filtro pela situação. A linha mostra número, cliente, título, situação, vigência e o valor com a periodicidade, ou "Sem cobrança". O aviso de vigência vencida aparece na linha.
+A lista tem busca por número, título e nome do cliente, e filtro pela situação. A linha mostra número, cliente, título, situação, vigência e o valor com a periodicidade, ou "Sem cobrança". Sem fim, a vigência mostra o início seguido de "indeterminado". O aviso de vigência vencida aparece na linha quando há fim anterior a hoje.
 
-A ficha é uma página, no mesmo padrão da ordem. A cobrança recorrente escolhe a periodicidade e a competência, Atual ou Anterior, e mostra a série de vencimentos. Rascunho mostra Ativar e Cancelar. Vigente mostra Suspender, Encerrar e, na entrega 2, Gerar próxima cobrança. Suspenso mostra Retomar e Encerrar. O histórico fica na própria ficha, do mais recente para o mais antigo.
+A ficha é uma página, no mesmo padrão da ordem. O fim em branco leva o texto "Em branco, o prazo fica indeterminado." A cobrança recorrente escolhe a periodicidade e a competência, Atual ou Anterior. Com fim, mostra a série. Sem fim, e com competência e dia preenchidos, mostra "Próximo vencimento" com a data do período mais antigo sem título e o texto "Sem data de fim, a cobrança segue um período por vez." Rascunho mostra Ativar e Cancelar. Vigente mostra Suspender, Encerrar e, na entrega 2, Gerar próxima cobrança. Suspenso mostra Retomar e Encerrar. O histórico fica na própria ficha, do mais recente para o mais antigo. Salvar volta à lista.
 
 Na ordem, o tipo Contrato abre a escolha dos contratos vigentes daquele cliente. Sem cliente, a escolha fica desabilitada. O número escolhido aparece no comprovante.
 
