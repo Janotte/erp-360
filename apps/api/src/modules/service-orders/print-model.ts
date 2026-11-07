@@ -1,6 +1,7 @@
 import { tenants, users } from '@erp-360/mod-core';
 import { meansOfPayment, paymentMethods, paymentPlanLines } from '@erp-360/mod-financial';
 import { cities, states } from '@erp-360/mod-persons';
+import { contracts } from '@erp-360/mod-contracts';
 import {
   serviceOrderFieldValues,
   serviceOrderLines,
@@ -17,6 +18,7 @@ import {
 import { and, asc, eq } from 'drizzle-orm';
 
 import { db } from '../../db/index.ts';
+import { formatContractNumber } from '../contracts/rules.ts';
 import { formatServiceOrderNumber, installmentsLabel } from './rules.ts';
 import { getOrCreateServiceOrderSettings } from './settings.ts';
 
@@ -250,6 +252,15 @@ export async function buildServiceOrderPrint(tenantId: string, orderId: string) 
   }
 
   let originNumber: string | null = null;
+  let contractNumber: string | null = null;
+  if (order.contractId) {
+    const [contract] = await db
+      .select({ number: contracts.number })
+      .from(contracts)
+      .where(and(eq(contracts.id, order.contractId), eq(contracts.tenantId, tenantId)))
+      .limit(1);
+    if (contract) contractNumber = formatContractNumber(contract.number);
+  }
   if (order.originOrderId) {
     const [origin] = await db
       .select({ number: serviceOrders.number })
@@ -294,6 +305,7 @@ export async function buildServiceOrderPrint(tenantId: string, orderId: string) 
     locationLabel: locationLabels[order.location],
     statusLabel: statusLabels[order.status],
     originNumber,
+    contractNumber,
     customer: {
       taxId: printTaxId(order.customerTaxId),
       name: order.customerName,

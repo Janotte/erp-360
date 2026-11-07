@@ -27,6 +27,7 @@ function model(patch: Partial<ServiceOrderPrint> = {}): ServiceOrderPrint {
     locationLabel: 'Remoto',
     statusLabel: 'Aberta',
     originNumber: null,
+    contractNumber: null,
     customer: {
       taxId: null,
       name: 'Cliente <b>',
@@ -145,6 +146,16 @@ describe('folha da ordem de serviço', () => {
     assert.match(sheet, /31\/10\/2026/);
     assert.match(sheet, /30\/11\/2026/);
     assert.equal(sheet.includes('Meio de Pagamento'), false);
+  });
+
+  it('imprime o número do contrato na célula do tipo', () => {
+    const linked = serviceOrderDocument(
+      model({ attendanceLabel: 'Contrato', contractNumber: '000.001' }),
+      '',
+    );
+    assert.match(linked, /Contrato<br>000\.001/);
+    const plain = serviceOrderDocument(model(), '');
+    assert.equal(plain.includes('Contrato<br>'), false);
   });
 
   it('mantém a forma única quando não há parcelas', () => {

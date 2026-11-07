@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import { catalogItems, measures } from '@erp-360/mod-catalog';
+import { contractCounters, contracts } from '@erp-360/mod-contracts';
 import { tenants } from '@erp-360/mod-core';
 import {
   meansOfPayment,
@@ -9,6 +10,7 @@ import {
   paymentMethodTerms,
   paymentPlans,
 } from '@erp-360/mod-financial';
+import { persons } from '@erp-360/mod-persons';
 import { serviceOrderFields, serviceOrderFieldValues, serviceOrderNoteLines, serviceOrders } from '@erp-360/mod-service-orders';
 import { formatPhone } from '@erp-360/shared';
 import { eq, sql } from 'drizzle-orm';
@@ -376,6 +378,8 @@ describe('gravação da ordem de serviço', { concurrency: false }, () => {
   after(async () => {
     if (tenantId) {
       await db.delete(serviceOrders).where(eq(serviceOrders.tenantId, tenantId));
+      await db.delete(contracts).where(eq(contracts.tenantId, tenantId));
+      await db.delete(contractCounters).where(eq(contractCounters.tenantId, tenantId));
       await db.delete(paymentPlans).where(eq(paymentPlans.tenantId, tenantId));
       await db.delete(catalogItems).where(eq(catalogItems.tenantId, tenantId));
       await db.delete(measures).where(eq(measures.tenantId, tenantId));
@@ -711,6 +715,159 @@ describe('gravação da ordem de serviço', { concurrency: false }, () => {
     assert.equal(byDigit.statusCode, 200, byDigit.body);
     const digits = byDigit.json() as { data: { number: number }[] };
     assert.ok(digits.data.some((row) => row.number === 1));
+  });
+
+  it('liga a ordem ao contrato vigente e imprime o número', async () => {
+    const missing = await open({ attendance: 'contract' });
+    assert.equal(missing.statusCode, 400);
+
+    const contractBody = {
+      personId,
+      title: 'Manutenção',
+      startedOn: '2026-11-01',
+      endedOn: '2027-10-31',
+      billingKind: 'monthly',
+      billingCompetence: 'current',
+      periodAmount: 30_000,
+      dueDay: 20,
+      paymentMethodId: null,
+      notes: '',
+    };
+    const drafted = await app.inject({
+      method: 'POST',
+      url: '/contracts',
+      headers: headers(),
+      payload: contractBody,
+    });
+    assert.equal(drafted.statusCode, 201, drafted.body);
+    const draftContract = drafted.json() as { id: string };
+    const stillDraft = await open({ attendance: 'contract', contractId: draftContract.id });
+    assert.equal(stillDraft.statusCode, 400);
+
+    const activated = await app.inject({
+      method: 'PUT',
+      url: `/contracts/${draftContract.id}`,
+      headers: headers(),
+      payload: { ...contractBody, status: 'active', suspensionReason: null },
+    });
+    assert.equal(activated.statusCode, 200, activated.body);
+
+    const withContract = await open({ attendance: 'walk_in', contractId: draftContract.id });
+    assert.equal(withContract.statusCode, 400);
+
+    const opened = await open({ attendance: 'contract', contractId: draftContract.id });
+    assert.equal(opened.statusCode, 201, opened.body);
+    let detail = opened.json() as OrderDetail & {
+      contractId: string | null;
+      contractNumberLabel: string | null;
+    };
+    assert.equal(detail.contractId, draftContract.id);
+    assert.equal(detail.contractNumberLabel, '000.001');
+
+    const printed = await app.inject({
+      method: 'GET',
+      url: `/service-orders/${detail.id}/print`,
+      headers: headers(),
+    });
+    assert.equal(printed.statusCode, 200, printed.body);
+    assert.equal((printed.json() as { contractNumber: string | null }).contractNumber, '000.001');
+
+    const plain = await open();
+    assert.equal(plain.statusCode, 201, plain.body);
+    const plainDetail = plain.json() as { id: string };
+    const plainPrint = await app.inject({
+      method: 'GET',
+      url: `/service-orders/${plainDetail.id}/print`,
+      headers: headers(),
+    });
+    assert.equal((plainPrint.json() as { contractNumber: string | null }).contractNumber, null);
+
+    const suspended = await app.inject({
+      method: 'PUT',
+      url: `/contracts/${draftContract.id}`,
+      headers: headers(),
+      payload: {
+        ...contractBody,
+        status: 'suspended',
+        suspensionReason: 'Obra parada',
+      },
+    });
+    assert.equal(suspended.statusCode, 200, suspended.body);
+    detail = await save(detail, {
+      lines: [{ kind: 'product', itemId: productId, quantity: '1', unitPrice: '10' }],
+    });
+    assert.equal(detail.contractId, draftContract.id);
+
+    const otherDraft = await app.inject({
+      method: 'POST',
+      url: '/contracts',
+      headers: headers(),
+      payload: { ...contractBody, title: 'Rascunho' },
+    });
+    assert.equal(otherDraft.statusCode, 201, otherDraft.body);
+    const otherId = (otherDraft.json() as { id: string }).id;
+    const switched = await send(detail, { contractId: otherId });
+    assert.equal(switched.statusCode, 400);
+
+    const [otherPerson] = await db
+      .insert(persons)
+      .values({ tenantId, name: 'Outro cliente da ordem', isClient: true })
+      .returning({ id: persons.id });
+    const moved = await send(detail, { personId: otherPerson.id });
+    assert.equal(moved.statusCode, 400);
+
+    const cleared = await save(detail, { attendance: 'walk_in', contractId: null });
+    assert.equal(cleared.contractId, null);
+
+    const other = await createCompany('Ordem alheia');
+    try {
+      const foreignDraft = await app.inject({
+        method: 'POST',
+        url: '/contracts',
+        headers: { authorization: `Bearer ${app.jwt.sign({ userId: other.userId, tenantId: other.tenantId })}` },
+        payload: { ...contractBody, personId: other.personId, title: 'Alheio' },
+      });
+      assert.equal(foreignDraft.statusCode, 201, foreignDraft.body);
+      const foreignId = (foreignDraft.json() as { id: string }).id;
+      const foreignPut = await app.inject({
+        method: 'PUT',
+        url: `/contracts/${foreignId}`,
+        headers: {
+          authorization: `Bearer ${app.jwt.sign({ userId: other.userId, tenantId: other.tenantId })}`,
+        },
+        payload: {
+          ...contractBody,
+          personId: other.personId,
+          title: 'Alheio',
+          status: 'active',
+          suspensionReason: null,
+        },
+      });
+      assert.equal(foreignPut.statusCode, 200, foreignPut.body);
+      const refused = await open({ attendance: 'contract', contractId: foreignId });
+      assert.equal(refused.statusCode, 400);
+    } finally {
+      await db.delete(contracts).where(eq(contracts.tenantId, other.tenantId));
+      await removeCompany(other.tenantId);
+    }
+
+    const resumed = await app.inject({
+      method: 'PUT',
+      url: `/contracts/${draftContract.id}`,
+      headers: headers(),
+      payload: { ...contractBody, status: 'active', suspensionReason: null },
+    });
+    assert.equal(resumed.statusCode, 200, resumed.body);
+    const linked = await save(cleared, { attendance: 'contract', contractId: draftContract.id });
+    const progressed = await save(linked, { status: 'in_progress' });
+    const ready = await save(progressed, { status: 'ready' });
+    const delivered = await save(ready, {
+      status: 'delivered',
+      paymentMethodId,
+      paymentInstallments: 1,
+    });
+    const locked = await send(delivered, { contractId: null });
+    assert.equal(locked.statusCode, 400);
   });
 });
 

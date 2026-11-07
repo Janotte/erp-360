@@ -1,6 +1,7 @@
 import '../../types/fastify.ts';
 
 import { catalogItems } from '@erp-360/mod-catalog';
+import { contracts } from '@erp-360/mod-contracts';
 import {
   paymentMethods,
   paymentMethodTerms,
@@ -26,7 +27,9 @@ import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
 import { buildServiceOrderPrint } from './print-model.ts';
+import { formatContractNumber } from '../contracts/rules.ts';
 import {
+  assertContractLink,
   assertLine,
   assertOrigin,
   assertRequiredFields,
@@ -70,6 +73,7 @@ const createBody = z.object({
   attendance: z.enum(serviceOrderAttendances).optional(),
   location: z.enum(serviceOrderLocations).optional(),
   originOrderId: z.string().uuid().nullable().optional(),
+  contractId: z.string().uuid().nullable().optional(),
   promisedAt: timestampSchema.nullable().optional(),
   internalNotes: z.string().trim().optional(),
 });
@@ -80,6 +84,7 @@ const orderBody = z
     attendance: z.enum(serviceOrderAttendances),
     location: z.enum(serviceOrderLocations),
     originOrderId: z.string().uuid().nullable(),
+    contractId: z.string().uuid().nullable(),
     promisedAt: timestampSchema.nullable(),
     status: z.enum(serviceOrderStatuses),
     internalNotes: z.string().trim(),
@@ -214,6 +219,8 @@ type LoadedOrder = {
   labelFrozenAt: Date | null;
   openedByUserId: string;
   originOrderId: string | null;
+  contractId: string | null;
+  contractNumberLabel: string | null;
   personId: string;
   internalNotes: string;
   freightAmount: number;
@@ -364,6 +371,25 @@ async function assertOriginExists(tenantId: string, originOrderId: string) {
     .where(and(eq(serviceOrders.id, originOrderId), eq(serviceOrders.tenantId, tenantId)))
     .limit(1);
   if (!origin) reject('A ordem de origem não existe.');
+}
+
+async function assertContractChoice(
+  tenantId: string,
+  personId: string,
+  contractId: string,
+  previousContractId: string | null,
+) {
+  const [contract] = await db
+    .select({ personId: contracts.personId, status: contracts.status })
+    .from(contracts)
+    .where(and(eq(contracts.id, contractId), eq(contracts.tenantId, tenantId)))
+    .limit(1);
+  if (!contract || contract.personId !== personId) {
+    reject('Escolha um contrato vigente deste cliente.');
+  }
+  if (contractId !== previousContractId && contract.status !== 'active') {
+    reject('Escolha um contrato vigente deste cliente.');
+  }
 }
 
 function emptyPaymentSnapshot() {
@@ -642,6 +668,16 @@ async function loadOrder(tenantId: string, id: string): Promise<LoadedOrder | nu
         .orderBy(asc(paymentPlanLines.lineNumber))
     : [];
 
+  let contractNumberLabel: string | null = null;
+  if (order.contractId) {
+    const [contract] = await db
+      .select({ number: contracts.number })
+      .from(contracts)
+      .where(and(eq(contracts.id, order.contractId), eq(contracts.tenantId, tenantId)))
+      .limit(1);
+    if (contract) contractNumberLabel = formatContractNumber(contract.number);
+  }
+
   return {
     id: order.id,
     number: order.number,
@@ -654,6 +690,8 @@ async function loadOrder(tenantId: string, id: string): Promise<LoadedOrder | nu
     labelFrozenAt: order.labelFrozenAt,
     openedByUserId: order.openedByUserId,
     originOrderId: order.originOrderId,
+    contractId: order.contractId,
+    contractNumberLabel,
     personId: order.personId,
     internalNotes: order.internalNotes,
     freightAmount: order.freightAmount,
@@ -703,6 +741,8 @@ function present(order: LoadedOrder) {
     labelFrozenAt: order.labelFrozenAt,
     openedByUserId: order.openedByUserId,
     originOrderId: order.originOrderId,
+    contractId: order.contractId,
+    contractNumberLabel: order.contractNumberLabel,
     personId: order.personId,
     ...order.customer,
     internalNotes: order.internalNotes,
@@ -726,6 +766,7 @@ function sameExceptInternalNotes(current: LoadedOrder, body: OrderBody) {
   if (current.attendance !== body.attendance) return false;
   if (current.location !== body.location) return false;
   if ((current.originOrderId ?? null) !== (body.originOrderId ?? null)) return false;
+  if ((current.contractId ?? null) !== (body.contractId ?? null)) return false;
   if (!sameInstant(current.promisedAt, body.promisedAt)) return false;
   if (current.status !== body.status) return false;
   if (current.freightAmount !== body.freightAmount) return false;
@@ -793,8 +834,11 @@ export async function createServiceOrder(
   const attendance = input.attendance ?? 'walk_in';
   const location = input.location ?? 'remote';
   const originOrderId = input.originOrderId ?? null;
+  const contractId = input.contractId ?? null;
   assertOrigin({ attendance, originOrderId, orderId: '' });
+  assertContractLink({ attendance, contractId });
   if (originOrderId) await assertOriginExists(tenantId, originOrderId);
+  if (contractId) await assertContractChoice(tenantId, input.personId, contractId, null);
   const copy = await customerCopy(tenantId, input.personId);
 
   const orderId = await db.transaction(async (tx) => {
@@ -820,6 +864,7 @@ export async function createServiceOrder(
         promisedAt: input.promisedAt ? new Date(input.promisedAt) : null,
         openedByUserId: userId,
         originOrderId,
+        contractId,
         personId: input.personId,
         ...copy,
         internalNotes: input.internalNotes?.trim() ?? '',
@@ -871,7 +916,11 @@ async function updateServiceOrder(tenantId: string, id: string, body: OrderBody)
     originOrderId: body.originOrderId,
     orderId: id,
   });
+  assertContractLink({ attendance: body.attendance, contractId: body.contractId });
   if (body.originOrderId) await assertOriginExists(tenantId, body.originOrderId);
+  if (body.contractId) {
+    await assertContractChoice(tenantId, body.personId, body.contractId, current.contractId);
+  }
 
   const copy =
     body.personId === current.personId
@@ -964,6 +1013,7 @@ async function updateServiceOrder(tenantId: string, id: string, body: OrderBody)
         attendance: body.attendance,
         location: body.location,
         originOrderId: body.originOrderId,
+        contractId: body.contractId,
         promisedAt: body.promisedAt ? new Date(body.promisedAt) : null,
         personId: body.personId,
         ...copy,
@@ -1074,6 +1124,7 @@ async function listServiceOrders(
     .select({
       id: serviceOrders.id,
       number: serviceOrders.number,
+      contractId: serviceOrders.contractId,
       customerName: serviceOrders.customerName,
       openedAt: serviceOrders.openedAt,
       promisedAt: serviceOrders.promisedAt,
@@ -1109,6 +1160,7 @@ async function listServiceOrders(
       id: row.id,
       number: row.number,
       numberLabel: formatServiceOrderNumber(row.number),
+      contractId: row.contractId,
       customerName: row.customerName,
       summarySlot: settings.summarySlot,
       summaryLabel,

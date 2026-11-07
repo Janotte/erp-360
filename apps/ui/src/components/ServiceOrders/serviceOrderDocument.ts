@@ -23,6 +23,7 @@ export type ServiceOrderPrint = {
   locationLabel: string;
   statusLabel: string;
   originNumber: string | null;
+  contractNumber: string | null;
   customer: {
     taxId: string | null;
     name: string;
@@ -183,9 +184,11 @@ export function serviceOrderDocument(model: ServiceOrderPrint, css: string) {
     .filter(Boolean)
     .join(' - ');
   const email = contactItem('email', model.tenant.email);
-  const attendance = model.originNumber
-    ? `${escapeHtml(model.attendanceLabel)}<br>${escapeHtml(model.originNumber)}`
-    : escapeHtml(model.attendanceLabel);
+  const attendance = model.contractNumber
+    ? `${escapeHtml(model.attendanceLabel)}<br>${escapeHtml(model.contractNumber)}`
+    : model.originNumber
+      ? `${escapeHtml(model.attendanceLabel)}<br>${escapeHtml(model.originNumber)}`
+      : escapeHtml(model.attendanceLabel);
 
   const productRows = model.products
     .map((line) =>
