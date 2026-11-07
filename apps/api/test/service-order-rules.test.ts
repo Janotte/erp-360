@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  assertContractLink,
   assertLine,
   assertOrigin,
   assertRequiredFields,
@@ -138,6 +139,17 @@ describe('rótulo, origem, obrigatório e linha', () => {
     assert.doesNotThrow(() =>
       assertRequiredFields([{ ...field, isActive: false }], { field01: '' }),
     );
+  });
+
+  it('exige contrato só no tipo Contrato', () => {
+    assert.doesNotThrow(() =>
+      assertContractLink({ attendance: 'contract', contractId: 'contract-1' }),
+    );
+    assert.doesNotThrow(() =>
+      assertContractLink({ attendance: 'walk_in', contractId: null }),
+    );
+    refused(() => assertContractLink({ attendance: 'contract', contractId: null }));
+    refused(() => assertContractLink({ attendance: 'walk_in', contractId: 'contract-1' }));
   });
 
   it('recusa técnico em produto e item de produto em serviço', () => {

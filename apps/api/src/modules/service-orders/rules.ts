@@ -89,6 +89,18 @@ export function labelChangeSlots(
   });
 }
 
+export function assertContractLink(input: {
+  attendance: ServiceOrderAttendance;
+  contractId: string | null;
+}) {
+  if (input.attendance === 'contract' && !input.contractId) {
+    reject('A ordem de contrato precisa de um contrato.');
+  }
+  if (input.attendance !== 'contract' && input.contractId) {
+    reject('Só o tipo Contrato aponta um contrato.');
+  }
+}
+
 export function assertOrigin(input: {
   attendance: ServiceOrderAttendance;
   originOrderId: string | null;
