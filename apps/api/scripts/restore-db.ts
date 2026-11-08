@@ -4,6 +4,8 @@ import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import pg from 'pg';
+
 import { env } from '../src/config/index.ts';
 
 const USAGE = 'Uso: pnpm --filter @erp-360/api db:restore -- --confirm [arquivo.dump]';
@@ -40,7 +42,35 @@ function isHarmlessClientServerMismatch(stderr: string): boolean {
   );
 }
 
-function main() {
+/** O dump não conhece objetos criados depois dele. --clean não os apaga e o DROP das tabelas antigas falha. */
+async function emptyDatabase() {
+  const client = new pg.Client({
+    host: env.database.host,
+    port: env.database.port,
+    database: env.database.name,
+    user: env.database.user,
+    password: env.database.password,
+  });
+  await client.connect();
+  try {
+    await client.query(`
+      select pg_terminate_backend(pid)
+      from pg_stat_activity
+      where datname = current_database()
+        and pid <> pg_backend_pid()
+    `);
+    await client.query('drop schema if exists public cascade');
+    await client.query('drop schema if exists drizzle cascade');
+    await client.query('create schema public');
+    await client.query('create schema drizzle');
+    await client.query('grant all on schema public to public');
+    await client.query('grant all on schema drizzle to public');
+  } finally {
+    await client.end();
+  }
+}
+
+async function main() {
   const { confirmed, fileArg } = parseArgs(process.argv.slice(2));
 
   if (!confirmed) {
@@ -63,6 +93,7 @@ function main() {
   }
 
   console.log(`♻️ Restaurando backup em ${env.database.name} a partir de: ${backupPath}`);
+  await emptyDatabase();
 
   const result = spawnSync(
     'pg_restore',
@@ -113,4 +144,4 @@ function main() {
   console.log('✅ Restauração concluída com sucesso.');
 }
 
-main();
+await main();
