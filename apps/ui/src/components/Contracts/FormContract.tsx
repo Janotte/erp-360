@@ -15,8 +15,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  billingConfirmText,
+  billingDoneText,
   type ContractBillingCompetence,
   type ContractBillingKind,
+  type ContractBillingResult,
   type ContractDetail,
   type ContractEvent,
   type ContractInput,
@@ -54,7 +57,8 @@ function onEnterSequence(event: KeyboardEvent<HTMLFormElement>) {
     event.preventDefault();
     return;
   }
-  if (!field || field.hasAttribute('disabled') || field instanceof HTMLButtonElement) return;
+  if (!field || field.hasAttribute('disabled') || field instanceof HTMLButtonElement)
+    return;
   event.preventDefault();
   focusNextField(event.currentTarget, field);
 }
@@ -104,6 +108,7 @@ type Draft = {
   notes: string;
   status: ContractStatus;
   suspensionReason: string;
+  billedCompetences: string[];
 };
 
 function emptyDraft(): Draft {
@@ -120,6 +125,7 @@ function emptyDraft(): Draft {
     notes: '',
     status: 'draft',
     suspensionReason: '',
+    billedCompetences: [],
   };
 }
 
@@ -138,6 +144,7 @@ function draftFromContract(contract: ContractDetail): Draft {
     notes: contract.notes,
     status: contract.status,
     suspensionReason: contract.suspensionReason ?? '',
+    billedCompetences: contract.billedCompetences,
   };
 }
 
@@ -186,6 +193,7 @@ function scheduleOf(draft: Draft) {
       billingKind: draft.billingKind,
       billingCompetence: draft.billingCompetence,
       dueDay,
+      billedCompetences: draft.billedCompetences,
     });
   } catch {
     return [];
@@ -212,6 +220,9 @@ export function FormContract() {
   const [draft, setDraft] = useState<Draft | null>(id ? null : emptyDraft());
   const [suspending, setSuspending] = useState(false);
   const [reason, setReason] = useState('');
+  const [billingPreview, setBillingPreview] = useState<ContractBillingResult | null>(
+    null,
+  );
 
   const contract = useQuery({
     queryKey: ['contract', id],
@@ -286,6 +297,36 @@ export function FormContract() {
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Falha ao salvar o contrato.');
+    },
+  });
+
+  const previewBillings = useMutation({
+    mutationFn: () => contractsService.previewBillings(id),
+    onSuccess: (result) => {
+      if (result.titles === 0) {
+        setBillingPreview(null);
+        toast.message('Nenhuma parcela pronta para cobrança.');
+        return;
+      }
+      setBillingPreview(result);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Falha ao consultar a cobrança.');
+    },
+  });
+
+  const generateBillings = useMutation({
+    mutationFn: () => contractsService.generateBillings(id),
+    onSuccess: (result) => {
+      setBillingPreview(null);
+      void queryClient.invalidateQueries({ queryKey: ['contract', id] });
+      if (result.failures.length > 0) toast.error(billingDoneText(result));
+      else if (result.titles === 0)
+        toast.message('Nenhuma parcela pronta para cobrança.');
+      else toast.success(billingDoneText(result));
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Falha ao gerar a cobrança.');
     },
   });
 
@@ -372,7 +413,9 @@ export function FormContract() {
               disabled={locked}
               onChange={(event) => patch({ endedOn: event.target.value })}
             />
-            <p className="text-xs text-zinc-500">Em branco, o prazo fica indeterminado.</p>
+            <p className="text-xs text-zinc-500">
+              Em branco, o prazo fica indeterminado.
+            </p>
           </div>
           <div className="col-span-12 space-y-1.5 md:col-span-3">
             <Label htmlFor="contract-kind">Cobrança</Label>
@@ -498,8 +541,8 @@ export function FormContract() {
             </ul>
           ) : (
             <p className="text-sm text-zinc-700">
-              Próximo vencimento: {formatDate(schedule[0].dueOn)}. Sem data de fim, a cobrança
-              segue um período por vez.
+              Próximo vencimento: {formatDate(schedule[0].dueOn)}. Sem data de fim, a
+              cobrança segue um período por vez.
             </p>
           )}
         </div>
@@ -508,6 +551,29 @@ export function FormContract() {
           <p className="text-sm text-zinc-700">
             Motivo da suspensão: {draft.suspensionReason}
           </p>
+        ) : null}
+
+        {billingPreview ? (
+          <div className="flex flex-col gap-3 rounded-md border border-zinc-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-zinc-700">{billingConfirmText(billingPreview)}</p>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                disabled={generateBillings.isPending}
+                onClick={() => generateBillings.mutate()}
+              >
+                Confirmar
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={generateBillings.isPending}
+                onClick={() => setBillingPreview(null)}
+              >
+                Voltar
+              </Button>
+            </div>
+          </div>
         ) : null}
 
         {suspending ? (
@@ -578,6 +644,16 @@ export function FormContract() {
             ) : null}
             {draft.status === 'active' ? (
               <>
+                {id && recurring ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={save.isPending || previewBillings.isPending}
+                    onClick={() => previewBillings.mutate()}
+                  >
+                    Gerar cobranças
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="outline"

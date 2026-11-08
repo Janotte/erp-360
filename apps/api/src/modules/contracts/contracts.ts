@@ -1,34 +1,37 @@
 import '../../types/fastify.ts';
 
-import { tenants, users } from '@erp-360/mod-core';
 import {
   contractBillingCompetences,
   contractBillingKinds,
+  contractBillings,
   contractCounters,
   contractEvents,
   contracts,
   contractStatuses,
 } from '@erp-360/mod-contracts';
+import { users } from '@erp-360/mod-core';
 import { paymentMethods } from '@erp-360/mod-financial';
-import { cities, persons } from '@erp-360/mod-persons';
+import { persons } from '@erp-360/mod-persons';
 import { serviceOrders } from '@erp-360/mod-service-orders';
-import { civilDate, contractBillingSchedule, escapeIlike } from '@erp-360/shared';
+import { contractBillingSchedule, escapeIlike } from '@erp-360/shared';
 import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
 import { formatServiceOrderNumber } from '../service-orders/rules.ts';
+import { contractBillingRoutes } from './billings.ts';
+import { todayForTenant } from './clock.ts';
 import {
   assertBilling,
   assertMutable,
   assertTermKeepsBilledPeriods,
   assertTransition,
-  formatContractNumber,
-  termExpired,
   type ContractBilling,
   type ContractFields,
   type ContractStatus,
+  formatContractNumber,
+  termExpired,
 } from './rules.ts';
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -66,16 +69,6 @@ function reject(message: string): never {
   throw error;
 }
 
-function timeZoneOf(value: string | null | undefined) {
-  if (!value) return 'America/Sao_Paulo';
-  try {
-    Intl.DateTimeFormat('pt-BR', { timeZone: value }).format(new Date());
-    return value;
-  } catch {
-    return 'America/Sao_Paulo';
-  }
-}
-
 function assertCivilDate(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) reject('Data inválida.');
@@ -103,10 +96,7 @@ function billingOf(body: ContractBody): ContractBilling {
   };
 }
 
-function fieldsOf(
-  body: ContractBody,
-  status: ContractStatus,
-): ContractFields {
+function fieldsOf(body: ContractBody, status: ContractStatus): ContractFields {
   return {
     ...billingOf(body),
     personId: body.personId,
@@ -122,24 +112,6 @@ let eventTick = 0;
 function nextEventInstant() {
   eventTick = Math.max(Date.now(), eventTick + 1);
   return new Date(eventTick);
-}
-
-async function todayForTenant(tenantId: string) {
-  const [tenant] = await db
-    .select({ cityId: tenants.cityId })
-    .from(tenants)
-    .where(eq(tenants.id, tenantId))
-    .limit(1);
-  let timeZone = 'America/Sao_Paulo';
-  if (tenant?.cityId) {
-    const [city] = await db
-      .select({ timezone: cities.timezone })
-      .from(cities)
-      .where(eq(cities.id, tenant.cityId))
-      .limit(1);
-    timeZone = timeZoneOf(city?.timezone);
-  }
-  return civilDate(new Date(), timeZone);
 }
 
 async function assertClient(tenantId: string, personId: string) {
@@ -159,15 +131,18 @@ async function assertPaymentMethod(tenantId: string, paymentMethodId: string) {
       receiptKind: paymentMethods.receiptKind,
     })
     .from(paymentMethods)
-    .where(and(eq(paymentMethods.id, paymentMethodId), eq(paymentMethods.tenantId, tenantId)))
+    .where(
+      and(eq(paymentMethods.id, paymentMethodId), eq(paymentMethods.tenantId, tenantId)),
+    )
     .limit(1);
   if (!method?.isActive || !method.useInServiceOrder) {
     reject('A forma de pagamento não está disponível para o contrato.');
   }
-  if (method.receiptKind === 'store_credit') reject('Crédito em loja não entra no contrato.');
+  if (method.receiptKind === 'store_credit')
+    reject('Crédito em loja não entra no contrato.');
 }
 
-function scheduleFor(billing: ContractBilling) {
+function scheduleFor(billing: ContractBilling, billedCompetences: readonly string[]) {
   if (
     billing.billingKind === 'none' ||
     !billing.billingCompetence ||
@@ -181,6 +156,7 @@ function scheduleFor(billing: ContractBilling) {
     billingKind: billing.billingKind,
     billingCompetence: billing.billingCompetence,
     dueDay: billing.dueDay,
+    billedCompetences,
   });
 }
 
@@ -205,13 +181,18 @@ async function loadContract(tenantId: string, id: string) {
       closedOn: contracts.closedOn,
     })
     .from(contracts)
-    .innerJoin(persons, and(eq(persons.id, contracts.personId), eq(persons.tenantId, contracts.tenantId)))
+    .innerJoin(
+      persons,
+      and(eq(persons.id, contracts.personId), eq(persons.tenantId, contracts.tenantId)),
+    )
     .where(and(eq(contracts.id, id), eq(contracts.tenantId, tenantId)))
     .limit(1);
   return row ?? null;
 }
 
-function storedFields(row: NonNullable<Awaited<ReturnType<typeof loadContract>>>): ContractFields {
+function storedFields(
+  row: NonNullable<Awaited<ReturnType<typeof loadContract>>>,
+): ContractFields {
   return {
     personId: row.personId,
     title: row.title,
@@ -249,10 +230,19 @@ async function present(tenantId: string, id: string, today: string) {
     .from(contractEvents)
     .innerJoin(
       users,
-      and(eq(users.id, contractEvents.actorUserId), eq(users.tenantId, contractEvents.tenantId)),
+      and(
+        eq(users.id, contractEvents.actorUserId),
+        eq(users.tenantId, contractEvents.tenantId),
+      ),
     )
     .where(and(eq(contractEvents.contractId, id), eq(contractEvents.tenantId, tenantId)))
     .orderBy(desc(contractEvents.createdAt), desc(contractEvents.id));
+  const billed = await db
+    .select({ competence: contractBillings.competence })
+    .from(contractBillings)
+    .where(
+      and(eq(contractBillings.contractId, id), eq(contractBillings.tenantId, tenantId)),
+    );
   const orders = await db
     .select({
       id: serviceOrders.id,
@@ -283,7 +273,11 @@ async function present(tenantId: string, id: string, today: string) {
     suspensionReason: row.suspensionReason,
     closedOn: row.closedOn,
     termExpired: termExpired(row.status, row.endedOn, today),
-    schedule: scheduleFor(billing),
+    billedCompetences: billed.map((row) => row.competence),
+    schedule: scheduleFor(
+      billing,
+      billed.map((row) => row.competence),
+    ),
     events,
     orders: orders.map((order) => ({
       ...order,
@@ -337,7 +331,10 @@ async function createContract(tenantId: string, userId: string, body: ContractBo
   const notes = body.notes?.trim() ?? '';
 
   const contractId = await db.transaction(async (tx) => {
-    await tx.insert(contractCounters).values({ tenantId, lastNumber: 0 }).onConflictDoNothing();
+    await tx
+      .insert(contractCounters)
+      .values({ tenantId, lastNumber: 0 })
+      .onConflictDoNothing();
     const [counter] = await tx
       .update(contractCounters)
       .set({ lastNumber: sql`${contractCounters.lastNumber} + 1` })
@@ -385,7 +382,12 @@ async function createContract(tenantId: string, userId: string, body: ContractBo
   return detail;
 }
 
-async function updateContract(tenantId: string, userId: string, id: string, body: UpdateBody) {
+async function updateContract(
+  tenantId: string,
+  userId: string,
+  id: string,
+  body: UpdateBody,
+) {
   const current = await loadContract(tenantId, id);
   if (!current) return null;
   assertCivilDate(body.startedOn);
@@ -469,10 +471,7 @@ async function updateContract(tenantId: string, userId: string, id: string, body
   return present(tenantId, id, today);
 }
 
-async function listContracts(
-  tenantId: string,
-  query: z.infer<typeof listQuery>,
-) {
+async function listContracts(tenantId: string, query: z.infer<typeof listQuery>) {
   const filters = [eq(contracts.tenantId, tenantId)];
   if (query.status) filters.push(eq(contracts.status, query.status));
   if (query.personId) filters.push(eq(contracts.personId, query.personId));
@@ -483,7 +482,12 @@ async function listContracts(
     const compact = term.replace(/[.\s]/g, '');
     const asNumber = /^\d+$/.test(compact) ? Number(compact) : null;
     const textMatch = or(ilike(contracts.title, pattern), ilike(persons.name, pattern));
-    if (textMatch && asNumber !== null && Number.isSafeInteger(asNumber) && asNumber > 0) {
+    if (
+      textMatch &&
+      asNumber !== null &&
+      Number.isSafeInteger(asNumber) &&
+      asNumber > 0
+    ) {
       const numbered = or(textMatch, eq(contracts.number, asNumber));
       if (numbered) filters.push(numbered);
     } else if (textMatch) {
@@ -507,7 +511,10 @@ async function listContracts(
       periodAmount: contracts.periodAmount,
     })
     .from(contracts)
-    .innerJoin(persons, and(eq(persons.id, contracts.personId), eq(persons.tenantId, contracts.tenantId)))
+    .innerJoin(
+      persons,
+      and(eq(persons.id, contracts.personId), eq(persons.tenantId, contracts.tenantId)),
+    )
     .where(and(...filters))
     .orderBy(desc(contracts.number));
 
@@ -522,6 +529,7 @@ async function listContracts(
 
 export const contractRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
+  await contractBillingRoutes(fastify, {});
 
   fastify.get('/', { schema: { querystring: listQuery } }, async (request) => {
     return listContracts(request.user.tenantId, request.query);

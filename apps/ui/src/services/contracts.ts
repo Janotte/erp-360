@@ -1,3 +1,5 @@
+import { formatCurrency } from '@erp-360/shared';
+
 import { apiFetch } from './apiClient';
 
 export type ContractStatus = 'draft' | 'active' | 'suspended' | 'closed' | 'cancelled';
@@ -69,9 +71,38 @@ export interface ContractDetail {
   suspensionReason: string | null;
   closedOn: string | null;
   termExpired: boolean;
+  billedCompetences: string[];
   schedule: ContractInstallment[];
   events: ContractEvent[];
   orders: ContractOrder[];
+}
+
+export interface ContractBillingResult {
+  contracts: number;
+  titles: number;
+  amount: number;
+  failures: { contractId: string; numberLabel: string; message: string }[];
+}
+
+export function billingConfirmText(
+  result: Pick<ContractBillingResult, 'contracts' | 'titles' | 'amount'>,
+) {
+  const titles = result.titles === 1 ? '1 título' : `${result.titles} títulos`;
+  const contracts =
+    result.contracts === 1 ? '1 contrato' : `${result.contracts} contratos`;
+  const verb = result.titles === 1 ? 'Será gerado' : 'Serão gerados';
+  return `${verb} ${titles} em ${contracts}, no total de ${formatCurrency(result.amount)}.`;
+}
+
+export function billingDoneText(result: ContractBillingResult) {
+  const done =
+    result.titles === 1 ? '1 título gerado.' : `${result.titles} títulos gerados.`;
+  if (result.failures.length === 0) return done;
+  const failed = result.failures
+    .map((row) => `${row.numberLabel}: ${row.message}`)
+    .join(' ');
+  if (result.titles === 0) return failed;
+  return `${done} ${failed}`;
 }
 
 export interface ContractInput {
@@ -142,5 +173,23 @@ export const contractsService = {
     const body = await readBody(res);
     if (!res.ok) throw new Error(messageOf(body, 'Falha ao salvar o contrato.'));
     return body as unknown as ContractDetail;
+  },
+
+  previewBillings: async (contractId?: string): Promise<ContractBillingResult> => {
+    const query = contractId ? `?contractId=${contractId}` : '';
+    const res = await apiFetch(`/contracts/billings/preview${query}`);
+    const body = await readBody(res);
+    if (!res.ok) throw new Error(messageOf(body, 'Falha ao consultar a cobrança.'));
+    return body as unknown as ContractBillingResult;
+  },
+
+  generateBillings: async (contractId?: string): Promise<ContractBillingResult> => {
+    const res = await apiFetch('/contracts/billings', {
+      method: 'POST',
+      body: JSON.stringify(contractId ? { contractId } : {}),
+    });
+    const body = await readBody(res);
+    if (!res.ok) throw new Error(messageOf(body, 'Falha ao gerar a cobrança.'));
+    return body as unknown as ContractBillingResult;
   },
 };

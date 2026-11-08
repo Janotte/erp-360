@@ -1,8 +1,9 @@
 import { formatCurrency } from '@erp-360/shared';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Plus, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +23,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  billingConfirmText,
+  billingDoneText,
   type ContractBillingKind,
+  type ContractBillingResult,
   type ContractListItem,
   contractsService,
   type ContractStatus,
@@ -69,6 +73,9 @@ export function ListContracts() {
   const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ContractStatus | 'all'>('all');
+  const [billingPreview, setBillingPreview] = useState<ContractBillingResult | null>(
+    null,
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchText.trim()), 400);
@@ -84,6 +91,36 @@ export function ListContracts() {
       }),
   });
 
+  const previewBillings = useMutation({
+    mutationFn: () => contractsService.previewBillings(),
+    onSuccess: (result) => {
+      if (result.titles === 0) {
+        setBillingPreview(null);
+        toast.message('Nenhuma parcela pronta para cobrança.');
+        return;
+      }
+      setBillingPreview(result);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Falha ao consultar a cobrança.');
+    },
+  });
+
+  const generateBillings = useMutation({
+    mutationFn: () => contractsService.generateBillings(),
+    onSuccess: (result) => {
+      setBillingPreview(null);
+      if (result.failures.length > 0) toast.error(billingDoneText(result));
+      else if (result.titles === 0)
+        toast.message('Nenhuma parcela pronta para cobrança.');
+      else toast.success(billingDoneText(result));
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Falha ao gerar a cobrança.');
+    },
+  });
+
+  const billingPending = previewBillings.isPending || generateBillings.isPending;
   const rows = list.data?.data ?? [];
 
   return (
@@ -95,13 +132,46 @@ export function ListContracts() {
             Cliente, vigência e cobrança do período.
           </p>
         </div>
-        <Button asChild>
-          <Link to="/contracts/new">
-            <Plus className="h-4 w-4" />
-            Novo contrato
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={billingPending}
+            onClick={() => previewBillings.mutate()}
+          >
+            Gerar cobranças
+          </Button>
+          <Button asChild>
+            <Link to="/contracts/new">
+              <Plus className="h-4 w-4" />
+              Novo contrato
+            </Link>
+          </Button>
+        </div>
       </div>
+
+      {billingPreview ? (
+        <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-zinc-700">{billingConfirmText(billingPreview)}</p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              disabled={billingPending}
+              onClick={() => generateBillings.mutate()}
+            >
+              Confirmar
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={billingPending}
+              onClick={() => setBillingPreview(null)}
+            >
+              Voltar
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center">
         <div className="relative w-full sm:max-w-xs">

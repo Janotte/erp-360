@@ -46,11 +46,11 @@ O propósito do produto já cita o setor de serviços: contrato, recorrência e 
 - Cobrança da ordem e cobrança do contrato não se misturam. Ligar a ordem ao contrato não zera item, não abate o valor do período e não gera título.
 - A cobrança recorrente, quando existir, gera um título em `receivables` por período. O recebimento continua no financeiro. Faturada não é situação da ordem nem do contrato.
 - A periodicidade é mensal, trimestral, semestral ou anual. A competência é Atual ou Anterior. As duas nascem com o contrato e não mudam depois da ativação.
-- Atual vence no dia informado, no primeiro mês de cada período. Anterior vence no dia informado, no mês seguinte ao fim de cada período. Com fim, a ficha mostra a série inteira. Sem fim, mostra só o próximo vencimento ainda sem título. A geração cria essa parcela, mesmo que a data já tenha passado.
+- Atual vence no dia informado, no primeiro mês de cada período. Anterior vence no dia informado, no mês seguinte ao fim de cada período. A data de corte é o dia 1 desse mês de vencimento. A geração inclui todo período sem título cuja data de corte já chegou. Com fim, a ficha mostra a série inteira. Sem fim, mostra só o próximo vencimento ainda sem título.
 - Vigência vencida é um aviso calculado pelas datas. A situação continua Vigente até alguém encerrar.
 - Cancelar só cabe no rascunho. Depois de ativar, o caminho é suspender ou encerrar. Encerrar não apaga título já gerado.
 - Troca do valor do período ou do dia de vencimento em contrato vigente grava o valor anterior no histórico e vale dali para a frente. Título já emitido permanece.
-- Não há worker. A geração da cobrança é um botão na ficha do contrato.
+- Não há worker. A geração da cobrança é um clique na lista, para todos os vigentes. A ficha repete a mesma regra para um contrato.
 
 ## Entregas
 
@@ -187,15 +187,17 @@ Na competência Anterior o último vencimento pode cair depois de `endedOn`. No 
 
 Alongar `endedOn` acrescenta períodos no fim da série. Encurtar remove períodos ainda sem título cujo mês inicial ficou depois do novo fim. Encurtar de modo a deixar de fora um período que já tem título é recusado. Apagar o fim não é encurtar: os títulos permanecem e a cobrança segue.
 
-Um vencimento é passado quando `dueOn` é anterior a hoje. A fila não começa no mês corrente e não pula esses vencimentos. O próximo é sempre o período mais antigo sem título, mesmo que a data já tenha passado. A ficha nomeia só esse. Os outros vencidos não aparecem enquanto ele não for gerado.
+A data de corte da competência atual é o dia 1 do mês inicial do período. A da competência anterior é o dia 1 do período seguinte. O vencimento cai no dia do contrato, nesse mesmo mês. Um contrato que começa em 01/10/2026, anual e anterior, tem corte em 01/10/2027 e vencimento em 15/10/2027.
 
-Contrato mensal, competência Anterior, dia 15, início em 01/01/2026 e sem fim, lido em 07/11/2026, com nada cobrado: o próximo vencimento é 15/02/2026. Também já passaram 15/03, 15/04, 15/05, 15/06, 15/07, 15/08, 15/09 e 15/10. O período de outubro vence em 15/11 e ainda não venceu. O período de novembro vence em 15/12.
+A geração inclui todo período sem título cuja data de corte é hoje ou anterior, do mais antigo ao mais novo. Período cuja data de corte ainda não chegou fica de fora. A ficha, sem fim, continua nomeando só o próximo vencimento.
+
+Contrato mensal, competência anterior, dia 15, início em 01/10/2026 e sem fim, gerado em 07/11/2026: a data de corte 01/11/2026 já chegou, e nasce o título de 15/11/2026. O período de novembro espera 01/12/2026.
 
 Trocar o dia ou o valor recalcula as parcelas ainda sem título. Parcela já gerada guarda o vencimento e o valor da geração.
 
 ### Geração da parcela
 
-O botão "Gerar próxima cobrança" aparece em contrato Vigente com cobrança recorrente e com alguma parcela ainda sem título. Ele gera só a primeira parcela da fila que ainda não tem cobrança, tenha o vencimento passado ou não. Não pula parcela e não escolhe outro vencimento. Sem fim, essa fila não acaba enquanto o contrato estiver Vigente.
+Na lista, um clique gera as parcelas de todos os contratos vigentes com cobrança recorrente cuja data de corte já chegou. Não pula competência e não escolhe outro vencimento. Sem fim, a fila segue enquanto o contrato estiver vigente. A ficha de um contrato usa a mesma regra, só para ele.
 
 Suspenso, Encerrado, Cancelado e Rascunho não geram. Título já criado permanece se o contrato for suspenso ou encerrado depois. Se o vencimento já passou, o título nasce vencido.
 
@@ -331,7 +333,7 @@ O menu ganha Contratos ao lado de Ordens de serviço.
 
 A lista tem busca por número, título e nome do cliente, e filtro pela situação. A linha mostra número, cliente, título, situação, vigência e o valor com a periodicidade, ou "Sem cobrança". Sem fim, a vigência mostra o início seguido de "indeterminado". O aviso de vigência vencida aparece na linha quando há fim anterior a hoje.
 
-A ficha é uma página, no mesmo padrão da ordem. O fim em branco leva o texto "Em branco, o prazo fica indeterminado." A cobrança recorrente escolhe a periodicidade e a competência, Atual ou Anterior. Com fim, mostra a série. Sem fim, e com competência e dia preenchidos, mostra "Próximo vencimento" com a data do período mais antigo sem título e o texto "Sem data de fim, a cobrança segue um período por vez." Rascunho mostra Ativar e Cancelar. Vigente mostra Suspender, Encerrar e, na entrega 2, Gerar próxima cobrança. Suspenso mostra Retomar e Encerrar. O histórico fica na própria ficha, do mais recente para o mais antigo. Salvar volta à lista.
+A ficha é uma página, no mesmo padrão da ordem. O fim em branco leva o texto "Em branco, o prazo fica indeterminado." A cobrança recorrente escolhe a periodicidade e a competência, Atual ou Anterior. Com fim, mostra a série. Sem fim, e com competência e dia preenchidos, mostra "Próximo vencimento" com a data do período mais antigo sem título e o texto "Sem data de fim, a cobrança segue um período por vez." Rascunho mostra Ativar e Cancelar. Vigente mostra Suspender e Encerrar. Suspenso mostra Retomar e Encerrar. Na entrega 2, a lista tem o clique que gera as parcelas cuja data de corte já chegou. A ficha do contrato vigente gera as dele. O histórico fica na própria ficha, do mais recente para o mais antigo. Salvar volta à lista.
 
 Na ordem, o tipo Contrato abre a escolha dos contratos vigentes daquele cliente. Sem cliente, a escolha fica desabilitada. O número escolhido aparece no comprovante.
 

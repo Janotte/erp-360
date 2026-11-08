@@ -1,15 +1,24 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
-import { contractCounters, contracts } from '@erp-360/mod-contracts';
-import { meansOfPayment, paymentMethods } from '@erp-360/mod-financial';
+import { contractBillings, contractCounters, contracts } from '@erp-360/mod-contracts';
+import { meansOfPayment, paymentMethods, receivables } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
-import { addCivilDays, civilDate } from '@erp-360/shared';
-import { eq } from 'drizzle-orm';
+import {
+  addCivilDays,
+  civilDate,
+  contractBillingSchedule,
+  contractInstallmentsDue,
+} from '@erp-360/shared';
+import { and, eq } from 'drizzle-orm';
 
 import { buildApp } from '../src/app.ts';
 import { env } from '../src/config/index.ts';
 import { db } from '../src/db/index.ts';
+import {
+  contractBillingDescription,
+  contractBillingDocumentNumber,
+} from '../src/modules/contracts/billings.ts';
 import { createCompany, removeCompany } from './fixtures.ts';
 
 type ContractBody = {
@@ -75,7 +84,11 @@ describe('cadastro do contrato', { concurrency: false }, () => {
   let paymentMethodId = '';
 
   before(async () => {
-    assert.equal(env.database.name, 'erp360_test', 'Os testes só rodam no banco erp360_test.');
+    assert.equal(
+      env.database.name,
+      'erp360_test',
+      'Os testes só rodam no banco erp360_test.',
+    );
     await app.ready();
     const company = await createCompany('Contrato');
     tenantId = company.tenantId;
@@ -245,7 +258,9 @@ describe('cadastro do contrato', { concurrency: false }, () => {
     const active = cleared.json() as ContractDetail;
     assert.equal(active.endedOn, null);
     assert.equal(active.termExpired, false);
-    assert.deepEqual(active.schedule, [{ competence: '2026-11-01', dueOn: '2026-11-20' }]);
+    assert.deepEqual(active.schedule, [
+      { competence: '2026-11-01', dueOn: '2026-11-20' },
+    ]);
   });
 
   it('ativa o mensal e mostra os doze vencimentos', async () => {
@@ -310,12 +325,21 @@ describe('cadastro do contrato', { concurrency: false }, () => {
       monthlyBody({ title: 'Valor', billingCompetence: 'previous' }),
       monthlyBody({ title: 'Valor', paymentMethodId }),
     ]) {
-      const refused = await update(active.id, { ...body, status: 'active', suspensionReason: null });
+      const refused = await update(active.id, {
+        ...body,
+        status: 'active',
+        suspensionReason: null,
+      });
       assert.equal(refused.statusCode, 400, refused.body);
     }
 
     const saved = await update(active.id, {
-      ...monthlyBody({ title: 'Valor novo', notes: 'Portaria', periodAmount: 35_000, dueDay: 10 }),
+      ...monthlyBody({
+        title: 'Valor novo',
+        notes: 'Portaria',
+        periodAmount: 35_000,
+        dueDay: 10,
+      }),
       status: 'active',
       suspensionReason: null,
     });
@@ -323,7 +347,9 @@ describe('cadastro do contrato', { concurrency: false }, () => {
     const detail = saved.json() as ContractDetail;
     assert.equal(detail.events[0]?.kind, 'billing');
     assert.equal(detail.events[0]?.periodAmount, 35_000);
-    const activation = detail.events.find((event) => event.toStatus === 'active' && event.kind === 'status');
+    const activation = detail.events.find(
+      (event) => event.toStatus === 'active' && event.kind === 'status',
+    );
     assert.equal(activation?.periodAmount, 30_000);
   });
 
@@ -343,7 +369,10 @@ describe('cadastro do contrato', { concurrency: false }, () => {
       suspensionReason: null,
     });
     assert.equal(missing.statusCode, 400);
-    assert.equal((missing.json() as { message: string }).message, 'Informe o motivo da suspensão.');
+    assert.equal(
+      (missing.json() as { message: string }).message,
+      'Informe o motivo da suspensão.',
+    );
 
     const suspended = await update(id, {
       ...monthlyBody({ title: 'Suspensão', endedOn: '2027-12-31' }),
@@ -426,7 +455,10 @@ describe('cadastro do contrato', { concurrency: false }, () => {
     });
     assert.equal(byMask.statusCode, 200, byMask.body);
     const masked = byMask.json() as { data: { numberLabel: string; title: string }[] };
-    assert.equal(masked.data.some((row) => row.numberLabel === '000.001'), true);
+    assert.equal(
+      masked.data.some((row) => row.numberLabel === '000.001'),
+      true,
+    );
 
     const byDigit = await app.inject({
       method: 'GET',
@@ -434,7 +466,10 @@ describe('cadastro do contrato', { concurrency: false }, () => {
       headers: headers(),
     });
     const digits = byDigit.json() as { data: { number: number }[] };
-    assert.equal(digits.data.some((row) => row.number === 1), true);
+    assert.equal(
+      digits.data.some((row) => row.number === 1),
+      true,
+    );
 
     const byTitle = await app.inject({
       method: 'GET',
@@ -451,7 +486,10 @@ describe('cadastro do contrato', { concurrency: false }, () => {
       headers: headers(),
     });
     const customers = byCustomer.json() as { data: { customerName: string }[] };
-    assert.equal(customers.data.every((row) => row.customerName === 'Contrato'), true);
+    assert.equal(
+      customers.data.every((row) => row.customerName === 'Contrato'),
+      true,
+    );
     assert.equal(customers.data.length > 0, true);
 
     const [second] = await db
@@ -474,9 +512,17 @@ describe('cadastro do contrato', { concurrency: false }, () => {
       url: '/contracts?status=cancelled',
       headers: headers(),
     });
-    const cancelled = byStatus.json() as { data: { status: string; numberLabel: string }[] };
-    assert.equal(cancelled.data.every((row) => row.status === 'cancelled'), true);
-    assert.equal(cancelled.data.some((row) => row.numberLabel === '000.001'), true);
+    const cancelled = byStatus.json() as {
+      data: { status: string; numberLabel: string }[];
+    };
+    assert.equal(
+      cancelled.data.every((row) => row.status === 'cancelled'),
+      true,
+    );
+    assert.equal(
+      cancelled.data.some((row) => row.numberLabel === '000.001'),
+      true,
+    );
   });
 
   it('recusa forma inativa, fora da ordem e crédito em loja', async () => {
@@ -520,8 +566,14 @@ describe('cadastro do contrato', { concurrency: false }, () => {
       })
       .returning({ id: paymentMethods.id });
 
-    assert.equal((await create(noneBody({ paymentMethodId: inactive.id }))).statusCode, 400);
-    assert.equal((await create(noneBody({ paymentMethodId: otherChannel.id }))).statusCode, 400);
+    assert.equal(
+      (await create(noneBody({ paymentMethodId: inactive.id }))).statusCode,
+      400,
+    );
+    assert.equal(
+      (await create(noneBody({ paymentMethodId: otherChannel.id }))).statusCode,
+      400,
+    );
     const storeCredit = await create(noneBody({ paymentMethodId: credit.id }));
     assert.equal(storeCredit.statusCode, 400);
     assert.equal(
@@ -549,5 +601,347 @@ describe('cadastro do contrato', { concurrency: false }, () => {
     assert.equal(instants[instants.length - 1]?.toStatus, 'draft');
     assert.equal(instants[instants.length - 1]?.fromStatus, null);
     assert.deepEqual(detail.orders, []);
+  });
+});
+
+describe('cobrança do contrato', { concurrency: false }, () => {
+  const app = buildApp({ logger: false });
+  let token = '';
+  let tenantId = '';
+  let personId = '';
+  let paymentMethodId = '';
+  let meansOfPaymentId = '';
+
+  before(async () => {
+    assert.equal(
+      env.database.name,
+      'erp360_test',
+      'Os testes só rodam no banco erp360_test.',
+    );
+    await app.ready();
+    const company = await createCompany('Cobrança');
+    tenantId = company.tenantId;
+    personId = company.personId;
+    token = app.jwt.sign({ userId: company.userId, tenantId });
+    const [cash] = await db
+      .select({ id: meansOfPayment.id })
+      .from(meansOfPayment)
+      .where(eq(meansOfPayment.code, '01'))
+      .limit(1);
+    meansOfPaymentId = cash.id;
+    const [method] = await db
+      .insert(paymentMethods)
+      .values({
+        tenantId,
+        code: 'BOL',
+        name: 'Boleto',
+        meansOfPaymentId: cash.id,
+        receiptKind: 'bank',
+        useInServiceOrder: true,
+      })
+      .returning({ id: paymentMethods.id });
+    paymentMethodId = method.id;
+  });
+
+  after(async () => {
+    if (tenantId) {
+      await db.delete(contractBillings).where(eq(contractBillings.tenantId, tenantId));
+      await db.delete(receivables).where(eq(receivables.tenantId, tenantId));
+      await db.delete(contracts).where(eq(contracts.tenantId, tenantId));
+      await db.delete(contractCounters).where(eq(contractCounters.tenantId, tenantId));
+      await db.delete(paymentMethods).where(eq(paymentMethods.tenantId, tenantId));
+      await removeCompany(tenantId);
+    }
+    await app.close();
+  });
+
+  function headers() {
+    return { authorization: `Bearer ${token}` };
+  }
+
+  async function activate(body: ContractBody) {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/contracts',
+      headers: headers(),
+      payload: body,
+    });
+    assert.equal(created.statusCode, 201, created.body);
+    const detail = created.json() as ContractDetail;
+    const saved = await app.inject({
+      method: 'PUT',
+      url: `/contracts/${detail.id}`,
+      headers: headers(),
+      payload: { ...body, status: 'active', suspensionReason: null },
+    });
+    assert.equal(saved.statusCode, 200, saved.body);
+    return saved.json() as ContractDetail;
+  }
+
+  it('gera o recebível da data de corte e não repete a competência', async () => {
+    const today = civilDate(new Date(), 'America/Sao_Paulo');
+    const contract = await activate({
+      personId,
+      title: 'Suporte técnico',
+      startedOn: '2026-10-01',
+      endedOn: null,
+      billingKind: 'monthly',
+      billingCompetence: 'previous',
+      periodAmount: 107_000,
+      dueDay: 15,
+      paymentMethodId,
+      notes: '',
+    });
+    assert.equal(contract.numberLabel, '000.001');
+
+    const expected = contractInstallmentsDue({
+      startedOn: '2026-10-01',
+      endedOn: null,
+      billingKind: 'monthly',
+      billingCompetence: 'previous',
+      dueDay: 15,
+      asOf: today,
+    });
+    if (today >= '2026-11-07') {
+      assert.deepEqual(expected[0], { competence: '2026-10-01', dueOn: '2026-11-15' });
+    }
+
+    const preview = await app.inject({
+      method: 'GET',
+      url: `/contracts/billings/preview?contractId=${contract.id}`,
+      headers: headers(),
+    });
+    assert.equal(preview.statusCode, 200, preview.body);
+    assert.deepEqual(preview.json(), {
+      contracts: expected.length === 0 ? 0 : 1,
+      titles: expected.length,
+      amount: expected.length * 107_000,
+      failures: [],
+    });
+
+    const generated = await app.inject({
+      method: 'POST',
+      url: '/contracts/billings',
+      headers: headers(),
+      payload: { contractId: contract.id },
+    });
+    assert.equal(generated.statusCode, 200, generated.body);
+    assert.equal((generated.json() as { titles: number }).titles, expected.length);
+
+    for (const installment of expected) {
+      const documentNumber = contractBillingDocumentNumber(1, installment.competence);
+      const [title] = await db
+        .select({
+          description: receivables.description,
+          dueOn: receivables.dueOn,
+          installmentAmount: receivables.installmentAmount,
+          issueOn: receivables.issueOn,
+          status: receivables.status,
+          paymentMethodId: receivables.paymentMethodId,
+          meansOfPaymentId: receivables.meansOfPaymentId,
+          debtorId: receivables.debtorId,
+        })
+        .from(receivables)
+        .where(
+          and(
+            eq(receivables.tenantId, tenantId),
+            eq(receivables.documentNumber, documentNumber),
+          ),
+        );
+      assert.ok(title);
+      assert.equal(title.debtorId, personId);
+      assert.equal(title.dueOn, installment.dueOn);
+      assert.equal(title.installmentAmount, 107_000);
+      assert.equal(title.issueOn, today);
+      assert.equal(title.status, 'pendente');
+      assert.equal(title.paymentMethodId, paymentMethodId);
+      assert.equal(title.meansOfPaymentId, meansOfPaymentId);
+      assert.equal(
+        title.description,
+        contractBillingDescription('000.001', 'monthly', installment.competence),
+      );
+      const [billing] = await db
+        .select({
+          amount: contractBillings.amount,
+          dueOn: contractBillings.dueOn,
+        })
+        .from(contractBillings)
+        .where(
+          and(
+            eq(contractBillings.tenantId, tenantId),
+            eq(contractBillings.contractId, contract.id),
+            eq(contractBillings.competence, installment.competence),
+          ),
+        );
+      assert.equal(billing?.amount, 107_000);
+      assert.equal(billing?.dueOn, installment.dueOn);
+    }
+
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/contracts/${contract.id}`,
+      headers: headers(),
+    });
+    assert.equal(detail.statusCode, 200, detail.body);
+    assert.deepEqual(
+      (detail.json() as ContractDetail).schedule,
+      contractBillingSchedule({
+        startedOn: '2026-10-01',
+        endedOn: null,
+        billingKind: 'monthly',
+        billingCompetence: 'previous',
+        dueDay: 15,
+        billedCompetences: expected.map((row) => row.competence),
+      }),
+    );
+
+    const again = await app.inject({
+      method: 'POST',
+      url: '/contracts/billings',
+      headers: headers(),
+      payload: { contractId: contract.id },
+    });
+    assert.equal(again.statusCode, 200, again.body);
+    assert.deepEqual(again.json(), { contracts: 0, titles: 0, amount: 0, failures: [] });
+
+    if (expected[0]) {
+      await db
+        .update(receivables)
+        .set({ status: 'cancelado' })
+        .where(
+          and(
+            eq(receivables.tenantId, tenantId),
+            eq(
+              receivables.documentNumber,
+              contractBillingDocumentNumber(1, expected[0].competence),
+            ),
+          ),
+        );
+      const afterCancel = await app.inject({
+        method: 'POST',
+        url: '/contracts/billings',
+        headers: headers(),
+        payload: { contractId: contract.id },
+      });
+      assert.deepEqual(afterCancel.json(), {
+        contracts: 0,
+        titles: 0,
+        amount: 0,
+        failures: [],
+      });
+    }
+  });
+
+  it('deixa de fora suspenso, sem cobrança e o corte que ainda não chegou', async () => {
+    const today = civilDate(new Date(), 'America/Sao_Paulo');
+    const annual = await activate({
+      personId,
+      title: 'Anual anterior',
+      startedOn: '2026-10-01',
+      endedOn: null,
+      billingKind: 'annual',
+      billingCompetence: 'previous',
+      periodAmount: 50_000,
+      dueDay: 15,
+      paymentMethodId: null,
+      notes: '',
+    });
+    const suspended = await activate({
+      personId,
+      title: 'Suspenso',
+      startedOn: '2026-01-01',
+      endedOn: null,
+      billingKind: 'monthly',
+      billingCompetence: 'current',
+      periodAmount: 10_000,
+      dueDay: 10,
+      paymentMethodId: null,
+      notes: '',
+    });
+    const held = await app.inject({
+      method: 'PUT',
+      url: `/contracts/${suspended.id}`,
+      headers: headers(),
+      payload: {
+        personId,
+        title: 'Suspenso',
+        startedOn: '2026-01-01',
+        endedOn: null,
+        billingKind: 'monthly',
+        billingCompetence: 'current',
+        periodAmount: 10_000,
+        dueDay: 10,
+        paymentMethodId: null,
+        notes: '',
+        status: 'suspended',
+        suspensionReason: 'Pausa',
+      },
+    });
+    assert.equal(held.statusCode, 200, held.body);
+    await activate({
+      personId,
+      title: 'Sem cobrança',
+      startedOn: '2026-01-01',
+      endedOn: null,
+      billingKind: 'none',
+      billingCompetence: null,
+      periodAmount: 0,
+      dueDay: null,
+      paymentMethodId: null,
+      notes: '',
+    });
+
+    const refused = await app.inject({
+      method: 'POST',
+      url: '/contracts/billings',
+      headers: headers(),
+      payload: { contractId: suspended.id },
+    });
+    assert.equal(refused.statusCode, 400, refused.body);
+    assert.equal(
+      (refused.json() as { message: string }).message,
+      'Só contrato vigente com cobrança gera parcela.',
+    );
+
+    const annualDue = contractInstallmentsDue({
+      startedOn: '2026-10-01',
+      endedOn: null,
+      billingKind: 'annual',
+      billingCompetence: 'previous',
+      dueDay: 15,
+      asOf: today,
+    });
+    const preview = await app.inject({
+      method: 'GET',
+      url: '/contracts/billings/preview',
+      headers: headers(),
+    });
+    assert.equal(preview.statusCode, 200, preview.body);
+    const previewBody = preview.json() as { titles: number };
+    assert.equal(previewBody.titles, annualDue.length);
+
+    const generated = await app.inject({
+      method: 'POST',
+      url: '/contracts/billings',
+      headers: headers(),
+      payload: {},
+    });
+    assert.equal(generated.statusCode, 200, generated.body);
+    assert.equal((generated.json() as { failures: unknown[] }).failures.length, 0);
+    assert.equal((generated.json() as { titles: number }).titles, annualDue.length);
+
+    const [annualBilling] = await db
+      .select({ id: contractBillings.id })
+      .from(contractBillings)
+      .where(eq(contractBillings.contractId, annual.id));
+    if (annualDue.length === 0) assert.equal(annualBilling, undefined);
+    else assert.ok(annualBilling);
+
+    const quiet = await app.inject({
+      method: 'GET',
+      url: '/contracts/billings/preview',
+      headers: headers(),
+    });
+    assert.deepEqual(quiet.json(), { contracts: 0, titles: 0, amount: 0, failures: [] });
   });
 });

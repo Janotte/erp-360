@@ -1,5 +1,5 @@
 import { tenantColumns, tenants, users } from '@erp-360/mod-core';
-import { paymentMethods } from '@erp-360/mod-financial';
+import { paymentMethods, receivables } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
 import { sql } from 'drizzle-orm';
 import {
@@ -174,6 +174,48 @@ export const contractEvents = pgTable(
     check(
       'contract_events_from_status_check',
       sql`(${table.fromStatus} is null) = (${table.kind} = 'status' and ${table.toStatus} = 'draft')`,
+    ),
+  ],
+);
+
+/** Período de contrato que já gerou recebível. Cancelar o título não apaga a linha. */
+export const contractBillings = pgTable(
+  'contract_billings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ...tenantColumns,
+    contractId: uuid('contract_id').notNull(),
+    competence: date('competence').notNull(),
+    dueOn: date('due_on').notNull(),
+    amount: integer('amount').notNull(),
+    receivableId: uuid('receivable_id').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    unique('contract_billings_id_tenant_id_unique').on(table.id, table.tenantId),
+    unique('contract_billings_tenant_contract_competence_unique').on(
+      table.tenantId,
+      table.contractId,
+      table.competence,
+    ),
+    unique('contract_billings_tenant_receivable_unique').on(
+      table.tenantId,
+      table.receivableId,
+    ),
+    foreignKey({
+      name: 'contract_billings_contract_tenant_fk',
+      columns: [table.contractId, table.tenantId],
+      foreignColumns: [contracts.id, contracts.tenantId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'contract_billings_receivable_tenant_fk',
+      columns: [table.receivableId, table.tenantId],
+      foreignColumns: [receivables.id, receivables.tenantId],
+    }).onDelete('restrict'),
+    check('contract_billings_amount_check', sql`${table.amount} > 0`),
+    check(
+      'contract_billings_competence_day_check',
+      sql`extract(day from ${table.competence}) = 1`,
     ),
   ],
 );

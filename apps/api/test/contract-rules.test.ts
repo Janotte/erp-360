@@ -1,16 +1,20 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { contractBillingSchedule } from '@erp-360/shared';
+import { contractBillingSchedule, contractInstallmentsDue } from '@erp-360/shared';
 
+import {
+  contractBillingDescription,
+  contractBillingDocumentNumber,
+} from '../src/modules/contracts/billings.ts';
 import {
   assertBilling,
   assertMutable,
   assertTermKeepsBilledPeriods,
   assertTransition,
+  type ContractFields,
   formatContractNumber,
   termExpired,
-  type ContractFields,
 } from '../src/modules/contracts/rules.ts';
 
 const monthlyCurrentDues = [
@@ -105,8 +109,14 @@ describe('série de vencimentos', () => {
       schedule('semiannual', 'previous').map((row) => row.dueOn),
       ['2027-05-20', '2027-11-20'],
     );
-    assert.deepEqual(schedule('annual', 'current').map((row) => row.dueOn), ['2026-11-20']);
-    assert.deepEqual(schedule('annual', 'previous').map((row) => row.dueOn), ['2027-11-20']);
+    assert.deepEqual(
+      schedule('annual', 'current').map((row) => row.dueOn),
+      ['2026-11-20'],
+    );
+    assert.deepEqual(
+      schedule('annual', 'previous').map((row) => row.dueOn),
+      ['2027-11-20'],
+    );
   });
 
   it('marca a competência no dia 1 do mês inicial do período', () => {
@@ -167,6 +177,109 @@ describe('série de vencimentos', () => {
         dueDay: 20,
       }),
       [{ competence: '2026-11-01', dueOn: '2027-02-20' }],
+    );
+  });
+});
+
+describe('parcelas com data de corte já chegada', () => {
+  it('em 07/11/2026 o mensal anterior de outubro vence em 15/11 e o de novembro espera', () => {
+    assert.deepEqual(
+      contractInstallmentsDue({
+        startedOn: '2026-10-01',
+        endedOn: null,
+        billingKind: 'monthly',
+        billingCompetence: 'previous',
+        dueDay: 15,
+        asOf: '2026-11-07',
+      }),
+      [{ competence: '2026-10-01', dueOn: '2026-11-15' }],
+    );
+    assert.deepEqual(
+      contractInstallmentsDue({
+        startedOn: '2026-10-01',
+        endedOn: null,
+        billingKind: 'monthly',
+        billingCompetence: 'previous',
+        dueDay: 15,
+        asOf: '2026-10-31',
+      }),
+      [],
+    );
+    assert.deepEqual(
+      contractInstallmentsDue({
+        startedOn: '2026-10-01',
+        endedOn: null,
+        billingKind: 'monthly',
+        billingCompetence: 'previous',
+        dueDay: 15,
+        asOf: '2026-12-01',
+      }),
+      [
+        { competence: '2026-10-01', dueOn: '2026-11-15' },
+        { competence: '2026-11-01', dueOn: '2026-12-15' },
+      ],
+    );
+  });
+
+  it('o anual anterior de 01/10/2026 corta em 01/10/2027 e vence em 15/10/2027', () => {
+    const input = {
+      startedOn: '2026-10-01',
+      endedOn: null,
+      billingKind: 'annual' as const,
+      billingCompetence: 'previous' as const,
+      dueDay: 15,
+    };
+    assert.deepEqual(contractInstallmentsDue({ ...input, asOf: '2026-11-07' }), []);
+    assert.deepEqual(contractInstallmentsDue({ ...input, asOf: '2027-09-30' }), []);
+    assert.deepEqual(contractInstallmentsDue({ ...input, asOf: '2027-10-01' }), [
+      { competence: '2026-10-01', dueOn: '2027-10-15' },
+    ]);
+  });
+
+  it('junta os cortes passados e pula a competência que já tem título', () => {
+    const input = {
+      startedOn: '2026-01-01',
+      endedOn: null,
+      billingKind: 'monthly' as const,
+      billingCompetence: 'previous' as const,
+      dueDay: 15,
+      asOf: '2026-11-07',
+    };
+    const all = contractInstallmentsDue(input);
+    assert.equal(all[0]?.dueOn, '2026-02-15');
+    assert.equal(all.at(-1)?.dueOn, '2026-11-15');
+    assert.equal(all.length, 10);
+    assert.equal(
+      contractBillingDescription('000.001', 'monthly', '2026-10-01'),
+      'Contrato 000.001 · competência 10/2026',
+    );
+    assert.equal(
+      contractBillingDescription('000.001', 'quarterly', '2026-10-01'),
+      'Contrato 000.001 · competência 10/2026 a 12/2026',
+    );
+    assert.equal(
+      contractBillingDescription('000.001', 'annual', '2026-10-01'),
+      'Contrato 000.001 · competência 10/2026 a 09/2027',
+    );
+    assert.equal(contractBillingDocumentNumber(1, '2026-10-01'), '000001202610');
+    assert.deepEqual(
+      contractInstallmentsDue({
+        ...input,
+        billedCompetences: [
+          '2026-01-01',
+          '2026-02-01',
+          '2026-03-01',
+          '2026-04-01',
+          '2026-05-01',
+          '2026-06-01',
+          '2026-07-01',
+          '2026-08-01',
+        ],
+      }),
+      [
+        { competence: '2026-09-01', dueOn: '2026-10-15' },
+        { competence: '2026-10-01', dueOn: '2026-11-15' },
+      ],
     );
   });
 });

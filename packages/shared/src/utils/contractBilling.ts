@@ -55,11 +55,55 @@ function installmentAt(
   dueDay: number,
 ): ContractInstallment {
   const due =
-    billingCompetence === 'current' ? cursor : shiftMonth(cursor.year, cursor.month, span);
+    billingCompetence === 'current'
+      ? cursor
+      : shiftMonth(cursor.year, cursor.month, span);
   return {
     competence: civilDate(cursor.year, cursor.month, 1),
     dueOn: civilDate(due.year, due.month, dueDay),
   };
+}
+
+/** Dia 1 do mês em que a parcela pode ser gerada. É o mês do vencimento. */
+export function contractBillingCutoff(dueOn: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueOn)) throw new Error('Data inválida.');
+  return `${dueOn.slice(0, 8)}01`;
+}
+
+/**
+ * Parcelas sem título cuja data de corte é `asOf` ou anterior.
+ * A fila anda do período mais antigo ao mais novo e para quando a data de corte ainda não chegou.
+ */
+export function contractInstallmentsDue(input: {
+  startedOn: string;
+  endedOn: string | null;
+  billingKind: ContractBillingKind;
+  billingCompetence: ContractBillingCompetence;
+  dueDay: number;
+  asOf: string;
+  billedCompetences?: readonly string[];
+}): ContractInstallment[] {
+  if (!Number.isInteger(input.dueDay) || input.dueDay < 1 || input.dueDay > 28) {
+    throw new Error('O dia de vencimento vai de 1 a 28.');
+  }
+  const start = parseCivilDate(input.startedOn);
+  parseCivilDate(input.asOf);
+  const span = monthsByKind[input.billingKind];
+  const endIndex = input.endedOn
+    ? monthIndex(parseCivilDate(input.endedOn).year, parseCivilDate(input.endedOn).month)
+    : null;
+  const billed = new Set(input.billedCompetences ?? []);
+  const rows: ContractInstallment[] = [];
+  let cursor = { year: start.year, month: start.month };
+
+  for (;;) {
+    if (endIndex !== null && monthIndex(cursor.year, cursor.month) > endIndex) break;
+    const row = installmentAt(cursor, span, input.billingCompetence, input.dueDay);
+    if (contractBillingCutoff(row.dueOn) > input.asOf) break;
+    if (!billed.has(row.competence)) rows.push(row);
+    cursor = shiftMonth(cursor.year, cursor.month, span);
+  }
+  return rows;
 }
 
 /**
