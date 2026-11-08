@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 
 import { PersonSearchSelect } from '@/components/Persons/PersonSearchSelect';
 import { Button } from '@/components/ui/button';
+import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -26,6 +27,7 @@ import {
   contractsService,
   type ContractStatus,
 } from '@/services/contracts';
+import { financialService } from '@/services/financials';
 import { paymentMethodsService } from '@/services/paymentMethods';
 
 const selectClass =
@@ -105,6 +107,7 @@ type Draft = {
   amount: string;
   dueDay: string;
   paymentMethodId: string;
+  planAccountId: string;
   notes: string;
   status: ContractStatus;
   suspensionReason: string;
@@ -122,6 +125,7 @@ function emptyDraft(): Draft {
     amount: '',
     dueDay: '',
     paymentMethodId: '',
+    planAccountId: '',
     notes: '',
     status: 'draft',
     suspensionReason: '',
@@ -141,6 +145,7 @@ function draftFromContract(contract: ContractDetail): Draft {
       contract.billingKind === 'none' ? '' : formatCurrencyInput(contract.periodAmount),
     dueDay: contract.dueDay ? String(contract.dueDay) : '',
     paymentMethodId: contract.paymentMethodId ?? '',
+    planAccountId: contract.planAccountId ?? '',
     notes: contract.notes,
     status: contract.status,
     suspensionReason: contract.suspensionReason ?? '',
@@ -177,6 +182,7 @@ function toInput(draft: Draft): ContractInput {
     periodAmount: recurring ? parseCurrencyToCents(draft.amount) : 0,
     dueDay: recurring && draft.dueDay !== '' && Number.isInteger(dueDay) ? dueDay : null,
     paymentMethodId: recurring ? draft.paymentMethodId || null : null,
+    planAccountId: recurring ? draft.planAccountId || null : null,
     notes: draft.notes.trim(),
   };
 }
@@ -240,6 +246,11 @@ export function FormContract() {
         isActive: true,
         channel: 'serviceOrder',
       }),
+  });
+  const planAccounts = useQuery({
+    queryKey: ['financial', 'plan-accounts', 'revenue'],
+    queryFn: () =>
+      financialService.listPlanAccounts({ nature: 'revenue', acceptsEntries: true }),
   });
 
   useEffect(() => {
@@ -342,6 +353,19 @@ export function FormContract() {
   const recurring = draft.billingKind !== 'none';
   const schedule = scheduleOf(draft);
   const frozen = draft.status !== 'draft';
+  const accountOptions = planAccounts.data ?? [];
+  const savedAccountLabel =
+    draft.planAccountId &&
+    contract.data?.planAccountId === draft.planAccountId &&
+    contract.data.planAccountCode
+      ? `${contract.data.planAccountCode} - ${contract.data.planAccountName ?? ''}`
+      : '';
+  const planAccountOptions =
+    draft.planAccountId &&
+    savedAccountLabel &&
+    !accountOptions.some((item) => item.id === draft.planAccountId)
+      ? [{ id: draft.planAccountId, label: savedAccountLabel }, ...accountOptions]
+      : accountOptions;
 
   function patch(partial: Partial<Draft>) {
     setDraft((current) => (current ? { ...current, ...partial } : current));
@@ -434,6 +458,7 @@ export function FormContract() {
                   amount: billingKind === 'none' ? '' : draft.amount,
                   dueDay: billingKind === 'none' ? '' : draft.dueDay,
                   paymentMethodId: billingKind === 'none' ? '' : draft.paymentMethodId,
+                  planAccountId: billingKind === 'none' ? '' : draft.planAccountId,
                 });
               }}
             >
@@ -509,6 +534,21 @@ export function FormContract() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="col-span-12 space-y-1.5 md:col-span-8">
+                <Label htmlFor="contract-account">Plano de contas</Label>
+                <CatalogSearchSelect
+                  id="contract-account"
+                  enterSequence
+                  value={draft.planAccountId}
+                  onChange={(planAccountId) => patch({ planAccountId })}
+                  options={planAccountOptions}
+                  placeholder="Buscar conta de receita..."
+                  emptyMessage="Nenhuma conta de receita cadastrada."
+                  allowClear={!locked}
+                  disabled={locked}
+                  isLoading={planAccounts.isLoading}
+                />
               </div>
             </>
           ) : null}

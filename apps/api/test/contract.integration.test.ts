@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
 import { contractBillings, contractCounters, contracts } from '@erp-360/mod-contracts';
-import { meansOfPayment, paymentMethods, receivables } from '@erp-360/mod-financial';
+import {
+  meansOfPayment,
+  paymentMethods,
+  planAccounts,
+  receivables,
+} from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
 import {
   addCivilDays,
@@ -31,6 +36,7 @@ type ContractBody = {
   periodAmount: number;
   dueDay: number | null;
   paymentMethodId: string | null;
+  planAccountId?: string | null;
   notes: string;
 };
 
@@ -48,6 +54,8 @@ type ContractEvent = {
 
 type ContractDetail = ContractBody & {
   id: string;
+  planAccountCode: string | null;
+  planAccountName: string | null;
   number: number;
   numberLabel: string;
   status: string;
@@ -119,6 +127,7 @@ describe('cadastro do contrato', { concurrency: false }, () => {
       await db.delete(contracts).where(eq(contracts.tenantId, tenantId));
       await db.delete(contractCounters).where(eq(contractCounters.tenantId, tenantId));
       await db.delete(paymentMethods).where(eq(paymentMethods.tenantId, tenantId));
+      await db.delete(planAccounts).where(eq(planAccounts.tenantId, tenantId));
       await removeCompany(tenantId);
     }
     if (otherTenantId) await removeCompany(otherTenantId);
@@ -140,6 +149,7 @@ describe('cadastro do contrato', { concurrency: false }, () => {
       periodAmount: 0,
       dueDay: null,
       paymentMethodId: null,
+      planAccountId: null,
       notes: '',
       ...overrides,
     };
@@ -156,6 +166,7 @@ describe('cadastro do contrato', { concurrency: false }, () => {
       periodAmount: 30_000,
       dueDay: 20,
       paymentMethodId: null,
+      planAccountId: null,
       notes: '',
       ...overrides,
     };
@@ -582,6 +593,99 @@ describe('cadastro do contrato', { concurrency: false }, () => {
     );
   });
 
+  it('guarda conta de receita e recusa despesa, sintética e inativa', async () => {
+    const [revenue] = await db
+      .insert(planAccounts)
+      .values({
+        tenantId,
+        accountCode: '3.01',
+        name: 'Receita de contratos',
+        nature: 'revenue',
+        dreLine: 'gross_revenue',
+        acceptsEntries: true,
+      })
+      .returning({ id: planAccounts.id });
+    const [expense] = await db
+      .insert(planAccounts)
+      .values({
+        tenantId,
+        accountCode: '4.01',
+        name: 'Despesa administrativa',
+        nature: 'expense',
+        dreLine: 'operating_expense',
+        acceptsEntries: true,
+      })
+      .returning({ id: planAccounts.id });
+    const [group] = await db
+      .insert(planAccounts)
+      .values({
+        tenantId,
+        accountCode: '3',
+        name: 'Receitas',
+        nature: 'revenue',
+        dreLine: 'gross_revenue',
+        acceptsEntries: false,
+      })
+      .returning({ id: planAccounts.id });
+    const [inactive] = await db
+      .insert(planAccounts)
+      .values({
+        tenantId,
+        accountCode: '3.02',
+        name: 'Receita antiga',
+        nature: 'revenue',
+        dreLine: 'gross_revenue',
+        acceptsEntries: true,
+        isActive: false,
+      })
+      .returning({ id: planAccounts.id });
+
+    const saved = await open(monthlyBody({ planAccountId: revenue.id }));
+    assert.equal(saved.planAccountId, revenue.id);
+    assert.equal(saved.planAccountCode, '3.01');
+    const cleared = await open(noneBody({ planAccountId: revenue.id }));
+    assert.equal(cleared.planAccountId, null);
+
+    for (const accountId of [expense.id, group.id, inactive.id]) {
+      const refused = await create(monthlyBody({ planAccountId: accountId }));
+      assert.equal(refused.statusCode, 400, refused.body);
+    }
+    assert.equal(
+      (await create(monthlyBody({ planAccountId: expense.id }))).json().message,
+      'O contrato usa uma conta de receita que aceita lançamento.',
+    );
+    const inactiveResponse = await create(monthlyBody({ planAccountId: inactive.id }));
+    assert.equal(
+      (inactiveResponse.json() as { message: string }).message,
+      'A conta informada está inativa.',
+    );
+
+    const [otherRevenue] = await db
+      .insert(planAccounts)
+      .values({
+        tenantId,
+        accountCode: '3.03',
+        name: 'Receita de locação',
+        nature: 'revenue',
+        dreLine: 'gross_revenue',
+        acceptsEntries: true,
+      })
+      .returning({ id: planAccounts.id });
+    const activated = await update(saved.id, {
+      ...monthlyBody({ planAccountId: revenue.id }),
+      status: 'active',
+      suspensionReason: null,
+    });
+    assert.equal(activated.statusCode, 200, activated.body);
+    const moved = await update(saved.id, {
+      ...monthlyBody({ planAccountId: otherRevenue.id, title: 'Mensal revista' }),
+      status: 'active',
+      suspensionReason: null,
+    });
+    assert.equal(moved.statusCode, 200, moved.body);
+    assert.equal((moved.json() as ContractDetail).planAccountId, otherRevenue.id);
+  });
+
   it('devolve o histórico do mais recente para o mais antigo', async () => {
     const byMask = await app.inject({
       method: 'GET',
@@ -611,6 +715,7 @@ describe('cobrança do contrato', { concurrency: false }, () => {
   let personId = '';
   let paymentMethodId = '';
   let meansOfPaymentId = '';
+  let planAccountId = '';
 
   before(async () => {
     assert.equal(
@@ -641,6 +746,18 @@ describe('cobrança do contrato', { concurrency: false }, () => {
       })
       .returning({ id: paymentMethods.id });
     paymentMethodId = method.id;
+    const [revenue] = await db
+      .insert(planAccounts)
+      .values({
+        tenantId,
+        accountCode: '3.01',
+        name: 'Receita de contratos',
+        nature: 'revenue',
+        dreLine: 'gross_revenue',
+        acceptsEntries: true,
+      })
+      .returning({ id: planAccounts.id });
+    planAccountId = revenue.id;
   });
 
   after(async () => {
@@ -650,6 +767,7 @@ describe('cobrança do contrato', { concurrency: false }, () => {
       await db.delete(contracts).where(eq(contracts.tenantId, tenantId));
       await db.delete(contractCounters).where(eq(contractCounters.tenantId, tenantId));
       await db.delete(paymentMethods).where(eq(paymentMethods.tenantId, tenantId));
+      await db.delete(planAccounts).where(eq(planAccounts.tenantId, tenantId));
       await removeCompany(tenantId);
     }
     await app.close();
@@ -690,6 +808,7 @@ describe('cobrança do contrato', { concurrency: false }, () => {
       periodAmount: 107_000,
       dueDay: 15,
       paymentMethodId,
+      planAccountId,
       notes: '',
     });
     assert.equal(contract.numberLabel, '000.001');
@@ -739,6 +858,7 @@ describe('cobrança do contrato', { concurrency: false }, () => {
           status: receivables.status,
           paymentMethodId: receivables.paymentMethodId,
           meansOfPaymentId: receivables.meansOfPaymentId,
+          planAccountId: receivables.planAccountId,
           debtorId: receivables.debtorId,
         })
         .from(receivables)
@@ -756,6 +876,7 @@ describe('cobrança do contrato', { concurrency: false }, () => {
       assert.equal(title.status, 'pendente');
       assert.equal(title.paymentMethodId, paymentMethodId);
       assert.equal(title.meansOfPaymentId, meansOfPaymentId);
+      assert.equal(title.planAccountId, planAccountId);
       assert.equal(
         title.description,
         contractBillingDescription('000.001', 'monthly', installment.competence),

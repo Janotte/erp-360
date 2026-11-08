@@ -1,5 +1,5 @@
 import { tenantColumns, tenants, users } from '@erp-360/mod-core';
-import { paymentMethods, receivables } from '@erp-360/mod-financial';
+import { paymentMethods, planAccounts, receivables } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
 import { sql } from 'drizzle-orm';
 import {
@@ -80,6 +80,7 @@ export const contracts = pgTable(
     periodAmount: integer('period_amount').default(0).notNull(),
     dueDay: smallint('due_day'),
     paymentMethodId: uuid('payment_method_id'),
+    planAccountId: uuid('plan_account_id'),
     notes: text('notes').default('').notNull(),
     suspensionReason: varchar('suspension_reason', { length: 200 }),
     closedOn: date('closed_on'),
@@ -97,6 +98,11 @@ export const contracts = pgTable(
       name: 'contracts_payment_method_tenant_fk',
       columns: [table.paymentMethodId, table.tenantId],
       foreignColumns: [paymentMethods.id, paymentMethods.tenantId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'contracts_plan_account_tenant_fk',
+      columns: [table.planAccountId, table.tenantId],
+      foreignColumns: [planAccounts.id, planAccounts.tenantId],
     }).onDelete('restrict'),
     check('contracts_number_check', sql`${table.number} > 0`),
     check('contracts_title_check', sql`length(trim(${table.title})) > 0`),

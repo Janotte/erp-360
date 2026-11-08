@@ -32,16 +32,17 @@ O título nasce com o valor do período na hora da geração. Mudar o valor ou o
 
 ## Recebível
 
-| Campo      | Origem                                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------------------------ |
-| Devedor    | Cliente do contrato                                                                                          |
-| Valor      | Valor do período, em centavos                                                                                |
-| Vencimento | Vencimento da parcela                                                                                        |
-| Emissão    | Hoje, no fuso da cidade da empresa                                                                           |
-| Descrição  | Mensal: `Contrato 000.001 · competência 10/2026`. Demais: `Contrato 000.001 · competência 10/2026 a 12/2026` |
-| Forma      | Forma do contrato, quando houver, com o meio dessa forma                                                     |
-| Situação   | `pendente`                                                                                                   |
-| Documento  | Número do contrato, seis dígitos sem pontos, mais o início do período em `AAAAMM`                            |
+| Campo           | Origem                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------ |
+| Devedor         | Cliente do contrato                                                                                          |
+| Valor           | Valor do período, em centavos                                                                                |
+| Vencimento      | Vencimento da parcela                                                                                        |
+| Emissão         | Hoje, no fuso da cidade da empresa                                                                           |
+| Descrição       | Mensal: `Contrato 000.001 · competência 10/2026`. Demais: `Contrato 000.001 · competência 10/2026 a 12/2026` |
+| Forma           | Forma do contrato, quando houver, com o meio dessa forma                                                     |
+| Plano de contas | Conta de receita do contrato, quando houver. Título já emitido guarda a conta da geração.                    |
+| Situação        | `pendente`                                                                                                   |
+| Documento       | Número do contrato, seis dígitos sem pontos, mais o início do período em `AAAAMM`                            |
 
 `contract_billings` guarda contrato, competência (dia 1 do mês inicial), vencimento calculado, valor cobrado e o recebível. Único por empresa, contrato e competência, e por empresa e recebível.
 

@@ -125,6 +125,7 @@ async function dueContracts(tenantId: string, contractId?: string) {
       periodAmount: contracts.periodAmount,
       dueDay: contracts.dueDay,
       paymentMethodId: contracts.paymentMethodId,
+      planAccountId: contracts.planAccountId,
     })
     .from(contracts)
     .where(and(...filters));
@@ -231,6 +232,7 @@ export async function generateContractBillings(tenantId: string, contractId?: st
               installmentAmount: row.periodAmount,
               dueOn: installment.dueOn,
               status: 'pendente',
+              planAccountId: row.planAccountId,
               ...payment,
             })
             .returning({ id: receivables.id });

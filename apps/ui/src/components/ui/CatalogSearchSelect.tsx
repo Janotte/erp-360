@@ -21,6 +21,7 @@ interface CatalogSearchSelectProps {
   isLoading?: boolean;
   disabled?: boolean;
   id?: string;
+  enterSequence?: boolean;
 }
 
 export function CatalogSearchSelect({
@@ -34,6 +35,7 @@ export function CatalogSearchSelect({
   isLoading = false,
   disabled = false,
   id,
+  enterSequence = false,
 }: CatalogSearchSelectProps) {
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -94,6 +96,7 @@ export function CatalogSearchSelect({
           <button
             type="button"
             id={id}
+            {...(enterSequence ? { 'data-enter-sequence': '' } : {})}
             className="flex min-w-0 flex-1 items-center gap-2 px-1 text-left text-sm"
             onClick={() => setOpen(true)}
           >
@@ -118,6 +121,7 @@ export function CatalogSearchSelect({
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
           <Input
             id={id}
+            {...(enterSequence ? { 'data-enter-sequence': '' } : {})}
             value={searchText}
             placeholder={placeholder}
             className="pl-9"

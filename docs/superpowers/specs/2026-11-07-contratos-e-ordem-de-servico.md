@@ -84,21 +84,21 @@ Entra a lista de serviços do catálogo incluídos na cobrança do período e, s
 
 ## Núcleo do contrato
 
-| Campo              | Papel                                                                                                                    |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `number`           | Inteiro sequencial da empresa. Na tela, seis dígitos em grupos de três, como a ordem. O contador não reaproveita número. |
-| `personId`         | Cliente ativo, da mesma empresa, com `isClient`.                                                                         |
-| `title`            | Nome curto do contrato, até 120 caracteres.                                                                              |
-| `status`           | Situação.                                                                                                                |
-| `startedOn`        | Início da vigência. Obrigatório.                                                                                         |
-| `endedOn`          | Fim da vigência. Vazio significa prazo indeterminado, com ou sem cobrança. Quando preenchido, é igual ou posterior ao início. |
-| `billingKind`      | `none`, `monthly`, `quarterly`, `semiannual` ou `annual`.                                                                |
-| `billingCompetence` | `current` ou `previous`. Obrigatório na cobrança recorrente. Vazio sem cobrança. Na tela, Atual e Anterior.             |
-| `periodAmount`     | Centavos do período. Zero quando não há cobrança. Maior que zero quando há.                                              |
-| `dueDay`           | Dia do vencimento, de 1 a 28. Obrigatório na cobrança recorrente. Vazio sem cobrança. O limite 28 evita mês curto.       |
-| `paymentMethodId`  | Forma comercial da cobrança, opcional. A mesma `payment_methods` da ordem.                                               |
-| `notes`            | Texto livre.                                                                                                             |
-| `suspensionReason` | Obrigatório enquanto Suspenso. Vazio nas outras situações.                                                               |
+| Campo               | Papel                                                                                                                         |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `number`            | Inteiro sequencial da empresa. Na tela, seis dígitos em grupos de três, como a ordem. O contador não reaproveita número.      |
+| `personId`          | Cliente ativo, da mesma empresa, com `isClient`.                                                                              |
+| `title`             | Nome curto do contrato, até 120 caracteres.                                                                                   |
+| `status`            | Situação.                                                                                                                     |
+| `startedOn`         | Início da vigência. Obrigatório.                                                                                              |
+| `endedOn`           | Fim da vigência. Vazio significa prazo indeterminado, com ou sem cobrança. Quando preenchido, é igual ou posterior ao início. |
+| `billingKind`       | `none`, `monthly`, `quarterly`, `semiannual` ou `annual`.                                                                     |
+| `billingCompetence` | `current` ou `previous`. Obrigatório na cobrança recorrente. Vazio sem cobrança. Na tela, Atual e Anterior.                   |
+| `periodAmount`      | Centavos do período. Zero quando não há cobrança. Maior que zero quando há.                                                   |
+| `dueDay`            | Dia do vencimento, de 1 a 28. Obrigatório na cobrança recorrente. Vazio sem cobrança. O limite 28 evita mês curto.            |
+| `paymentMethodId`   | Forma comercial da cobrança, opcional. A mesma `payment_methods` da ordem.                                                    |
+| `notes`             | Texto livre.                                                                                                                  |
+| `suspensionReason`  | Obrigatório enquanto Suspenso. Vazio nas outras situações.                                                                    |
 
 O contrato nasce Rascunho, já com número. Rascunho edita cliente, título, datas, cobrança, periodicidade, competência, forma e observação. Vigente e Suspenso editam título, fim da vigência, observação e, pela regra de histórico, o valor do período e o dia. Cliente, início, número, periodicidade e competência não mudam depois da ativação. Encerrado e Cancelado não editam.
 
@@ -157,10 +157,10 @@ A série de vencimentos já aparece na entrega 1. O título em `receivables` ent
 | `semiannual`  | Semestral    | 6                |
 | `annual`      | Anual        | 12               |
 
-| `billingCompetence` | Rótulo   | Vencimento                                                                 |
-| ------------------- | -------- | -------------------------------------------------------------------------- |
-| `current`           | Atual    | Dia `dueDay` do primeiro mês do período                                    |
-| `previous`          | Anterior | Dia `dueDay` do mês seguinte ao último mês do período                      |
+| `billingCompetence` | Rótulo   | Vencimento                                            |
+| ------------------- | -------- | ----------------------------------------------------- |
+| `current`           | Atual    | Dia `dueDay` do primeiro mês do período               |
+| `previous`          | Anterior | Dia `dueDay` do mês seguinte ao último mês do período |
 
 O valor é o do período inteiro. Um contrato trimestral de R$ 300 gera um título de R$ 300 a cada trimestre, não três títulos de R$ 100. Período que ultrapassa o fim da vigência cobra o valor integral. Não há proporcionalidade.
 
@@ -172,16 +172,16 @@ O primeiro período começa no mês de `startedOn`. Cada período seguinte come�
 
 Contrato de 01/11/2026 a 31/10/2027, dia 20:
 
-| Periodicidade | Competência | Vencimentos |
-| ------------- | ----------- | ----------- |
-| Mensal | Atual | 20/11/2026, 20/12/2026, 20/01/2027, 20/02/2027, 20/03/2027, 20/04/2027, 20/05/2027, 20/06/2027, 20/07/2027, 20/08/2027, 20/09/2027, 20/10/2027 |
-| Mensal | Anterior | 20/12/2026, 20/01/2027, 20/02/2027, 20/03/2027, 20/04/2027, 20/05/2027, 20/06/2027, 20/07/2027, 20/08/2027, 20/09/2027, 20/10/2027, 20/11/2027 |
-| Trimestral | Atual | 20/11/2026, 20/02/2027, 20/05/2027, 20/08/2027 |
-| Trimestral | Anterior | 20/02/2027, 20/05/2027, 20/08/2027, 20/11/2027 |
-| Semestral | Atual | 20/11/2026, 20/05/2027 |
-| Semestral | Anterior | 20/05/2027, 20/11/2027 |
-| Anual | Atual | 20/11/2026 |
-| Anual | Anterior | 20/11/2027 |
+| Periodicidade | Competência | Vencimentos                                                                                                                                    |
+| ------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mensal        | Atual       | 20/11/2026, 20/12/2026, 20/01/2027, 20/02/2027, 20/03/2027, 20/04/2027, 20/05/2027, 20/06/2027, 20/07/2027, 20/08/2027, 20/09/2027, 20/10/2027 |
+| Mensal        | Anterior    | 20/12/2026, 20/01/2027, 20/02/2027, 20/03/2027, 20/04/2027, 20/05/2027, 20/06/2027, 20/07/2027, 20/08/2027, 20/09/2027, 20/10/2027, 20/11/2027 |
+| Trimestral    | Atual       | 20/11/2026, 20/02/2027, 20/05/2027, 20/08/2027                                                                                                 |
+| Trimestral    | Anterior    | 20/02/2027, 20/05/2027, 20/08/2027, 20/11/2027                                                                                                 |
+| Semestral     | Atual       | 20/11/2026, 20/05/2027                                                                                                                         |
+| Semestral     | Anterior    | 20/05/2027, 20/11/2027                                                                                                                         |
+| Anual         | Atual       | 20/11/2026                                                                                                                                     |
+| Anual         | Anterior    | 20/11/2027                                                                                                                                     |
 
 Na competência Anterior o último vencimento pode cair depois de `endedOn`. No exemplo, a vigência termina em 31/10/2027 e o último título vence em 20/11/2027. Esse título permanece na série.
 
@@ -203,16 +203,17 @@ Suspenso, Encerrado, Cancelado e Rascunho não geram. Título já criado permane
 
 A cobrança grava `contract_billings` e um `receivables` na mesma transação.
 
-| Campo do título     | Origem                                                                                 |
-| ------------------- | -------------------------------------------------------------------------------------- |
-| `debtorId`          | Cliente do contrato                                                                    |
-| `installmentAmount` | `periodAmount` vigente na geração                                                      |
-| `dueOn`             | Vencimento da parcela na série                                                         |
-| `issueOn`           | Data do dia                                                                            |
-| `description`       | `Contrato 000.001 · competência 11/2026` no mensal. Nos demais, `11/2026 a 01/2027`.   |
-| `paymentMethodId`   | Forma do contrato, se houver                                                           |
-| `status`            | `pendente`                                                                             |
-| `documentNumber`    | Número do contrato, seis dígitos sem pontos, mais o início do período em `AAAAMM`      |
+| Campo do título     | Origem                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| `debtorId`          | Cliente do contrato                                                                   |
+| `installmentAmount` | `periodAmount` vigente na geração                                                     |
+| `dueOn`             | Vencimento da parcela na série                                                        |
+| `issueOn`           | Data do dia                                                                           |
+| `description`       | `Contrato 000.001 · competência 11/2026` no mensal. Nos demais, `11/2026 a 01/2027`.  |
+| `paymentMethodId`   | Forma do contrato, se houver                                                          |
+| `planAccountId`     | Conta de receita do contrato, se houver. Título já emitido guarda a conta da geração. |
+| `status`            | `pendente`                                                                            |
+| `documentNumber`    | Número do contrato, seis dígitos sem pontos, mais o início do período em `AAAAMM`     |
 
 `contract_billings` guarda contrato, início do período, vencimento calculado, valor cobrado e o título. A unicidade é empresa + contrato + início do período. Repetir a geração da mesma parcela responde que a cobrança já existe e devolve a mesma linha.
 
@@ -242,25 +243,25 @@ Até lá, o marcador não existe e o preço da ordem é o que o usuário digitou
 
 `contracts`
 
-| Coluna              | Tipo                                                       |
-| ------------------- | ---------------------------------------------------------- |
-| `id`                | uuid                                                       |
-| `tenant_id`         | uuid, com o restante de `tenantColumns`                    |
-| `number`            | integer, único por empresa, maior que zero                 |
-| `person_id`         | uuid, pessoa da empresa                                    |
-| `title`             | varchar(120)                                               |
-| `status`            | enum `draft`, `active`, `suspended`, `closed`, `cancelled` |
-| `started_on`        | date                                                       |
-| `ended_on`          | date, nulo só quando `billing_kind` é `none`               |
-| `billing_kind`      | enum `none`, `monthly`, `quarterly`, `semiannual`, `annual` |
-| `billing_competence` | enum `current`, `previous`, nulo quando não há cobrança   |
-| `period_amount`     | integer, zero ou positivo                                  |
-| `due_day`           | smallint, nulo ou de 1 a 28                                |
-| `payment_method_id` | uuid, nulo, forma da empresa                               |
-| `notes`             | text, vazio por padrão                                     |
-| `suspension_reason` | varchar(200), nulo                                         |
-| `closed_on`         | date, nulo                                                 |
-| `created_at`        | timestamp                                                  |
+| Coluna               | Tipo                                                        |
+| -------------------- | ----------------------------------------------------------- |
+| `id`                 | uuid                                                        |
+| `tenant_id`          | uuid, com o restante de `tenantColumns`                     |
+| `number`             | integer, único por empresa, maior que zero                  |
+| `person_id`          | uuid, pessoa da empresa                                     |
+| `title`              | varchar(120)                                                |
+| `status`             | enum `draft`, `active`, `suspended`, `closed`, `cancelled`  |
+| `started_on`         | date                                                        |
+| `ended_on`           | date, nulo só quando `billing_kind` é `none`                |
+| `billing_kind`       | enum `none`, `monthly`, `quarterly`, `semiannual`, `annual` |
+| `billing_competence` | enum `current`, `previous`, nulo quando não há cobrança     |
+| `period_amount`      | integer, zero ou positivo                                   |
+| `due_day`            | smallint, nulo ou de 1 a 28                                 |
+| `payment_method_id`  | uuid, nulo, forma da empresa                                |
+| `notes`              | text, vazio por padrão                                      |
+| `suspension_reason`  | varchar(200), nulo                                          |
+| `closed_on`          | date, nulo                                                  |
+| `created_at`         | timestamp                                                   |
 
 Restrições:
 
@@ -273,21 +274,21 @@ Restrições:
 
 `contract_events`
 
-| Coluna           | Tipo                      |
-| ---------------- | ------------------------- |
-| `id`             | uuid                      |
-| `tenant_id`      | uuid                      |
-| `contract_id`    | uuid, contrato da empresa |
-| `kind`           | enum `status`, `billing`  |
-| `from_status`    | enum, nulo na abertura    |
-| `to_status`      | enum                      |
-| `billing_kind`         | enum                      |
-| `billing_competence`   | enum, nulo                |
-| `period_amount`        | integer                   |
-| `due_day`        | smallint, nulo            |
-| `reason`         | varchar(200), nulo        |
-| `actor_user_id`  | uuid, usuário da empresa  |
-| `created_at`     | timestamp                 |
+| Coluna               | Tipo                      |
+| -------------------- | ------------------------- |
+| `id`                 | uuid                      |
+| `tenant_id`          | uuid                      |
+| `contract_id`        | uuid, contrato da empresa |
+| `kind`               | enum `status`, `billing`  |
+| `from_status`        | enum, nulo na abertura    |
+| `to_status`          | enum                      |
+| `billing_kind`       | enum                      |
+| `billing_competence` | enum, nulo                |
+| `period_amount`      | integer                   |
+| `due_day`            | smallint, nulo            |
+| `reason`             | varchar(200), nulo        |
+| `actor_user_id`      | uuid, usuário da empresa  |
+| `created_at`         | timestamp                 |
 
 A abertura grava `kind = status`, `from_status` nulo e `to_status = draft`.
 
@@ -297,35 +298,35 @@ A abertura grava `kind = status`, `from_status` nulo e `to_status = draft`.
 
 `contract_billings`
 
-| Coluna          | Tipo                    |
-| --------------- | ----------------------- |
-| `id`            | uuid                    |
-| `tenant_id`     | uuid                    |
-| `contract_id`   | uuid                    |
+| Coluna          | Tipo                                    |
+| --------------- | --------------------------------------- |
+| `id`            | uuid                                    |
+| `tenant_id`     | uuid                                    |
+| `contract_id`   | uuid                                    |
 | `competence`    | date, dia 1 do mês de início do período |
 | `due_on`        | date, vencimento da parcela na série    |
-| `amount`        | integer, maior que zero |
-| `receivable_id` | uuid, título da empresa |
-| `created_at`    | timestamp               |
+| `amount`        | integer, maior que zero                 |
+| `receivable_id` | uuid, título da empresa                 |
+| `created_at`    | timestamp                               |
 
 Único por `(tenant_id, contract_id, competence)` e por `(tenant_id, receivable_id)`.
 
 ## Regras que a API recusa
 
-| Caso                                                                            | Resposta                                         |
-| ------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Transição fora da lista                                                         | 400, a situação não pode seguir para a escolhida |
-| Ativar sem cobrança válida                                                      | 400                                              |
-| Suspender sem motivo                                                            | 400                                              |
-| Editar contrato encerrado ou cancelado                                          | 400                                              |
-| Trocar cliente, início, periodicidade ou competência depois do rascunho         | 400                                              |
-| Encurtar a vigência e deixar de fora um período que já tem título               | 400                                              |
-| Ordem Contrato sem contrato                                                     | 400                                              |
-| Ordem de outro tipo com contrato                                                | 400                                              |
-| Contrato de outro cliente, de outra empresa, ou que não está vigente na escolha | 400                                              |
+| Caso                                                                                      | Resposta                                         |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Transição fora da lista                                                                   | 400, a situação não pode seguir para a escolhida |
+| Ativar sem cobrança válida                                                                | 400                                              |
+| Suspender sem motivo                                                                      | 400                                              |
+| Editar contrato encerrado ou cancelado                                                    | 400                                              |
+| Trocar cliente, início, periodicidade ou competência depois do rascunho                   | 400                                              |
+| Encurtar a vigência e deixar de fora um período que já tem título                         | 400                                              |
+| Ordem Contrato sem contrato                                                               | 400                                              |
+| Ordem de outro tipo com contrato                                                          | 400                                              |
+| Contrato de outro cliente, de outra empresa, ou que não está vigente na escolha           | 400                                              |
 | Gerar parcela que não é a próxima da fila, ou quando o fim existe e a série já foi gerada | 400                                              |
-| Repetir a geração da parcela que já tem título                                  | 409, devolve a cobrança existente                |
-| Gerar com contrato que não está vigente                                         | 400                                              |
+| Repetir a geração da parcela que já tem título                                            | 409, devolve a cobrança existente                |
+| Gerar com contrato que não está vigente                                                   | 400                                              |
 
 ## Telas
 

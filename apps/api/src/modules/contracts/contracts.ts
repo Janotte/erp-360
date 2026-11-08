@@ -10,7 +10,7 @@ import {
   contractStatuses,
 } from '@erp-360/mod-contracts';
 import { users } from '@erp-360/mod-core';
-import { paymentMethods } from '@erp-360/mod-financial';
+import { paymentMethods, planAccounts } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
 import { serviceOrders } from '@erp-360/mod-service-orders';
 import { contractBillingSchedule, escapeIlike } from '@erp-360/shared';
@@ -46,6 +46,7 @@ const contractBody = z.object({
   periodAmount: z.number().int().min(0),
   dueDay: z.number().int().nullable(),
   paymentMethodId: z.string().uuid().nullable(),
+  planAccountId: z.string().uuid().nullable().optional(),
   notes: z.string().trim().optional(),
 });
 
@@ -96,6 +97,11 @@ function billingOf(body: ContractBody): ContractBilling {
   };
 }
 
+function planAccountOf(body: ContractBody) {
+  if (body.billingKind === 'none') return null;
+  return body.planAccountId ?? null;
+}
+
 function fieldsOf(body: ContractBody, status: ContractStatus): ContractFields {
   return {
     ...billingOf(body),
@@ -103,6 +109,7 @@ function fieldsOf(body: ContractBody, status: ContractStatus): ContractFields {
     title: body.title,
     notes: body.notes?.trim() ?? '',
     paymentMethodId: body.paymentMethodId,
+    planAccountId: planAccountOf(body),
     status,
   };
 }
@@ -142,6 +149,28 @@ async function assertPaymentMethod(tenantId: string, paymentMethodId: string) {
     reject('Crédito em loja não entra no contrato.');
 }
 
+async function assertPlanAccount(
+  tenantId: string,
+  planAccountId: string,
+  currentId: string | null,
+) {
+  const [account] = await db
+    .select({
+      nature: planAccounts.nature,
+      acceptsEntries: planAccounts.acceptsEntries,
+      isActive: planAccounts.isActive,
+    })
+    .from(planAccounts)
+    .where(and(eq(planAccounts.id, planAccountId), eq(planAccounts.tenantId, tenantId)))
+    .limit(1);
+  if (!account || account.nature !== 'revenue' || !account.acceptsEntries) {
+    reject('O contrato usa uma conta de receita que aceita lançamento.');
+  }
+  if (!account.isActive && planAccountId !== currentId) {
+    reject('A conta informada está inativa.');
+  }
+}
+
 function scheduleFor(billing: ContractBilling, billedCompetences: readonly string[]) {
   if (
     billing.billingKind === 'none' ||
@@ -176,6 +205,9 @@ async function loadContract(tenantId: string, id: string) {
       periodAmount: contracts.periodAmount,
       dueDay: contracts.dueDay,
       paymentMethodId: contracts.paymentMethodId,
+      planAccountId: contracts.planAccountId,
+      planAccountCode: planAccounts.accountCode,
+      planAccountName: planAccounts.name,
       notes: contracts.notes,
       suspensionReason: contracts.suspensionReason,
       closedOn: contracts.closedOn,
@@ -184,6 +216,13 @@ async function loadContract(tenantId: string, id: string) {
     .innerJoin(
       persons,
       and(eq(persons.id, contracts.personId), eq(persons.tenantId, contracts.tenantId)),
+    )
+    .leftJoin(
+      planAccounts,
+      and(
+        eq(planAccounts.id, contracts.planAccountId),
+        eq(planAccounts.tenantId, contracts.tenantId),
+      ),
     )
     .where(and(eq(contracts.id, id), eq(contracts.tenantId, tenantId)))
     .limit(1);
@@ -204,6 +243,7 @@ function storedFields(
     periodAmount: row.periodAmount,
     dueDay: row.dueDay,
     paymentMethodId: row.paymentMethodId,
+    planAccountId: row.planAccountId,
     status: row.status,
   };
 }
@@ -269,6 +309,9 @@ async function present(tenantId: string, id: string, today: string) {
     periodAmount: row.periodAmount,
     dueDay: row.dueDay,
     paymentMethodId: row.paymentMethodId,
+    planAccountId: row.planAccountId,
+    planAccountCode: row.planAccountCode,
+    planAccountName: row.planAccountName,
     notes: row.notes,
     suspensionReason: row.suspensionReason,
     closedOn: row.closedOn,
@@ -328,6 +371,8 @@ async function createContract(tenantId: string, userId: string, body: ContractBo
   assertBilling(billing);
   await assertClient(tenantId, body.personId);
   if (body.paymentMethodId) await assertPaymentMethod(tenantId, body.paymentMethodId);
+  const planAccountId = planAccountOf(body);
+  if (planAccountId) await assertPlanAccount(tenantId, planAccountId, null);
   const notes = body.notes?.trim() ?? '';
 
   const contractId = await db.transaction(async (tx) => {
@@ -357,6 +402,7 @@ async function createContract(tenantId: string, userId: string, body: ContractBo
         periodAmount: body.periodAmount,
         dueDay: body.dueDay,
         paymentMethodId: body.paymentMethodId,
+        planAccountId,
         notes,
       })
       .returning({ id: contracts.id });
@@ -413,6 +459,9 @@ async function updateContract(
     await assertClient(tenantId, next.personId);
     if (next.paymentMethodId) await assertPaymentMethod(tenantId, next.paymentMethodId);
   }
+  if (next.planAccountId) {
+    await assertPlanAccount(tenantId, next.planAccountId, stored.planAccountId);
+  }
 
   const statusChanged = stored.status !== next.status;
   const chargeChanged = billingChanged(stored, next);
@@ -432,6 +481,7 @@ async function updateContract(
         periodAmount: next.periodAmount,
         dueDay: next.dueDay,
         paymentMethodId: next.paymentMethodId,
+        planAccountId: next.planAccountId,
         notes: next.notes,
         suspensionReason: next.status === 'suspended' ? reason : null,
         closedOn,

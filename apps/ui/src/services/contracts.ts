@@ -67,6 +67,9 @@ export interface ContractDetail {
   periodAmount: number;
   dueDay: number | null;
   paymentMethodId: string | null;
+  planAccountId: string | null;
+  planAccountCode: string | null;
+  planAccountName: string | null;
   notes: string;
   suspensionReason: string | null;
   closedOn: string | null;
@@ -115,6 +118,7 @@ export interface ContractInput {
   periodAmount: number;
   dueDay: number | null;
   paymentMethodId: string | null;
+  planAccountId: string | null;
   notes: string;
 }
 

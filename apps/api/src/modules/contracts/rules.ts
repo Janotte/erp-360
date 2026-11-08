@@ -1,6 +1,7 @@
 export type ContractStatus = 'draft' | 'active' | 'suspended' | 'closed' | 'cancelled';
 
-export type ContractBillingKind = 'none' | 'monthly' | 'quarterly' | 'semiannual' | 'annual';
+export type ContractBillingKind =
+  'none' | 'monthly' | 'quarterly' | 'semiannual' | 'annual';
 
 export type ContractBillingCompetence = 'current' | 'previous';
 
@@ -18,6 +19,7 @@ export type ContractFields = ContractBilling & {
   title: string;
   notes: string;
   paymentMethodId: string | null;
+  planAccountId: string | null;
   status: ContractStatus;
 };
 
@@ -44,6 +46,7 @@ const comparableKeys = [
   'endedOn',
   'periodAmount',
   'dueDay',
+  'planAccountId',
   'status',
 ] as const satisfies readonly (keyof ContractFields)[];
 
@@ -72,12 +75,19 @@ export function assertBilling(input: ContractBilling) {
     reject('O fim da vigência não pode ser anterior ao início.');
   }
   if (input.billingKind === 'none') {
-    if (input.periodAmount !== 0 || input.dueDay !== null || input.billingCompetence !== null) {
+    if (
+      input.periodAmount !== 0 ||
+      input.dueDay !== null ||
+      input.billingCompetence !== null
+    ) {
       reject('Contrato sem cobrança não leva valor, dia nem competência.');
     }
     return;
   }
-  if (input.dueDay !== null && (!Number.isInteger(input.dueDay) || input.dueDay < 1 || input.dueDay > 28)) {
+  if (
+    input.dueDay !== null &&
+    (!Number.isInteger(input.dueDay) || input.dueDay < 1 || input.dueDay > 28)
+  ) {
     reject('O dia de vencimento vai de 1 a 28.');
   }
   if (
@@ -91,7 +101,10 @@ export function assertBilling(input: ContractBilling) {
 }
 
 /** Fim vazio segue em aberto. Um fim preenchido não pode deixar período já cobrado de fora. */
-export function assertTermKeepsBilledPeriods(endedOn: string | null, competences: string[]) {
+export function assertTermKeepsBilledPeriods(
+  endedOn: string | null,
+  competences: string[],
+) {
   if (competences.length === 0 || !endedOn) return;
   const end = yearMonth(endedOn);
   for (const competence of competences) {
@@ -127,7 +140,9 @@ export function assertMutable(stored: ContractFields, next: ContractFields) {
   if (stored.status === 'draft') return;
   for (const key of frozenKeys) {
     if (stored[key] !== next[key]) {
-      reject('Cliente, início, periodicidade, competência e forma não mudam depois da ativação.');
+      reject(
+        'Cliente, início, periodicidade, competência e forma não mudam depois da ativação.',
+      );
     }
   }
 }

@@ -80,6 +80,7 @@ const stored: ContractFields = {
   periodAmount: 30_000,
   dueDay: 20,
   paymentMethodId: 'method-1',
+  planAccountId: null,
   status: 'active',
 };
 
@@ -403,6 +404,7 @@ describe('cobrança do contrato', () => {
         endedOn: '2027-12-31',
         periodAmount: 35_000,
         dueDay: 10,
+        planAccountId: 'account-2',
       }),
     );
     refused(() => assertMutable(stored, { ...stored, personId: 'person-2' }));

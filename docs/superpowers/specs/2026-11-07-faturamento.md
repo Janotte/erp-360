@@ -6,11 +6,11 @@ Faturamento é o caminho do que já está devido até o título que o financeiro
 
 Três registros convivem, em momentos diferentes:
 
-| Registro | Dono | O que representa |
-| --- | --- | --- |
-| Cobrança da origem | Contrato, ordem ou venda | Este valor desta origem já foi cobrado, uma vez |
-| Documento de faturamento | Faturamento | O número comercial que o cliente vê, e o lugar em que a nota vai pendurar |
-| Título | Financeiro | O que se recebe, parcela a parcela |
+| Registro                 | Dono                     | O que representa                                                          |
+| ------------------------ | ------------------------ | ------------------------------------------------------------------------- |
+| Cobrança da origem       | Contrato, ordem ou venda | Este valor desta origem já foi cobrado, uma vez                           |
+| Documento de faturamento | Faturamento              | O número comercial que o cliente vê, e o lugar em que a nota vai pendurar |
+| Título                   | Financeiro               | O que se recebe, parcela a parcela                                        |
 
 A nota fiscal não é o título e não é a situação da ordem nem do contrato. NF-e e NFS-e entram ligadas ao documento de faturamento, cada uma com a própria situação. Enquanto a integração nacional não existe, o comercial e o financeiro funcionam com a situação fiscal `not_requested`.
 
@@ -31,7 +31,7 @@ Não há módulo de venda. Não há NFS-e. Não há nota de saída.
 - Identificadores em inglês. Rótulos em português. Dinheiro em centavos.
 - A empresa é o tenant. Não há segunda empresa dentro da mesma conta.
 - A origem aponta a cobrança com chave estrangeira composta. Não há `source_type` solto.
-- Título já emitido não muda de valor, vencimento nem cliente porque a origem mudou depois.
+- Título já emitido não muda de valor, vencimento, cliente nem conta porque a origem mudou depois.
 - Cancelar o título no financeiro não apaga a cobrança da origem. Uma nova geração da mesma cobrança espera o estorno estar definido.
 - A situação fiscal não trava a emissão comercial nem a geração do título.
 - Uma ordem ou venda com produto e serviço pode ter, no futuro, uma NF-e e uma NFS-e no mesmo documento comercial. Por isso o documento não guarda um único XML.
@@ -64,18 +64,18 @@ Entra quando a ordem e a venda precisarem de um número comercial estável para 
 
 O documento nasce emitido comercialmente, com número sequencial da empresa, cliente, totais e a chave da origem. A situação fiscal começa em `not_requested`. O título daquela origem passa a guardar o número desse documento em `invoiceNumber`.
 
-| Situação comercial | Significado |
-| --- | --- |
-| `issued` | O número existe e os títulos daquela origem foram gerados |
-| `canceled` | O documento comercial foi cancelado. O efeito no título segue a regra do financeiro |
+| Situação comercial | Significado                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------- |
+| `issued`           | O número existe e os títulos daquela origem foram gerados                           |
+| `canceled`         | O documento comercial foi cancelado. O efeito no título segue a regra do financeiro |
 
-| Situação fiscal | Significado |
-| --- | --- |
+| Situação fiscal | Significado                                                     |
+| --------------- | --------------------------------------------------------------- |
 | `not_requested` | Ninguém pediu nota. É o estado enquanto a integração não existe |
-| `pending` | O pedido foi montado e aguarda o ambiente nacional ou a SEFAZ |
-| `authorized` | A nota foi autorizada |
-| `rejected` | O ambiente recusou. O título permanece |
-| `canceled` | A nota autorizada foi cancelada no prazo do fisco |
+| `pending`       | O pedido foi montado e aguarda o ambiente nacional ou a SEFAZ   |
+| `authorized`    | A nota foi autorizada                                           |
+| `rejected`      | O ambiente recusou. O título permanece                          |
+| `canceled`      | A nota autorizada foi cancelada no prazo do fisco               |
 
 `pending`, `authorized`, `rejected` e `canceled` só passam a ser gravados na entrega que fala com o ambiente. Antes disso o único valor usado é `not_requested`.
 
