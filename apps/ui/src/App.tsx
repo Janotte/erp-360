@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect } from 'react';
 import {
   BrowserRouter,
   Navigate,
@@ -92,6 +92,19 @@ function Pagina({ children }: { children: ReactNode }) {
   );
 }
 
+function RolarAoTopo() {
+  const { pathname } = useLocation();
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+    document.querySelectorAll('main').forEach((element) => {
+      element.scrollTop = 0;
+    });
+  }, [pathname]);
+
+  return null;
+}
+
 function SessaoExpirada() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -134,6 +147,7 @@ function AreaLogada() {
 function App() {
   return (
     <BrowserRouter>
+      <RolarAoTopo />
       <SessaoExpirada />
       <Routes>
         <Route element={<Raiz />}>
