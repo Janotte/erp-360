@@ -39,8 +39,11 @@ type OrderDetail = {
   notes: Note[];
   lines: Line[];
   payments?: { methodName: string; dueOn: string; amount: number }[];
-  billings?: { documentNumber: string | null }[];
-  today?: string;
+  billings: {
+    documentNumber: string | null;
+    description: string;
+  }[];
+  today: string;
 };
 
 type BillingLine = {
@@ -335,7 +338,12 @@ describe('cobrança da ordem de serviço', { concurrency: false }, () => {
       url: `/service-orders/${billed.id}`,
       headers: headers(),
     });
-    assert.equal((read.json() as OrderDetail).status, 'delivered');
+    const loaded = read.json() as OrderDetail;
+    assert.equal(loaded.status, 'delivered');
+    assert.equal(loaded.today, await todayForTenant(tenantId));
+    assert.equal(loaded.billings.length, 2);
+    assert.equal(loaded.billings[0]?.documentNumber, '000001-01');
+    assert.equal(loaded.billings[0]?.description, 'Ordem 000.001 · parcela 1');
   });
 
   it('troca o plano pela forma confirmada e grava as datas enviadas', async () => {
@@ -432,6 +440,14 @@ describe('cobrança da ordem de serviço', { concurrency: false }, () => {
     assert.equal(response.statusCode, 400, response.body);
     assert.match(response.body, /A ordem precisa estar entregue para gerar o financeiro/);
     assert.equal((await titlesOf(detail.id)).length, 0);
+    const pending = await app.inject({
+      method: 'GET',
+      url: `/service-orders/${detail.id}`,
+      headers: headers(),
+    });
+    const loaded = pending.json() as OrderDetail;
+    assert.deepEqual(loaded.billings, []);
+    assert.equal(loaded.today, await todayForTenant(tenantId));
   });
 
   it('recusa total zero', async () => {

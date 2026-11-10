@@ -26,7 +26,8 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
-import { serviceOrderBillingRoutes } from './billings.ts';
+import { listServiceOrderBillings, serviceOrderBillingRoutes } from './billings.ts';
+import { todayForTenant } from '../contracts/clock.ts';
 import { buildServiceOrderPrint } from './print-model.ts';
 import { formatContractNumber } from '../contracts/rules.ts';
 import {
@@ -234,6 +235,8 @@ type LoadedOrder = {
   paymentInstallments: number | null;
   paymentPlanId: string | null;
   payments: LoadedPayment[];
+  today: string;
+  billings: Awaited<ReturnType<typeof listServiceOrderBillings>>;
   customer: CustomerCopy;
   fields: LoadedField[];
   notes: { slot: string; body: string }[];
@@ -711,6 +714,8 @@ async function loadOrder(tenantId: string, id: string): Promise<LoadedOrder | nu
       dueOn: isoDate(line.dueOn),
       amount: line.amount,
     })),
+    today: await todayForTenant(tenantId),
+    billings: await listServiceOrderBillings(tenantId, id),
     customer: {
       customerName: order.customerName,
       customerTaxId: order.customerTaxId,
@@ -756,6 +761,8 @@ function present(order: LoadedOrder) {
     paymentMethodId: order.paymentMethodId,
     paymentInstallments: order.paymentInstallments,
     ...(order.payments.length > 0 ? { payments: order.payments } : {}),
+    today: order.today,
+    billings: order.billings,
     fields: order.fields,
     notes: order.notes,
     lines: order.lines,
