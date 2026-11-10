@@ -52,11 +52,7 @@ Essa entrega não cria documento de faturamento e não pede nota. A mensalidade 
 
 ### Ordem de serviço
 
-A ordem gera título quando passa a Entregue, na mesma transação da entrega. A cópia de pagamento que a ordem já guardou define quantos títulos, o vencimento e a forma. Total zero não gera título.
-
-A ligação fica numa tabela da ordem, um título por parcela prevista, única por empresa, ordem e número da parcela. Entregar de novo não duplica. Cancelar a ordem depois de entregue não apaga título já gerado.
-
-A ordem continua Entregue. O comprovante continua igual. A nota não é emitida.
+O momento, o diálogo e a ligação desta cobrança estão em `2026-11-10-faturamento-ordem-de-servico.md`. A geração é um item do menu da lista, depois de Entregue, e não ocorre na transição. A ordem continua Entregue. O comprovante continua igual. A nota não é emitida.
 
 ### Documento de faturamento
 
@@ -98,7 +94,7 @@ A primeira entrega de cada nota grava o pedido e a situação `pending`, sem env
 A ordem abaixo evita refazer título, numeração e vínculo cada vez que um módulo novo aparece.
 
 1. **Cobrança do contrato.** A Entrega 2 já especificada. Gera `contract_billings` e o título. Sem documento e sem nota. Libera a fila de vencimentos, inclusive os que já passaram.
-2. **Cobrança da ordem.** Na entrega, gera os títulos a partir da cópia de pagamento. Sem documento e sem nota. A situação da ordem não muda por causa do título.
+2. **Cobrança da ordem.** Pelo menu Gerar financeiro, na lista, depois de Entregue. Gera os títulos a partir das parcelas confirmadas. Sem documento e sem nota. A situação da ordem não muda. O detalhe está na especificação de 10 de novembro.
 3. **Documento de faturamento.** Número comercial, vínculo com a origem e situação fiscal `not_requested`. As gerações novas da ordem passam a criá-lo na mesma transação dos títulos. Títulos antigos, de contrato ou de ordem, não são reescritos.
 4. **Venda.** Pedido, itens, cópia de pagamento, documento e títulos. Sem nota e sem baixar estoque nesta etapa, se o estoque da venda ainda não existir.
 5. **NFS-e, ainda sem o ambiente nacional.** O documento com serviço ganha o pedido da nota e continua recebível. Nenhum XML sai da empresa.
