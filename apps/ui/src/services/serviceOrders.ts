@@ -95,6 +95,11 @@ export interface ServiceOrderLine {
   technicianName: string | null;
 }
 
+export interface ServiceOrderBillingResult {
+  message: string;
+  billings: ServiceOrderBilling[];
+}
+
 export interface ServiceOrderBilling {
   lineNumber: number;
   dueOn: string;
@@ -292,6 +297,21 @@ export const serviceOrdersService = {
     const body = await readBody(res);
     if (!res.ok) throw new Error(messageOf(body, 'Falha ao salvar a ordem.'));
     return body as unknown as ServiceOrderDetail;
+  },
+
+  generateBillings: async (
+    id: string,
+    payments: ServiceOrderPaymentInput[],
+  ): Promise<{ status: number; body: ServiceOrderBillingResult }> => {
+    const res = await apiFetch(`/service-orders/${id}/billings`, {
+      method: 'POST',
+      body: JSON.stringify({ payments }),
+    });
+    const body = await readBody(res);
+    if (res.status !== 200 && res.status !== 409) {
+      throw new Error(messageOf(body, 'Não foi possível gerar o financeiro.'));
+    }
+    return { status: res.status, body: body as unknown as ServiceOrderBillingResult };
   },
 
   print: async (id: string): Promise<ServiceOrderPrint> => {

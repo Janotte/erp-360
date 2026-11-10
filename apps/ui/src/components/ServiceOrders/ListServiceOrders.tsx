@@ -20,8 +20,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { ServiceOrderBillingDialog } from '@/components/ServiceOrders/ServiceOrderBillingDialog';
+import { ServiceOrderRowMenu } from '@/components/ServiceOrders/ServiceOrderRowMenu';
 import {
   serviceOrdersService,
+  type ServiceOrderListItem,
   type ServiceOrderStatus,
 } from '@/services/serviceOrders';
 
@@ -53,6 +56,12 @@ export function ListServiceOrders() {
   const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ServiceOrderStatus | 'all'>('all');
+  const [menu, setMenu] = useState<{
+    row: ServiceOrderListItem;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [billingId, setBillingId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchText.trim()), 400);
@@ -159,6 +168,10 @@ export function ListServiceOrders() {
                   key={row.id}
                   className="cursor-pointer"
                   onClick={() => navigate(`/service-orders/${row.id}`)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    setMenu({ row, x: event.clientX, y: event.clientY });
+                  }}
                 >
                   <TableCell>
                     <Link to={`/service-orders/${row.id}`} className="font-medium text-zinc-900">
@@ -176,6 +189,12 @@ export function ListServiceOrders() {
           </TableBody>
         </Table>
       </div>
+      <ServiceOrderRowMenu
+        cursor={menu}
+        onClose={() => setMenu(null)}
+        onBill={setBillingId}
+      />
+      <ServiceOrderBillingDialog orderId={billingId} onClose={() => setBillingId(null)} />
     </div>
   );
 }
