@@ -95,6 +95,16 @@ export interface ServiceOrderLine {
   technicianName: string | null;
 }
 
+export interface ServiceOrderBilling {
+  lineNumber: number;
+  dueOn: string;
+  amount: number;
+  documentNumber: string | null;
+  description: string;
+  status: 'pendente' | 'recebido' | 'cancelado';
+  receivableId: string;
+}
+
 export interface ServiceOrderPayment {
   paymentMethodId: string;
   methodName: string;
@@ -145,6 +155,8 @@ export interface ServiceOrderDetail {
   paymentMethodId: string | null;
   paymentInstallments: number | null;
   payments?: ServiceOrderPayment[];
+  today: string;
+  billings: ServiceOrderBilling[];
   fields: ServiceOrderFieldValue[];
   notes: ServiceOrderNoteValue[];
   lines: ServiceOrderLine[];

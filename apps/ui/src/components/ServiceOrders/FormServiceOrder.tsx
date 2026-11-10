@@ -41,6 +41,18 @@ import { serviceOrderDocument } from './serviceOrderDocument';
 
 const sheetCss = sheetTemplate.match(/<style>([\s\S]*?)<\/style>/i)?.[1] ?? '';
 
+const billingStatusLabel = {
+  pendente: 'Pendente',
+  recebido: 'Recebido',
+  cancelado: 'Cancelado',
+} as const;
+
+function formatIsoDate(value: string) {
+  const [year, month, day] = value.slice(0, 10).split('-');
+  if (!year || !month || !day) return value;
+  return `${day}/${month}/${year}`;
+}
+
 const statusLabels: Record<ServiceOrderStatus, string> = {
   open: 'Aberta',
   analyzing: 'Em análise',
@@ -1493,6 +1505,34 @@ export function FormServiceOrder() {
           <p className="text-sm text-zinc-500">Nenhuma parcela.</p>
         )}
       </section>
+
+      {order.data && order.data.billings.length > 0 ? (
+        <section className="space-y-4 rounded-lg border bg-white p-6">
+          <h3 className="text-lg font-semibold text-zinc-900">Financeiro</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-zinc-500">
+                  <th className="py-2 font-medium">Documento</th>
+                  <th className="py-2 font-medium">Vencimento</th>
+                  <th className="py-2 font-medium">Valor</th>
+                  <th className="py-2 font-medium">Situação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {order.data.billings.map((billing) => (
+                  <tr key={billing.receivableId} className="border-b">
+                    <td className="py-2 pr-2">{billing.documentNumber ?? '—'}</td>
+                    <td className="py-2 pr-2">{formatIsoDate(billing.dueOn)}</td>
+                    <td className="py-2 pr-2">{formatCurrency(billing.amount)}</td>
+                    <td className="py-2">{billingStatusLabel[billing.status]}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <section className="space-y-4 rounded-lg border bg-white p-6">
         <h3 className="text-lg font-semibold text-zinc-900">Observações</h3>
