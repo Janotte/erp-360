@@ -9,12 +9,14 @@ import {
   paymentMethods,
   paymentPlans,
   paymentReceiptKindEnum,
+  receivables,
 } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   foreignKey,
   integer,
   numeric,
@@ -338,6 +340,45 @@ export const serviceOrders = pgTable(
         ${table.intervalDays} is null or ${table.intervalDays} >= 0
       )`,
     ),
+  ],
+);
+
+/** Parcela da ordem que já gerou recebível. Cancelar o título não apaga a linha. */
+export const serviceOrderBillings = pgTable(
+  'service_order_billings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ...tenantColumns,
+    serviceOrderId: uuid('service_order_id').notNull(),
+    lineNumber: integer('line_number').notNull(),
+    dueOn: date('due_on').notNull(),
+    amount: integer('amount').notNull(),
+    receivableId: uuid('receivable_id').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    unique('service_order_billings_id_tenant_id_unique').on(table.id, table.tenantId),
+    unique('service_order_billings_tenant_order_line_unique').on(
+      table.tenantId,
+      table.serviceOrderId,
+      table.lineNumber,
+    ),
+    unique('service_order_billings_tenant_receivable_unique').on(
+      table.tenantId,
+      table.receivableId,
+    ),
+    foreignKey({
+      name: 'service_order_billings_order_tenant_fk',
+      columns: [table.serviceOrderId, table.tenantId],
+      foreignColumns: [serviceOrders.id, serviceOrders.tenantId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'service_order_billings_receivable_tenant_fk',
+      columns: [table.receivableId, table.tenantId],
+      foreignColumns: [receivables.id, receivables.tenantId],
+    }).onDelete('restrict'),
+    check('service_order_billings_line_check', sql`${table.lineNumber} >= 1`),
+    check('service_order_billings_amount_check', sql`${table.amount} > 0`),
   ],
 );
 
