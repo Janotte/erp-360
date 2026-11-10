@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  serviceOrderBillingDescription,
+  serviceOrderBillingDocumentNumber,
+} from '../src/modules/service-orders/billing-labels.ts';
+import {
   assertContractLink,
   assertLine,
   assertOrigin,
@@ -95,6 +99,12 @@ describe('totais e número', () => {
   it('agrupa o número de três em três, com pelo menos seis dígitos', () => {
     assert.equal(formatServiceOrderNumber(1), '000.001');
     assert.equal(formatServiceOrderNumber(1_000_000), '1.000.000');
+  });
+
+  it('monta documento e descrição da parcela sem a forma', () => {
+    assert.equal(serviceOrderBillingDescription('000.001', 1), 'Ordem 000.001 · parcela 1');
+    assert.equal(serviceOrderBillingDocumentNumber(1, 1), '000001-01');
+    assert.equal(serviceOrderBillingDocumentNumber(1_000_000, 2), '1000000-02');
   });
 
   it('imprime à vista só com uma parcela e carência zero', () => {
