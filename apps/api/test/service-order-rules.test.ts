@@ -92,9 +92,9 @@ describe('totais e número', () => {
     );
   });
 
-  it('agrupa o número de três em três, com pelo menos nove dígitos', () => {
-    assert.equal(formatServiceOrderNumber(1), '000.000.001');
-    assert.equal(formatServiceOrderNumber(1_000_000_000), '1.000.000.000');
+  it('agrupa o número de três em três, com pelo menos seis dígitos', () => {
+    assert.equal(formatServiceOrderNumber(1), '000.001');
+    assert.equal(formatServiceOrderNumber(1_000_000), '1.000.000');
   });
 
   it('imprime à vista só com uma parcela e carência zero', () => {

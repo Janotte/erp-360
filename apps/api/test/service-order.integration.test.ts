@@ -465,16 +465,16 @@ describe('gravação da ordem de serviço', { concurrency: false }, () => {
     assert.equal(second.statusCode, 201, second.body);
     const created = first.json() as OrderDetail;
     const next = second.json() as OrderDetail;
-    assert.equal(created.numberLabel, '000.000.001');
+    assert.equal(created.numberLabel, '000.001');
     assert.equal(created.location, 'remote');
-    assert.equal(next.numberLabel, '000.000.002');
+    assert.equal(next.numberLabel, '000.002');
 
     const cancelled = await save(created, { status: 'cancelled' });
     assert.equal(cancelled.status, 'cancelled');
 
     const third = await open();
     assert.equal(third.statusCode, 201, third.body);
-    assert.equal((third.json() as OrderDetail).numberLabel, '000.000.003');
+    assert.equal((third.json() as OrderDetail).numberLabel, '000.003');
   });
 
   it('copia a observação ativa e não reescreve a ordem já aberta', async () => {
@@ -700,7 +700,7 @@ describe('gravação da ordem de serviço', { concurrency: false }, () => {
   it('encontra a primeira ordem pelo número mascarado e pelo dígito', async () => {
     const byMask = await app.inject({
       method: 'GET',
-      url: '/service-orders?q=000.000.001',
+      url: '/service-orders?q=000.001',
       headers: headers(),
     });
     assert.equal(byMask.statusCode, 200, byMask.body);
@@ -1017,7 +1017,7 @@ describe('comprovante da ordem', { concurrency: false }, () => {
       totals: { adjustmentAmount: number };
     };
 
-    assert.equal(printed.number, '000.000.001');
+    assert.equal(printed.number, '000.001');
     assert.equal(printed.logoText, 'Folha');
     assert.equal(printed.logoUrl, null);
     assert.equal(printed.tenant.mobilePhone, null);

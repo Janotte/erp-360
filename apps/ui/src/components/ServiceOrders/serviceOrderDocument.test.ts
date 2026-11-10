@@ -5,7 +5,7 @@ import { serviceOrderDocument, type ServiceOrderPrint } from './serviceOrderDocu
 
 function model(patch: Partial<ServiceOrderPrint> = {}): ServiceOrderPrint {
   return {
-    number: '000.000.001',
+    number: '000.001',
     logoUrl: null,
     logoText: 'Hobby',
     tenant: {
@@ -68,7 +68,7 @@ describe('folha da ordem de serviço', () => {
   it('monta a folha com o número, a logo e o nome escapado', () => {
     const sheet = serviceOrderDocument(model(), 'body{color:red}');
     assert.match(sheet, /os-container/);
-    assert.match(sheet, /000\.000\.001/);
+    assert.match(sheet, /000\.001/);
     assert.match(sheet, /body\{color:red\}/);
     assert.match(sheet, /company-logo[\s\S]*Hobby/);
     assert.doesNotMatch(sheet, /<img/);

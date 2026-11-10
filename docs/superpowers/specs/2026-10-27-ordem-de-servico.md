@@ -80,7 +80,7 @@ Estes dados existem em qualquer nicho. Não são campos configuráveis.
 
 | Campo                 | Papel                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `number`              | Inteiro sequencial da empresa. Na tela e no comprovante, nove dígitos em grupos de três: `000.000.001`. O contador não reaproveita número. |
+| `number`              | Inteiro sequencial da empresa. Na tela e no comprovante, seis dígitos em grupos de três: `000.001`. O contador não reaproveita número. |
 | `status`              | Situação do atendimento.                                                                                                                   |
 | `attendance`          | Tipo de atendimento.                                                                                                                       |
 | `location`            | Local de atendimento. Remoto, interno ou externo. O padrão é remoto.                                                                      |

@@ -68,7 +68,7 @@ export function assertTotals(input: {
 
 export function formatServiceOrderNumber(value: number): string {
   const digits = String(Math.trunc(value));
-  const padded = digits.length < 9 ? digits.padStart(9, '0') : digits;
+  const padded = digits.length < 6 ? digits.padStart(6, '0') : digits;
   return padded.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
