@@ -60,6 +60,7 @@ const child = spawn(
     'test/contract.integration.test.ts',
     'test/service-order-rules.test.ts',
     'test/service-order.integration.test.ts',
+    'test/service-order-billing.integration.test.ts',
     '../ui/src/components/ServiceOrders/serviceOrderDocument.test.ts',
     'test/settlement.integration.test.ts',
   ],

@@ -26,6 +26,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
+import { serviceOrderBillingRoutes } from './billings.ts';
 import { buildServiceOrderPrint } from './print-model.ts';
 import { formatContractNumber } from '../contracts/rules.ts';
 import {
@@ -1174,6 +1175,7 @@ async function listServiceOrders(
 
 export const serviceOrderRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
+  await serviceOrderBillingRoutes(fastify, {});
 
   fastify.get('/', { schema: { querystring: listQuery } }, async (request) => {
     return listServiceOrders(request.user.tenantId, request.query);
