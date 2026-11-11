@@ -1073,6 +1073,7 @@ export function FormServiceOrder() {
             <select
               id="service-order-location"
               className={selectClass}
+              data-enter-sequence=""
               value={draft.location}
               disabled={locked}
               onChange={(event) =>
@@ -1569,6 +1570,9 @@ export function FormServiceOrder() {
           onClick={() => void printSheet()}
         >
           Imprimir
+        </Button>
+        <Button variant="outline" asChild>
+          <Link to="/service-orders">Voltar à lista</Link>
         </Button>
         {canDeliver && !locked ? (
           <Button
