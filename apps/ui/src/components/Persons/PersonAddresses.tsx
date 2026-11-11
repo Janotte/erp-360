@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { onEnterSequence, onEnterSequenceCapture } from '@/lib/enterSequence';
 import { locationsService } from '@/services/locations';
 import { type AddressType, type PersonAddress, personsService } from '@/services/persons';
 
@@ -305,6 +306,8 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
       {form && (
         <form
           className="space-y-3 rounded-md border border-zinc-200 p-3"
+          onKeyDown={onEnterSequence}
+          onKeyDownCapture={onEnterSequenceCapture}
           onSubmit={(event) => {
             event.preventDefault();
             if (!form.cityId) {
@@ -320,7 +323,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
               value={form.type}
               onValueChange={(value) => updateForm({ type: value as AddressType })}
             >
-              <SelectTrigger>
+              <SelectTrigger data-enter-sequence="">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -338,6 +341,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
               <Label htmlFor="postalCode">CEP</Label>
               <Input
                 id="postalCode"
+                data-enter-sequence=""
                 value={form.postalCode}
                 maxLength={9}
                 inputMode="numeric"
@@ -364,6 +368,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
               <Input
                 id="number"
                 ref={numberRef}
+                data-enter-sequence=""
                 value={form.number}
                 maxLength={60}
                 onChange={(event) => updateForm({ number: event.target.value })}
@@ -375,6 +380,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
             <Label htmlFor="street">Logradouro</Label>
             <Input
               id="street"
+              data-enter-sequence=""
               value={form.street}
               maxLength={60}
                 onChange={(event) => updateForm({ street: event.target.value })}
@@ -387,6 +393,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
               <Label htmlFor="complement">Complemento</Label>
               <Input
                 id="complement"
+                data-enter-sequence=""
                 value={form.complement}
                 maxLength={60}
                 onChange={(event) => updateForm({ complement: event.target.value })}
@@ -399,6 +406,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
               <Label htmlFor="neighborhood">Bairro</Label>
               <Input
                 id="neighborhood"
+                data-enter-sequence=""
                 value={form.neighborhood}
                 maxLength={60}
                 onChange={(event) => updateForm({ neighborhood: event.target.value })}
@@ -433,7 +441,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
                   setCitySearch('');
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger data-enter-sequence="">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
@@ -449,6 +457,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
               <Label htmlFor="citySearch">Cidade</Label>
               <Input
                 id="citySearch"
+                data-enter-sequence=""
                 value={citySearchText}
                 placeholder="Digite ao menos 2 letras"
                 disabled={!form.stateId}
@@ -478,7 +487,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
               }}
               disabled={!form.stateId || citySearch.length < 2}
             >
-              <SelectTrigger>
+              <SelectTrigger data-enter-sequence="">
                 <SelectValue
                   placeholder={
                     citySearch.length < 2 ? 'Busque a cidade' : 'Selecione a cidade'
@@ -505,7 +514,7 @@ export function PersonAddresses({ personId }: PersonAddressesProps) {
             <Button type="button" variant="outline" onClick={closeForm}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={saveMutation.isPending}>
+            <Button type="submit" data-enter-sequence="" disabled={saveMutation.isPending}>
               {saveMutation.isPending ? 'Salvando...' : 'Salvar endereço'}
             </Button>
           </div>

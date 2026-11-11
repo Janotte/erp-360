@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { onEnterSequence, onEnterSequenceCapture } from '@/lib/enterSequence';
 import { type ContactType, type PersonContact, personsService } from '@/services/persons';
 
 const contactTypes: ContactType[] = ['Principal', 'Outro'];
@@ -209,6 +210,8 @@ export function PersonContacts({ personId }: PersonContactsProps) {
       {form && (
         <form
           className="space-y-3 rounded-md border border-zinc-200 p-3"
+          onKeyDown={onEnterSequence}
+          onKeyDownCapture={onEnterSequenceCapture}
           onSubmit={(event) => {
             event.preventDefault();
             saveMutation.mutate(form);
@@ -220,7 +223,7 @@ export function PersonContacts({ personId }: PersonContactsProps) {
               value={form.type}
               onValueChange={(value) => updateForm({ type: value as ContactType })}
             >
-              <SelectTrigger>
+              <SelectTrigger data-enter-sequence="">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -238,6 +241,7 @@ export function PersonContacts({ personId }: PersonContactsProps) {
               <Label htmlFor="contactName">Nome</Label>
               <Input
                 id="contactName"
+                data-enter-sequence=""
                 value={form.name}
                 maxLength={60}
                 required
@@ -249,6 +253,7 @@ export function PersonContacts({ personId }: PersonContactsProps) {
               <Label htmlFor="relationship">Departamento / Relacionamento</Label>
               <Input
                 id="relationship"
+                data-enter-sequence=""
                 value={form.relationship}
                 maxLength={40}
                 onChange={(event) => updateForm({ relationship: event.target.value })}
@@ -264,6 +269,7 @@ export function PersonContacts({ personId }: PersonContactsProps) {
               <Label htmlFor="contactPhone">Telefone</Label>
               <Input
                 id="contactPhone"
+                data-enter-sequence=""
                 value={form.phone}
                 maxLength={15}
                 inputMode="numeric"
@@ -275,6 +281,7 @@ export function PersonContacts({ personId }: PersonContactsProps) {
               <Label htmlFor="mobilePhone">Celular</Label>
               <Input
                 id="mobilePhone"
+                data-enter-sequence=""
                 value={form.mobilePhone}
                 maxLength={15}
                 inputMode="numeric"
@@ -291,6 +298,7 @@ export function PersonContacts({ personId }: PersonContactsProps) {
               <Label htmlFor="whatsapp">WhatsApp</Label>
               <Input
                 id="whatsapp"
+                data-enter-sequence=""
                 value={form.whatsapp}
                 maxLength={15}
                 inputMode="numeric"
@@ -304,6 +312,7 @@ export function PersonContacts({ personId }: PersonContactsProps) {
               <Label htmlFor="contactEmail">E-mail</Label>
               <Input
                 id="contactEmail"
+                data-enter-sequence=""
                 type="email"
                 value={form.email}
                 maxLength={80}
@@ -324,7 +333,7 @@ export function PersonContacts({ personId }: PersonContactsProps) {
             <Button type="button" variant="outline" onClick={closeForm}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={saveMutation.isPending}>
+            <Button type="submit" data-enter-sequence="" disabled={saveMutation.isPending}>
               {saveMutation.isPending ? 'Salvando...' : 'Salvar contato'}
             </Button>
           </div>

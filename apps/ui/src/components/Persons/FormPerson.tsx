@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { onEnterSequence, onEnterSequenceCapture } from '@/lib/enterSequence';
 
 import {
   type CnpjLookupAddress,
@@ -264,6 +265,7 @@ export function FormPerson({
       } else {
         toast.success('Dados do CNPJ preenchidos. Confira e salve.');
       }
+      requestAnimationFrame(() => document.getElementById('nome')?.focus());
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -313,11 +315,17 @@ export function FormPerson({
 
   return (
     <div className="space-y-6 pt-4">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+        onSubmit={handleSubmit}
+        onKeyDown={onEnterSequence}
+        onKeyDownCapture={onEnterSequenceCapture}
+        className="space-y-4"
+      >
         <div className="space-y-1">
           <Label htmlFor="personKind">Tipo de pessoa</Label>
           <select
             id="personKind"
+            data-enter-sequence=""
             value={personKind}
             onChange={(event) => handleKindChange(parsePersonKind(event.target.value))}
             className={selectClassName}
@@ -336,13 +344,14 @@ export function FormPerson({
             <Label htmlFor="taxId">{labels.taxId}</Label>
             <Input
               id="taxId"
+              data-enter-sequence=""
               value={taxId}
               maxLength={taxIdMaxLength(personKind)}
               inputMode="numeric"
               autoComplete="off"
               onChange={(e) => handleTaxIdChange(e.target.value)}
               onKeyDown={(event) => {
-                if (event.key !== 'Enter') return;
+                if (event.key !== 'Enter' || event.shiftKey) return;
                 event.preventDefault();
                 lookupCnpj();
               }}
@@ -362,6 +371,7 @@ export function FormPerson({
           <Label htmlFor="nome">{labels.name}</Label>
           <Input
             id="nome"
+            data-enter-sequence=""
             value={name}
             maxLength={120}
             onChange={(e) => setName(e.target.value)}
@@ -392,6 +402,7 @@ export function FormPerson({
               <Label htmlFor="taxId">{labels.taxId}</Label>
               <Input
                 id="taxId"
+                data-enter-sequence=""
                 value={taxId}
                 maxLength={taxIdMaxLength(personKind)}
                 inputMode={personKind === 'foreigner' ? 'text' : 'numeric'}
@@ -407,6 +418,7 @@ export function FormPerson({
             <Label htmlFor="birthDate">{labels.birthDate}</Label>
             <Input
               id="birthDate"
+              data-enter-sequence=""
               type="date"
               value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
@@ -420,6 +432,7 @@ export function FormPerson({
               <Label htmlFor="taxpayerType">Indicador de contribuinte</Label>
               <select
                 id="taxpayerType"
+                data-enter-sequence=""
                 value={taxpayerType}
                 onChange={(event) => setTaxpayerType(event.target.value)}
                 className={selectClassName}
@@ -436,6 +449,7 @@ export function FormPerson({
               <Label htmlFor="stateRegistration">{labels.stateRegistration}</Label>
               <Input
                 id="stateRegistration"
+                data-enter-sequence=""
                 value={stateRegistration}
                 maxLength={20}
                 onChange={(e) => setStateRegistration(e.target.value)}
@@ -447,6 +461,7 @@ export function FormPerson({
             <Label htmlFor="stateRegistration">{labels.stateRegistration}</Label>
             <Input
               id="stateRegistration"
+              data-enter-sequence=""
               value={stateRegistration}
               maxLength={20}
               onChange={(e) => setStateRegistration(e.target.value)}
@@ -458,6 +473,7 @@ export function FormPerson({
           <Label htmlFor="nfeEmail">E-mail da NF-e</Label>
           <Input
             id="nfeEmail"
+            data-enter-sequence=""
             type="email"
             value={nfeEmail}
             maxLength={60}
@@ -469,6 +485,7 @@ export function FormPerson({
           <Label htmlFor="documentEmails">E-mails de documentos</Label>
           <Input
             id="documentEmails"
+            data-enter-sequence=""
             value={documentEmails}
             placeholder="Separe por vírgula"
             onChange={(e) => setDocumentEmails(e.target.value)}
@@ -479,6 +496,7 @@ export function FormPerson({
           <Label htmlFor="notes">Observações</Label>
           <textarea
             id="notes"
+            data-enter-sequence=""
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className="flex min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -586,7 +604,12 @@ export function FormPerson({
           </p>
         ) : null}
 
-        <Button type="submit" className="w-full mt-4" disabled={mutation.isPending}>
+        <Button
+          type="submit"
+          data-enter-sequence=""
+          className="w-full mt-4"
+          disabled={mutation.isPending}
+        >
           {mutation.isPending
             ? 'Salvando...'
             : stayAfterCreate
