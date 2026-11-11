@@ -407,7 +407,7 @@ export function PersonSearchSelect({
           closeCreate();
         }}
       >
-        <DialogContent className="flex max-h-[90vh] flex-col gap-4 overflow-hidden sm:max-w-3xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto overscroll-contain sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>
               {createdPerson ? 'Completar cadastro' : 'Cadastrar nova pessoa'}
@@ -418,25 +418,23 @@ export function PersonSearchSelect({
                 : 'Salve a pessoa para liberar endereço e contato antes de voltar à ordem.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            <FormPerson
-              key={creating ? search.trim() || 'new' : 'closed'}
-              initialName={/[a-z]/i.test(search) ? search : ''}
-              stayAfterCreate
-              createAs={{
-                isClient: types.includes('cliente'),
-                isSupplier: types.includes('fornecedor'),
-                isEmployee: types.includes('colaborador'),
-                isFinancialInstitution: types.includes('instituicao'),
-              }}
-              onPersisted={(person) => {
-                setCreatedPerson(person);
-                setSelectedLabel(person.name);
-              }}
-            />
-          </div>
+          <FormPerson
+            key={creating ? search.trim() || 'new' : 'closed'}
+            initialName={/[a-z]/i.test(search) ? search : ''}
+            stayAfterCreate
+            createAs={{
+              isClient: types.includes('cliente'),
+              isSupplier: types.includes('fornecedor'),
+              isEmployee: types.includes('colaborador'),
+              isFinancialInstitution: types.includes('instituicao'),
+            }}
+            onPersisted={(person) => {
+              setCreatedPerson(person);
+              setSelectedLabel(person.name);
+            }}
+          />
           {createdPerson ? (
-            <div className="flex justify-end border-t border-zinc-200 pt-4">
+            <div className="sticky bottom-0 flex justify-end border-t border-zinc-200 bg-background pt-4">
               <Button type="button" onClick={() => closeCreate(createdPerson)}>
                 Voltar para a ordem
               </Button>

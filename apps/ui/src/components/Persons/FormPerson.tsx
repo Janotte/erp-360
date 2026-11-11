@@ -215,7 +215,16 @@ export function FormPerson({
       );
       if (created && stayAfterCreate) {
         requestAnimationFrame(() => {
-          detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          requestAnimationFrame(() => {
+            const target = detailsRef.current;
+            const scroller = target?.closest<HTMLElement>('[role="dialog"]');
+            if (!target || !scroller) return;
+            const top =
+              target.getBoundingClientRect().top -
+              scroller.getBoundingClientRect().top +
+              scroller.scrollTop;
+            scroller.scrollTo({ top: Math.max(0, top - 12), behavior: 'smooth' });
+          });
         });
       }
     },
