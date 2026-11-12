@@ -107,7 +107,7 @@ describe('confirmação da entrada', () => {
       .from(catalogItems)
       .where(eq(catalogItems.id, item.id));
     assert.equal(posted.lastInboundOn, today);
-    assert.equal(posted.listPrice, '15.0000');
+    assert.equal(posted.listPrice, '20.0000');
 
     const titles = await db
       .select({ documentNumber: payables.documentNumber })
@@ -134,7 +134,7 @@ describe('confirmação da entrada', () => {
       .from(catalogItems)
       .where(eq(catalogItems.id, item.id));
     assert.equal(reversed.lastInboundOn, today);
-    assert.equal(reversed.listPrice, '15.0000');
+    assert.equal(reversed.listPrice, '20.0000');
 
     const remaining = await db
       .select({ id: payables.id })

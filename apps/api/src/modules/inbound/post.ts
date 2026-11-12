@@ -4,12 +4,13 @@ import {
   inboundDocumentInstallments,
   inboundDocumentLines,
   inboundDocuments,
+  inboundPricingOverrides,
   operationNatures,
   stockBalances,
   stockMovements,
 } from '@erp-360/mod-inbound';
 import { persons } from '@erp-360/mod-persons';
-import { civilDate } from '@erp-360/shared';
+import { civilDate, listPriceFromMargin } from '@erp-360/shared';
 import { and, eq, inArray, isNull, lte, or } from 'drizzle-orm';
 
 import { db } from '../../db/index.ts';
@@ -176,7 +177,6 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
       const [item] = await tx
         .select({
           tracksStock: catalogItems.tracksStock,
-          grossMargin: catalogItems.grossMargin,
         })
         .from(catalogItems)
         .where(and(eq(catalogItems.id, itemId), eq(catalogItems.tenantId, tenantId)))
@@ -254,10 +254,6 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
         .update(inboundDocumentLines)
         .set({ unitCost })
         .where(eq(inboundDocumentLines.id, line.id));
-      const suggestedPrice =
-        nature.suggestsListPrice && item.grossMargin != null && unitCost != null
-          ? round4(Number(unitCost) * (1 + money(item.grossMargin) / 100)).toFixed(4)
-          : null;
       await tx
         .update(catalogItems)
         .set({ lastInboundOn: inboundOn })
@@ -271,12 +267,63 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
             ),
           ),
         );
-      if (suggestedPrice) {
+    }
+
+    const pricedItemIds = [
+      ...new Set(
+        ordered.flatMap((line) => (line.itemId ? [line.itemId] : [])),
+      ),
+    ];
+    for (const itemId of pricedItemIds) {
+      const [item] = await tx
+        .select({
+          tracksStock: catalogItems.tracksStock,
+          grossMargin: catalogItems.grossMargin,
+        })
+        .from(catalogItems)
+        .where(and(eq(catalogItems.id, itemId), eq(catalogItems.tenantId, tenantId)))
+        .for('update');
+      if (!item) continue;
+      const [override] = await tx
+        .select({ grossMargin: inboundPricingOverrides.grossMargin })
+        .from(inboundPricingOverrides)
+        .where(
+          and(
+            eq(inboundPricingOverrides.documentId, documentId),
+            eq(inboundPricingOverrides.itemId, itemId),
+            eq(inboundPricingOverrides.tenantId, tenantId),
+          ),
+        )
+        .limit(1);
+      if (override) {
         await tx
           .update(catalogItems)
-          .set({ listPrice: suggestedPrice })
+          .set({ grossMargin: override.grossMargin })
           .where(and(eq(catalogItems.id, itemId), eq(catalogItems.tenantId, tenantId)));
       }
+      const margin = override ? override.grossMargin : item.grossMargin;
+      if (
+        !nature.suggestsListPrice ||
+        !nature.updatesAverageCost ||
+        !item.tracksStock ||
+        margin == null
+      ) {
+        continue;
+      }
+      const [balance] = await tx
+        .select({ averageCost: stockBalances.averageCost })
+        .from(stockBalances)
+        .where(
+          and(eq(stockBalances.itemId, itemId), eq(stockBalances.tenantId, tenantId)),
+        )
+        .limit(1);
+      if (!balance) continue;
+      const price = listPriceFromMargin(money(balance.averageCost), Number(margin));
+      if (price == null) continue;
+      await tx
+        .update(catalogItems)
+        .set({ listPrice: price.toFixed(4) })
+        .where(and(eq(catalogItems.id, itemId), eq(catalogItems.tenantId, tenantId)));
     }
 
     const createsPayable = nature.createsPayable && document.financialStatus !== 'waived';
