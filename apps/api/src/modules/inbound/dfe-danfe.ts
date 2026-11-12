@@ -10,6 +10,8 @@ export interface DanfeParty {
   municipalRegistration: string | null;
   address: string;
   street: string;
+  number: string;
+  complement: string;
   neighborhood: string;
   city: string;
   state: string;
@@ -158,7 +160,9 @@ function formatCep(value: string) {
 
 function formatAddress(address: Record<string, unknown> | null) {
   if (!address) return '';
-  const street = [text(address.xLgr), text(address.nro)].filter(Boolean).join(', ');
+  const street = [text(address.xLgr), text(address.nro), text(address.xCpl)]
+    .filter(Boolean)
+    .join(', ');
   const city = text(address.xMun);
   const state = text(address.UF);
   const place = [
@@ -181,9 +185,9 @@ function party(node: Record<string, unknown> | null, addressKey: string): DanfeP
     stateRegistrationSt: text(node?.IEST) || null,
     municipalRegistration: text(node?.IM) || null,
     address: formatAddress(address),
-    street: [text(address?.xLgr), text(address?.nro), text(address?.xCpl)]
-      .filter(Boolean)
-      .join(', '),
+    street: text(address?.xLgr),
+    number: text(address?.nro),
+    complement: text(address?.xCpl),
     neighborhood: text(address?.xBairro),
     city: text(address?.xMun),
     state: text(address?.UF),

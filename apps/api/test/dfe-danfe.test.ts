@@ -11,7 +11,7 @@ describe('DANFE da NF-e de entrada', () => {
       <NFe><infNFe Id="NFe${key}">
         <ide><natOp>Compra</natOp><serie>1</serie><nNF>2116</nNF><dhEmi>2026-10-23T10:00:00-03:00</dhEmi><tpNF>1</tpNF></ide>
         <emit><CNPJ>18371298000101</CNPJ><xNome>Fornecedor</xNome><IE>123</IE>
-          <enderEmit><xLgr>Rua A</xLgr><nro>10</nro><xBairro>Centro</xBairro><xMun>Florianopolis</xMun><UF>SC</UF><CEP>88000000</CEP><fone>4833334444</fone></enderEmit>
+          <enderEmit><xLgr>Rua A</xLgr><nro>10</nro><xCpl>Sala 02</xCpl><xBairro>Centro</xBairro><xMun>Florianopolis</xMun><UF>SC</UF><CEP>88000000</CEP><fone>4833334444</fone></enderEmit>
         </emit>
         <dest><CNPJ>00000000000191</CNPJ><xNome>Empresa</xNome></dest>
         <det nItem="1"><prod><cProd>ABC</cProd><xProd>Parafuso</xProd><NCM>73181500</NCM><CFOP>1102</CFOP><uCom>UN</uCom><qCom>2.0000</qCom><vUnCom>10.5000</vUnCom><vProd>21.00</vProd></prod>
@@ -31,7 +31,7 @@ describe('DANFE da NF-e de entrada', () => {
     assert.equal(danfe.operation, 'Compra');
     assert.equal(danfe.protocol, '135792468');
     assert.equal(danfe.emitter.name, 'Fornecedor');
-    assert.equal(danfe.emitter.address.includes('Rua A, 10'), true);
+    assert.equal(danfe.emitter.address.includes('Rua A, 10, Sala 02'), true);
     assert.equal(danfe.emitter.address.includes('CEP 88000-000'), true);
     assert.equal(danfe.recipient.name, 'Empresa');
     assert.equal(danfe.items.length, 1);
@@ -42,7 +42,9 @@ describe('DANFE da NF-e de entrada', () => {
     assert.equal(danfe.freightAmount, 100);
     assert.equal(danfe.discountAmount, 50);
     assert.equal(danfe.operationType, '1');
-    assert.equal(danfe.emitter.street, 'Rua A, 10');
+    assert.equal(danfe.emitter.street, 'Rua A');
+    assert.equal(danfe.emitter.number, '10');
+    assert.equal(danfe.emitter.complement, 'Sala 02');
     assert.equal(danfe.emitter.city, 'Florianopolis');
     assert.equal(danfe.emitter.phone, '4833334444');
     assert.equal(danfe.icmsAmount, 252);

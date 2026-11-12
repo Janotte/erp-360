@@ -746,6 +746,8 @@ export function FormInbound() {
               <ReadField label="I.E." value={emitter?.stateRegistration || ''} />
               <ReadField label="CEP" value={emitter?.postalCode || ''} />
               <ReadField label="Logradouro" value={emitter?.street || ''} />
+              <ReadField label="Número" value={emitter?.number || ''} />
+              <ReadField label="Complemento" value={emitter?.complement || ''} />
               <ReadField label="Bairro" value={emitter?.neighborhood || ''} />
               <ReadField label="Município" value={emitter?.city || ''} />
               <ReadField label="UF" value={emitter?.state || ''} />

@@ -132,6 +132,10 @@ function protocolText(view: DanfeView) {
   return [view.protocol, when].filter(Boolean).join('  ');
 }
 
+function streetLine(party: DanfeView['emitter']) {
+  return [party.street, party.number, party.complement].filter(Boolean).join(', ');
+}
+
 export function danfeDocument(view: DanfeView) {
   const emitter = view.emitter;
   const recipient = view.recipient;
@@ -151,7 +155,7 @@ export function danfeDocument(view: DanfeView) {
       ? formatTime(view.entryAt)
       : formatTime(view.entryTime),
     emitente_nome: emitter.name,
-    emitente_logradouro: emitter.street,
+    emitente_logradouro: streetLine(emitter),
     emitente_bairro: emitter.neighborhood,
     emitente_cep: formatPostalCode(emitter.postalCode),
     emitente_municipio: emitter.city,
@@ -163,7 +167,7 @@ export function danfeDocument(view: DanfeView) {
     emitente_im: emitter.municipalRegistration ?? '',
     destinatario_nome: recipient.name,
     destinatario_cnpj: documentNumber(recipient.taxId),
-    destinatario_logradouro: recipient.street,
+    destinatario_logradouro: streetLine(recipient),
     destinatario_bairro: recipient.neighborhood,
     destinatario_cep: formatPostalCode(recipient.postalCode),
     destinatario_municipio: recipient.city,
