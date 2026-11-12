@@ -7,6 +7,7 @@ import {
   fiscalItemTypes,
   formatRawDate,
   productFiscalItemTypes,
+  syncPricing,
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FormEvent } from 'react';
@@ -136,6 +137,7 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
   const [barcode, setBarcode] = useState(itemToUpdate?.barcode ?? seed?.barcode ?? '');
   const [listPrice, setListPrice] = useState(formatListPrice(itemToUpdate?.listPrice));
   const [grossMargin, setGrossMargin] = useState(formatPercent(itemToUpdate?.grossMargin));
+  const [listPriceError, setListPriceError] = useState('');
   const [ncmCode, setNcmCode] = useState(itemToUpdate?.ncmCode ?? seed?.ncmCode ?? '');
   const [ncmDescription, setNcmDescription] = useState(
     itemToUpdate?.ncmDescription ?? '',
@@ -198,6 +200,7 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
     setBarcode(item.barcode ?? '');
     setListPrice(formatListPrice(item.listPrice));
     setGrossMargin(formatPercent(item.grossMargin));
+    setListPriceError('');
     setNcmCode(item.ncmCode ?? '');
     setNcmDescription(item.ncmDescription ?? '');
     setCestCode(item.cestCode ?? '');
@@ -264,9 +267,63 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
     if (next === 'fixed_asset') setTracksStock(false);
   };
 
+  const averageCost = (() => {
+    const value = Number(itemToUpdate?.averageCost ?? 0);
+    return Number.isFinite(value) ? value : 0;
+  })();
+
+  const changeListPrice = (typed: string) => {
+    const masked = maskListPrice(typed);
+    const priceText = listPriceForApi(masked);
+    const marginText = listPriceForApi(grossMargin);
+    const synced = syncPricing({
+      average: averageCost,
+      marginPercent: marginText ? Number(marginText) : null,
+      price: priceText ? Number(priceText) : null,
+      edited: 'price',
+      emptyPriceWithoutCost: false,
+    });
+    setListPrice(masked);
+    if (synced.marginPercent === null) {
+      if (!masked) {
+        setGrossMargin('');
+        setListPriceError('');
+      } else if (averageCost > 0) {
+        setListPriceError('Preço de lista menor que o custo médio.');
+      } else {
+        setListPriceError('');
+      }
+      return;
+    }
+    setGrossMargin(formatPercent(synced.marginPercent.toFixed(4)));
+    setListPriceError('');
+  };
+
+  const changeGrossMargin = (typed: string) => {
+    const masked = maskPercent(typed);
+    const priceText = listPriceForApi(listPrice);
+    const marginText = listPriceForApi(masked);
+    const synced = syncPricing({
+      average: averageCost,
+      marginPercent: marginText ? Number(marginText) : null,
+      price: priceText ? Number(priceText) : null,
+      edited: 'margin',
+      emptyPriceWithoutCost: false,
+    });
+    setGrossMargin(masked);
+    if (!(averageCost > 0)) return;
+    if (synced.price !== null) {
+      setListPrice(formatListPrice(synced.price.toFixed(4)));
+      setListPriceError('');
+    } else if (!masked) {
+      setListPrice('');
+      setListPriceError('');
+    }
+  };
+
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (!measureId) return;
+    if (!measureId || listPriceError) return;
     mutation.mutate({
       sku,
       name,
@@ -438,8 +495,11 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
             value={listPrice}
             inputMode="decimal"
             placeholder="0,0000"
-            onChange={(event) => setListPrice(maskListPrice(event.target.value))}
+            onChange={(event) => changeListPrice(event.target.value)}
           />
+          {listPriceError ? (
+            <p className="text-sm text-destructive">{listPriceError}</p>
+          ) : null}
         </div>
         <div className="space-y-1">
           <Label htmlFor="itemMargin">Margem bruta (%)</Label>
@@ -449,10 +509,10 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
             value={grossMargin}
             inputMode="decimal"
             placeholder="0,00"
-            onChange={(event) => setGrossMargin(maskPercent(event.target.value))}
+            onChange={(event) => changeGrossMargin(event.target.value)}
           />
           <p className="text-sm text-zinc-500">
-            Na compra para revenda, o preço sugerido é o custo da nota vezes um mais esta margem.
+            Havendo custo médio, o preço de lista é esse custo dividido por um menos a margem.
           </p>
         </div>
         <div className="space-y-1">
@@ -645,7 +705,7 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
       ) : null}
 
       <div className="flex justify-end pt-2">
-        <Button type="submit" data-item-field disabled={mutation.isPending || !measureId}>
+        <Button type="submit" data-item-field disabled={mutation.isPending || !measureId || Boolean(listPriceError)}>
           {mutation.isPending ? 'Salvando...' : itemId ? 'Atualizar' : 'Cadastrar'}
         </Button>
       </div>
