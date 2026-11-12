@@ -1,55 +1,12 @@
-export interface CostFlags {
-  freightInCost: boolean;
-  insuranceInCost: boolean;
-  otherInCost: boolean;
-  discountInCost: boolean;
-  ipiInCost: boolean;
-  stInCost: boolean;
-  icmsInCost: boolean;
-}
+import { round4 } from '@erp-360/shared';
 
-export interface LineAmounts {
-  lineAmountCents: number;
-  freightCents: number;
-  insuranceCents: number;
-  otherCents: number;
-  discountCents: number;
-  ipiCents: number;
-  stCents: number;
-  icmsCents: number;
-  stockQty: number;
-}
-
-export function round4(value: number) {
-  return Math.round(value * 10_000) / 10_000;
-}
-
-export function lineUnitCost(amounts: LineAmounts, flags: CostFlags) {
-  if (amounts.stockQty <= 0) {
-    throw new Error('Quantidade de estoque inválida.');
-  }
-  let extra = 0;
-  if (flags.freightInCost) extra += amounts.freightCents;
-  if (flags.insuranceInCost) extra += amounts.insuranceCents;
-  if (flags.otherInCost) extra += amounts.otherCents;
-  if (flags.discountInCost) extra -= amounts.discountCents;
-  if (flags.ipiInCost) extra += amounts.ipiCents;
-  if (flags.stInCost) extra += amounts.stCents;
-  if (flags.icmsInCost) extra += amounts.icmsCents;
-  return round4((amounts.lineAmountCents + extra) / 100 / amounts.stockQty);
-}
-
-export function nextAverage(
-  currentQty: number,
-  currentAverage: number,
-  incomingQty: number,
-  unitCost: number,
-) {
-  if (currentQty <= 0) return round4(unitCost);
-  return round4(
-    (currentQty * currentAverage + incomingQty * unitCost) / (currentQty + incomingQty),
-  );
-}
+export {
+  type CostFlags,
+  type LineAmounts,
+  lineUnitCost,
+  nextAverage,
+  round4,
+} from '@erp-360/shared';
 
 export function reversedBalance(
   currentQty: number,
