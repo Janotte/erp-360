@@ -133,7 +133,7 @@ export const catalogItems = pgTable(
     ),
     check(
       'catalog_items_gross_margin_check',
-      sql`${table.grossMargin} is null or ${table.grossMargin} >= 0`,
+      sql`${table.grossMargin} is null or (${table.grossMargin} >= 0 and ${table.grossMargin} < 100)`,
     ),
     check(
       'catalog_items_measures_check',

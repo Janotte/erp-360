@@ -172,6 +172,38 @@ export const supplierItemLinks = pgTable(
   ],
 );
 
+export const inboundPricingOverrides = pgTable(
+  'inbound_pricing_overrides',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ...tenantColumns,
+    documentId: uuid('document_id').notNull(),
+    itemId: uuid('item_id').notNull(),
+    grossMargin: numeric('gross_margin', { precision: 8, scale: 4 }),
+  },
+  (table) => [
+    unique('inbound_pricing_overrides_item_unique').on(
+      table.tenantId,
+      table.documentId,
+      table.itemId,
+    ),
+    foreignKey({
+      name: 'inbound_pricing_overrides_document_tenant_fk',
+      columns: [table.documentId, table.tenantId],
+      foreignColumns: [inboundDocuments.id, inboundDocuments.tenantId],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'inbound_pricing_overrides_item_tenant_fk',
+      columns: [table.itemId, table.tenantId],
+      foreignColumns: [catalogItems.id, catalogItems.tenantId],
+    }).onDelete('restrict'),
+    check(
+      'inbound_pricing_overrides_margin_check',
+      sql`${table.grossMargin} is null or (${table.grossMargin} >= 0 and ${table.grossMargin} < 100)`,
+    ),
+  ],
+);
+
 export const inboundDocuments = pgTable(
   'inbound_documents',
   {
