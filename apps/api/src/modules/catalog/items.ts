@@ -121,6 +121,16 @@ async function nextItemCode(
   return formatItemCode(updated.lastNumber);
 }
 
+export function grossMarginRangeMessage(value: string | null | undefined) {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return null;
+  const margin = Number(trimmed.replace(',', '.'));
+  if (!Number.isFinite(margin) || margin < 0 || margin >= 100) {
+    return 'Informe a margem bruta entre 0 e 100, sem incluir 100.';
+  }
+  return null;
+}
+
 function buildItemValues(
   data: ItemBody,
 ): { values: ReturnType<typeof itemValues> } | { message: string } {
@@ -152,8 +162,12 @@ function buildItemValues(
   }
   const grossMargin = parseDecimal(data.grossMargin, 4, 8);
   if (!grossMargin.ok) {
+    const rangeMessage = grossMarginRangeMessage(data.grossMargin);
+    if (rangeMessage) return { message: rangeMessage };
     return { message: 'Informe a margem bruta com até 4 casas decimais.' };
   }
+  const marginRange = grossMarginRangeMessage(grossMargin.value);
+  if (marginRange) return { message: marginRange };
   const netWeightKg = parseDecimal(data.netWeightKg, 3, 12);
   if (!netWeightKg.ok) {
     return { message: 'Informe o peso líquido com até 3 casas decimais.' };
