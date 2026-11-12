@@ -1,9 +1,17 @@
 import {
-  type CostFlags,
-  lineUnitCost,
-  projectedAverage,
+  editPricingMargin,
+  editPricingPrice,
+  entryUnitCost,
+  parseStored,
+  percentText,
+  type PricingContext,
+  type PricingFields,
+  type PricingItemInfo,
+  type PricingOverrides,
+  projectedAverageForItem,
+  recomputePricing,
   round4,
-  syncPricing,
+  stockQuantity,
 } from '@erp-360/shared';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, X } from 'lucide-react';
@@ -36,40 +44,12 @@ import {
   type InboundDocument,
   type InboundDraft,
   type InboundDraftLine,
-  type InboundLine,
   type InboundPricing,
   inboundService,
   inboundStatusLabel,
 } from '@/services/inbound';
 import { type CatalogItem, itemsService } from '@/services/items';
 
-type Edited = 'margin' | 'price' | 'none';
-
-interface PriceFields {
-  margin: string;
-  price: string;
-  edited: Edited;
-  error: string;
-}
-
-interface ItemInfo {
-  itemId: string;
-  code: string;
-  name: string;
-  quantity: number;
-  averageCost: number;
-  grossMargin: string | null;
-}
-
-interface PricingContext {
-  flags: CostFlags;
-  docLines: Map<number, InboundLine>;
-}
-
-type Overrides = Record<string, string | null>;
-
-const priceMessage = 'Preço de lista menor que o custo médio.';
-const marginMessage = 'Informe a margem bruta entre 0 e 100, sem incluir 100.';
 const unchangedMessage = 'O lançamento não altera o preço de lista desta natureza.';
 const editableStatus = new Set(['pending', 'pre_note', 'divergent']);
 
@@ -91,48 +71,6 @@ function barcodeForCatalog(value: string | null | undefined) {
 function cestForCatalog(value: string | null | undefined) {
   const digits = digitsOf(value);
   return /^[0-9]{7}$/.test(digits) ? digits : '';
-}
-
-function maskPrice(value: string) {
-  const digits = value.replace(/\D/g, '').slice(0, 15);
-  if (!digits) return '';
-  const padded = digits.padStart(5, '0');
-  const fraction = padded.slice(-4);
-  const integers = padded.slice(0, -4).replace(/^0+(?=\d)/, '') || '0';
-  return `${integers.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${fraction}`;
-}
-
-function maskPercent(value: string) {
-  const digits = value.replace(/\D/g, '').slice(0, 6);
-  if (!digits) return '';
-  const padded = digits.padStart(3, '0');
-  const integers = padded.slice(0, -2).replace(/^0+(?=\d)/, '') || '0';
-  return `${integers},${padded.slice(-2)}`;
-}
-
-function priceText(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return '';
-  const [integers, fraction = ''] = value.toFixed(4).split('.');
-  return maskPrice(`${integers}${fraction}`);
-}
-
-function percentText(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return '';
-  return maskPercent(String(Math.round(value * 100)));
-}
-
-function parseMasked(value: string) {
-  const text = value.replace(/\./g, '').replace(',', '.').trim();
-  if (!text) return null;
-  const number = Number(text);
-  return Number.isFinite(number) ? number : null;
-}
-
-function parseStored(value: string | null | undefined) {
-  const text = (value ?? '').trim();
-  if (!text) return null;
-  const number = Number(text);
-  return Number.isFinite(number) ? number : null;
 }
 
 function money4(value: number | string | null | undefined) {
@@ -175,7 +113,7 @@ function linesFrom(document: InboundDocument): InboundDraftLine[] {
 function noteDraft(
   document: InboundDocument,
   lines: InboundDraftLine[],
-  overrides: Overrides,
+  overrides: PricingOverrides,
 ): InboundDraft {
   return {
     supplierId: document.supplierId,
@@ -208,7 +146,7 @@ function noteDraft(
   };
 }
 
-function snapshot(lines: InboundDraftLine[], overrides: Overrides) {
+function snapshot(lines: InboundDraftLine[], overrides: PricingOverrides) {
   return JSON.stringify({
     lines: lines.map((line) => [line.lineNumber, line.itemId ?? null, line.factor]),
     overrides: Object.entries(overrides).sort(([left], [right]) =>
@@ -217,104 +155,7 @@ function snapshot(lines: InboundDraftLine[], overrides: Overrides) {
   });
 }
 
-function projectedFor(
-  context: PricingContext,
-  itemId: string,
-  lines: InboundDraftLine[],
-  info: ItemInfo,
-) {
-  const incoming: { quantity: number; unitCost: number }[] = [];
-  for (const line of lines) {
-    if (line.itemId !== itemId) continue;
-    const source = context.docLines.get(line.lineNumber);
-    const stockQty = round4(line.commercialQty * line.factor);
-    if (!source || !(stockQty > 0)) return null;
-    incoming.push({
-      quantity: stockQty,
-      unitCost: lineUnitCost(
-        {
-          lineAmountCents: source.lineAmount,
-          freightCents: source.freightAmount,
-          insuranceCents: source.insuranceAmount,
-          otherCents: source.otherAmount,
-          discountCents: source.discountAmount,
-          ipiCents: source.ipiAmount,
-          stCents: source.stAmount,
-          icmsCents: source.icmsAmount,
-          stockQty,
-        },
-        context.flags,
-      ),
-    });
-  }
-  return projectedAverage(info.quantity, info.averageCost, incoming);
-}
-
-function recompute(
-  context: PricingContext,
-  itemIds: (string | null | undefined)[],
-  lines: InboundDraftLine[],
-  overrides: Overrides,
-  fields: Record<string, PriceFields>,
-  infos: Record<string, ItemInfo>,
-) {
-  const nextFields = { ...fields };
-  const nextOverrides = { ...overrides };
-  for (const itemId of new Set(itemIds)) {
-    if (!itemId) continue;
-    const info = infos[itemId];
-    if (!info) continue;
-    const average = projectedFor(context, itemId, lines, info) ?? 0;
-    const previous = fields[itemId];
-    const edited: Edited = previous?.edited ?? 'none';
-    const marginValue =
-      edited === 'none'
-        ? parseStored(itemId in overrides ? overrides[itemId] : info.grossMargin)
-        : parseMasked(previous?.margin ?? '');
-    const priceValue = edited === 'price' ? parseMasked(previous?.price ?? '') : null;
-    const synced = syncPricing({
-      average,
-      marginPercent: marginValue,
-      price: priceValue,
-      edited,
-      emptyPriceWithoutCost: true,
-    });
-    let error = '';
-    if (
-      edited === 'price' &&
-      priceValue !== null &&
-      average > 0 &&
-      synced.marginPercent === null
-    ) {
-      error = priceMessage;
-    }
-    if (edited === 'margin' && marginValue !== null && marginValue >= 100) {
-      error = marginMessage;
-    }
-    nextFields[itemId] = {
-      edited,
-      error,
-      margin:
-        edited === 'margin' || (edited === 'price' && error)
-          ? (previous?.margin ?? '')
-          : percentText(synced.marginPercent),
-      price: edited === 'price' ? (previous?.price ?? '') : priceText(synced.price),
-    };
-    if (edited === 'margin') {
-      if (marginValue === null) nextOverrides[itemId] = null;
-      else if (!error) nextOverrides[itemId] = marginValue.toFixed(4);
-    }
-    if (edited === 'price') {
-      if (priceValue === null) nextOverrides[itemId] = null;
-      else if (!error && average > 0 && synced.marginPercent !== null) {
-        nextOverrides[itemId] = synced.marginPercent.toFixed(4);
-      }
-    }
-  }
-  return { fields: nextFields, overrides: nextOverrides };
-}
-
-function infoFromCatalog(item: CatalogItem): ItemInfo {
+function infoFromCatalog(item: CatalogItem): PricingItemInfo {
   const quantity = Number(item.quantity ?? 0);
   const averageCost = Number(item.averageCost ?? 0);
   return {
@@ -328,7 +169,7 @@ function infoFromCatalog(item: CatalogItem): ItemInfo {
 }
 
 function infosFromPricing(pricing: InboundPricing) {
-  const infos: Record<string, ItemInfo> = {};
+  const infos: Record<string, PricingItemInfo> = {};
   for (const row of pricing.stock) {
     infos[row.itemId] = {
       itemId: row.itemId,
@@ -349,10 +190,10 @@ export function FormInboundLinks() {
   const queryClient = useQueryClient();
 
   const [lines, setLines] = useState<InboundDraftLine[]>([]);
-  const [overrides, setOverrides] = useState<Overrides>({});
-  const [fields, setFields] = useState<Record<string, PriceFields>>({});
+  const [overrides, setOverrides] = useState<PricingOverrides>({});
+  const [fields, setFields] = useState<Record<string, PricingFields>>({});
   const [factorText, setFactorText] = useState<Record<number, string>>({});
-  const [linkedInfo, setLinkedInfo] = useState<Record<string, ItemInfo>>({});
+  const [linkedInfo, setLinkedInfo] = useState<Record<string, PricingItemInfo>>({});
   const [baseline, setBaseline] = useState('');
   const [search, setSearch] = useState<Record<number, string>>({});
   const [newItemLine, setNewItemLine] = useState<number | null>(null);
@@ -426,12 +267,12 @@ export function FormInboundLinks() {
       docLines: new Map(document.lines.map((line) => [line.lineNumber, line])),
     };
     const nextLines = linesFrom(document);
-    const nextOverrides: Overrides = {};
+    const nextOverrides: PricingOverrides = {};
     for (const override of pricingData.overrides) {
       nextOverrides[override.itemId] = override.grossMargin;
     }
     const result = editable
-      ? recompute(
+      ? recomputePricing(
           context,
           nextLines.map((line) => line.itemId),
           nextLines,
@@ -515,7 +356,7 @@ export function FormInboundLinks() {
     const nextLines = lines.map((line) =>
       line.lineNumber === lineNumber ? { ...line, itemId: item.id } : line,
     );
-    const result = recompute(
+    const result = recomputePricing(
       context,
       [item.id, previousId],
       nextLines,
@@ -535,7 +376,7 @@ export function FormInboundLinks() {
     const nextLines = lines.map((line) =>
       line.lineNumber === lineNumber ? { ...line, itemId: null } : line,
     );
-    const result = recompute(context, [previousId], nextLines, overrides, fields, infos);
+    const result = recomputePricing(context, [previousId], nextLines, overrides, fields, infos);
     setLines(nextLines);
     setFields(result.fields);
     setOverrides(result.overrides);
@@ -551,7 +392,7 @@ export function FormInboundLinks() {
     const nextLines = lines.map((item) =>
       item.lineNumber === lineNumber ? { ...item, factor: value } : item,
     );
-    const result = recompute(context, [line.itemId], nextLines, overrides, fields, infos);
+    const result = recomputePricing(context, [line.itemId], nextLines, overrides, fields, infos);
     setLines(nextLines);
     setFields(result.fields);
     setOverrides(result.overrides);
@@ -564,33 +405,13 @@ export function FormInboundLinks() {
   }
 
   function typeMargin(itemId: string, typed: string) {
-    const previous = fields[itemId];
-    const nextFields = {
-      ...fields,
-      [itemId]: {
-        margin: maskPercent(typed),
-        price: previous?.price ?? '',
-        edited: 'margin' as const,
-        error: '',
-      },
-    };
-    const result = recompute(context, [itemId], lines, overrides, nextFields, infos);
+    const result = editPricingMargin(context, itemId, typed, lines, overrides, fields, infos);
     setFields(result.fields);
     setOverrides(result.overrides);
   }
 
   function typePrice(itemId: string, typed: string) {
-    const previous = fields[itemId];
-    const nextFields = {
-      ...fields,
-      [itemId]: {
-        margin: previous?.margin ?? '',
-        price: maskPrice(typed),
-        edited: 'price' as const,
-        error: '',
-      },
-    };
-    const result = recompute(context, [itemId], lines, overrides, nextFields, infos);
+    const result = editPricingPrice(context, itemId, typed, lines, overrides, fields, infos);
     setFields(result.fields);
     setOverrides(result.overrides);
   }
@@ -618,6 +439,7 @@ export function FormInboundLinks() {
               <th className="py-2 pr-2 font-medium">Qtd</th>
               <th className="py-2 pr-2 font-medium">Fator</th>
               <th className="py-2 pr-2 font-medium">Qtd na nota</th>
+              <th className="py-2 pr-2 font-medium">Custo da entrada</th>
               <th className="py-2 font-medium">Vínculo</th>
             </tr>
           </thead>
@@ -647,8 +469,9 @@ export function FormInboundLinks() {
                   )}
                 </td>
                 <td className="py-2 pr-2">
-                  {quantityText(round4(line.commercialQty * line.factor))}
+                  {quantityText(stockQuantity(line))}
                 </td>
+                <td className="py-2 pr-2">{money4(entryUnitCost(context, line))}</td>
                 <td className="py-2">
                   {showSearch && editable ? (
                     <div className="flex items-start gap-1">
@@ -748,7 +571,7 @@ export function FormInboundLinks() {
           group.reduce((total, line) => total + line.commercialQty * line.factor, 0),
         );
         const average =
-          editable && info ? projectedFor(context, itemId, lines, info) : null;
+          editable && info ? projectedAverageForItem(context, itemId, lines, info) : null;
         const price = fields[itemId];
         const catalogItem = catalogById.get(itemId);
         return (
