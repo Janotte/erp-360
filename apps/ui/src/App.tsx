@@ -31,6 +31,7 @@ import { ListPaymentMethods } from './components/Financial/PaymentMethods/ListPa
 import { ListPlanAccounts } from './components/Financial/PlanAccounts/ListPlanAccounts';
 import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
 import { FormInbound } from './components/Inbound/FormInbound';
+import { FormInboundLinks } from './components/Inbound/FormInboundLinks';
 import { ListInbounds } from './components/Inbound/ListInbounds';
 import { InboundSetupPage } from './components/Inbound/Setup/InboundSetupPage';
 import { Navbar } from './components/Navbar';
@@ -288,6 +289,14 @@ function App() {
               element={
                 <Pagina>
                   <FormInbound />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/inbound/:id/vinculos"
+              element={
+                <Pagina>
+                  <FormInboundLinks />
                 </Pagina>
               }
             />

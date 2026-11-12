@@ -7,12 +7,11 @@ import {
   statementDueDates,
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 
-import { FormItem } from '@/components/Catalog/Items/FormItem';
 import {
   filterFromSearch,
   freightLabels,
@@ -31,13 +30,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { companyCardService } from '@/services/companyCards';
@@ -51,27 +43,10 @@ import {
   inboundStatusLabel,
   recipientManifestationLabel,
 } from '@/services/inbound';
-import { itemsService } from '@/services/items';
 import { personsService } from '@/services/persons';
 
 function digitsOf(value: string | null | undefined) {
   return (value ?? '').replace(/\D/g, '');
-}
-
-function ncmForCatalog(value: string | null | undefined) {
-  const digits = digitsOf(value);
-  if (digits.length !== 8) return '';
-  return `${digits.slice(0, 4)}.${digits.slice(4, 6)}.${digits.slice(6)}`;
-}
-
-function barcodeForCatalog(value: string | null | undefined) {
-  const digits = digitsOf(value);
-  return /^[0-9]{8}$|^[0-9]{12,14}$/.test(digits) ? digits : '';
-}
-
-function cestForCatalog(value: string | null | undefined) {
-  const digits = digitsOf(value);
-  return /^[0-9]{7}$/.test(digits) ? digits : '';
 }
 
 function asksPayment(document: InboundDocument) {
@@ -195,17 +170,13 @@ export function FormInbound() {
 
   const [draft, setDraft] = useState<InboundDraft | null>(null);
   const [baseline, setBaseline] = useState('');
-  const [itemSearch, setItemSearch] = useState<Record<number, string>>({});
   const [supplierSearch, setSupplierSearch] = useState('');
-  const [newItemLine, setNewItemLine] = useState<number | null>(null);
-  const [linkedItems, setLinkedItems] = useState<
-    Record<number, { id: string; code: string; name: string }>
-  >({});
   const [installmentCount, setInstallmentCount] = useState('1');
   const [bulkCfop, setBulkCfop] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmReverse, setConfirmReverse] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [leaveTarget, setLeaveTarget] = useState<'back' | 'links'>('back');
   const prepared = useRef<string | null>(null);
   const [sections, setSections] = useState({
     fiscal: false,
@@ -303,27 +274,6 @@ export function FormInbound() {
       }),
     enabled: supplierSearch.trim().length >= 2 && !locked,
   });
-  const itemQueries = useQuery({
-    queryKey: ['inbound', 'item-search', itemSearch],
-    queryFn: async () => {
-      const entries = await Promise.all(
-        Object.entries(itemSearch)
-          .filter(([, term]) => term.trim().length >= 2)
-          .map(async ([lineNumber, term]) => {
-            const result = await itemsService.list({
-              page: 1,
-              limit: 8,
-              sortField: 'name',
-              sortOrder: 'asc',
-              search: term.trim(),
-            });
-            return [lineNumber, result.data] as const;
-          }),
-      );
-      return Object.fromEntries(entries);
-    },
-  });
-
   function remember(saved: InboundDocument) {
     queryClient.setQueryData(['inbound', 'detail', saved.id], saved);
     void queryClient.invalidateQueries({ queryKey: ['inbound', 'list'] });
@@ -440,12 +390,25 @@ export function FormInbound() {
     navigate(from);
   }
 
-  function goBack() {
-    if (dirty) {
-      setLeaveOpen(true);
+  function leaveTo(target: 'back' | 'links') {
+    if (target === 'links') {
+      navigate(`/inbound/${id}/vinculos`, { state: location.state });
       return;
     }
     navigate(from);
+  }
+
+  function goTo(target: 'back' | 'links') {
+    if (dirty) {
+      setLeaveTarget(target);
+      setLeaveOpen(true);
+      return;
+    }
+    leaveTo(target);
+  }
+
+  function goBack() {
+    goTo('back');
   }
 
   function payload(body: InboundDraft): InboundDraft {
@@ -471,14 +434,11 @@ export function FormInbound() {
     );
   }
 
-  const newItem = draft?.lines.find((line) => line.lineNumber === newItemLine) ?? null;
   const linkedLabel = (lineNumber: number, itemId: string) => {
     const saved = document?.lines.find((item) => item.lineNumber === lineNumber);
     if (saved?.itemId === itemId && saved.itemCode) {
       return `${saved.itemCode} ${saved.itemName ?? ''}`.trim();
     }
-    const local = linkedItems[lineNumber];
-    if (local?.id === itemId) return `${local.code} ${local.name}`;
     return 'Item selecionado';
   };
 
@@ -811,6 +771,11 @@ export function FormInbound() {
             open={sections.items}
             onToggle={() => setSections({ ...sections, items: !sections.items })}
           >
+            <div>
+              <Button type="button" variant="outline" onClick={() => goTo('links')}>
+                Vínculos
+              </Button>
+            </div>
             <div className="flex flex-wrap items-end gap-2">
               <div className="space-y-1">
                 <Label>CFOP de entrada</Label>
@@ -912,19 +877,7 @@ export function FormInbound() {
                           />
                         )}
                       </td>
-                      <td className="py-2 pr-2">
-                        <Input
-                          className="w-20"
-                          value={String(line.factor)}
-                          disabled={locked}
-                          onChange={(event) => {
-                            const factor = Number(event.target.value.replace(',', '.'));
-                            patchLine(line.lineNumber, {
-                              factor: Number.isFinite(factor) ? factor : 1,
-                            });
-                          }}
-                        />
-                      </td>
+                      <td className="py-2 pr-2">{line.factor}</td>
                       <td className="py-2 pr-2">
                         {document.accessKey || locked ? (
                           line.unitPrice
@@ -952,61 +905,9 @@ export function FormInbound() {
                         ) : (
                           <p className="text-amber-700">Sem vínculo</p>
                         )}
-                        {!locked ? (
-                          <>
-                            <Input
-                              value={itemSearch[line.lineNumber] ?? ''}
-                              placeholder="Buscar item"
-                              onChange={(event) =>
-                                setItemSearch({
-                                  ...itemSearch,
-                                  [line.lineNumber]: event.target.value,
-                                })
-                              }
-                            />
-                            <ul>
-                              {(itemQueries.data?.[line.lineNumber] ?? []).map((item) => (
-                                <li key={item.id}>
-                                  <button
-                                    type="button"
-                                    className="text-left text-zinc-700 hover:underline"
-                                    onClick={() => {
-                                      patchLine(line.lineNumber, { itemId: item.id });
-                                      setLinkedItems({
-                                        ...linkedItems,
-                                        [line.lineNumber]: {
-                                          id: item.id,
-                                          code: item.code,
-                                          name: item.name,
-                                        },
-                                      });
-                                      setItemSearch({
-                                        ...itemSearch,
-                                        [line.lineNumber]: '',
-                                      });
-                                    }}
-                                  >
-                                    {item.code} · {item.name}
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          </>
-                        ) : null}
                       </td>
                       <td className="py-2">
                         <div className="flex gap-1">
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            title="Cadastrar item"
-                            aria-label="Cadastrar item"
-                            disabled={locked}
-                            onClick={() => setNewItemLine(line.lineNumber)}
-                          >
-                            <Pencil />
-                          </Button>
                           {!document.accessKey && draft.lines.length > 1 ? (
                             <Button
                               type="button"
@@ -1478,43 +1379,6 @@ export function FormInbound() {
         </form>
       ) : null}
 
-      <Dialog
-        open={newItemLine != null}
-        onOpenChange={(open) => !open && setNewItemLine(null)}
-      >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Novo item</DialogTitle>
-            <DialogDescription>
-              Código de barras, descrição, NCM e CEST vieram da nota. Escolha a unidade de
-              medida para concluir o cadastro.
-            </DialogDescription>
-          </DialogHeader>
-          {newItem ? (
-            <FormItem
-              key={newItem.lineNumber}
-              seed={{
-                name: newItem.description,
-                description: newItem.description,
-                barcode: barcodeForCatalog(newItem.barcode),
-                ncmCode: ncmForCatalog(newItem.ncmCode),
-                cestCode: cestForCatalog(newItem.cestCode),
-              }}
-              onSuccess={(item) => {
-                const lineNumber = newItem.lineNumber;
-                patchLine(lineNumber, { itemId: item.id });
-                setLinkedItems((current) => ({
-                  ...current,
-                  [lineNumber]: { id: item.id, code: item.code, name: item.name },
-                }));
-                setItemSearch((current) => ({ ...current, [lineNumber]: '' }));
-                setNewItemLine(null);
-              }}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1577,7 +1441,7 @@ export function FormInbound() {
               variant="outline"
               onClick={() => {
                 setLeaveOpen(false);
-                navigate(from);
+                leaveTo(leaveTarget);
               }}
             >
               Descartar
@@ -1590,7 +1454,7 @@ export function FormInbound() {
                 void save.mutateAsync(payload(draft)).then(() => {
                   toast.success('Nota salva.');
                   setLeaveOpen(false);
-                  navigate(from);
+                  leaveTo(leaveTarget);
                 });
               }}
             >

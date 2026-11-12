@@ -1,3 +1,5 @@
+import type { CostFlags } from '@erp-360/shared';
+
 import { apiFetch } from './apiClient';
 
 export type InboundStatus =
@@ -73,6 +75,13 @@ export interface InboundLine {
   factor: string;
   unitPrice: string;
   lineAmount: number;
+  freightAmount?: number;
+  insuranceAmount?: number;
+  otherAmount?: number;
+  discountAmount?: number;
+  ipiAmount?: number;
+  stAmount?: number;
+  icmsAmount?: number;
   itemId: string | null;
   itemCode: string | null;
   itemName: string | null;
@@ -286,6 +295,26 @@ export interface InboundDraft {
   lines: InboundDraftLine[];
   installments: { number: string; dueOn: string; amount: number }[];
   finance?: InboundFinance;
+  pricingOverrides?: { itemId: string; grossMargin: string | null }[];
+}
+
+export interface InboundPricingStock {
+  itemId: string;
+  code: string;
+  name: string;
+  quantity: string;
+  averageCost: string;
+  grossMargin: string | null;
+}
+
+export interface InboundPricing {
+  editable: boolean;
+  discovered: boolean;
+  suggestsListPrice: boolean;
+  updatesAverageCost: boolean;
+  costFlags: CostFlags;
+  stock: InboundPricingStock[];
+  overrides: { itemId: string; grossMargin: string | null }[];
 }
 
 async function readBody(res: Response) {
@@ -315,6 +344,10 @@ export const inboundService = {
   get: async (id: string): Promise<InboundDocument> => {
     const res = await apiFetch(`/inbound/${id}`);
     return parse(res, 'Falha ao carregar a nota.');
+  },
+  pricing: async (id: string): Promise<InboundPricing> => {
+    const res = await apiFetch(`/inbound/${id}/pricing`);
+    return parse(res, 'Falha ao carregar os preços da nota.');
   },
   discover: async (id: string): Promise<InboundDiscoveryResult> => {
     const res = await apiFetch(`/inbound/${id}/discover`, { method: 'POST' });
