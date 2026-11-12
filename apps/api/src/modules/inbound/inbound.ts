@@ -56,13 +56,13 @@ import { normalizeInboundFinance } from './finance.ts';
 import { parseNfeXml } from './nfe.ts';
 import { getOrCreateNfeSettings } from './nfe-settings.ts';
 import { persistParsedNfe } from './persist-nfe.ts';
-import { registerInboundSupplier } from './register-supplier.ts';
 import {
   deleteInboundDocument,
   entryDateMessage,
   postInboundDocument,
   reverseInboundDocument,
 } from './post.ts';
+import { registerInboundSupplier } from './register-supplier.ts';
 
 export { entryDateMessage };
 import { cfopScope, ensureInboundSetup } from './setup.ts';
@@ -135,7 +135,13 @@ const draftBody = z.object({
   installments: z.array(installmentInput),
   finance: financeInput.optional(),
   pricingOverrides: z
-    .array(z.object({ itemId: z.string().uuid(), grossMargin: z.string().nullable() }))
+    .array(
+      z.object({
+        itemId: z.string().uuid(),
+        grossMargin: z.string().nullable(),
+        listPrice: z.string().nullable().optional(),
+      }),
+    )
     .optional(),
 });
 
@@ -983,14 +989,27 @@ export async function saveInboundDraft(
 }
 
 const pricingMarginMessage = 'Informe a margem bruta entre 0 e 100, sem incluir 100.';
+const pricingPriceMessage = 'O preço de lista é inválido.';
+
+function validatedListPrice(value: string | null | undefined) {
+  if (value == null) return null;
+  const text = value.trim().replace(',', '.');
+  if (text === '') return null;
+  const price = Number(text);
+  if (!Number.isFinite(price) || price < 0) {
+    throw new InboundError(400, pricingPriceMessage);
+  }
+  return price.toFixed(4);
+}
 
 function validatedPricingOverrides(
   overrides: z.infer<typeof draftBody>['pricingOverrides'],
 ) {
   if (!overrides) return undefined;
   return overrides.map((override) => {
+    const listPrice = validatedListPrice(override.listPrice);
     if (override.grossMargin === null)
-      return { itemId: override.itemId, grossMargin: null };
+      return { itemId: override.itemId, grossMargin: null, listPrice };
     const margin = Number(override.grossMargin.trim().replace(',', '.'));
     if (
       override.grossMargin.trim() === '' ||
@@ -1000,14 +1019,16 @@ function validatedPricingOverrides(
     ) {
       throw new InboundError(400, pricingMarginMessage);
     }
-    return { itemId: override.itemId, grossMargin: margin.toFixed(4) };
+    return { itemId: override.itemId, grossMargin: margin.toFixed(4), listPrice };
   });
 }
 
 async function savePricingOverrides(
   tenantId: string,
   documentId: string,
-  overrides: { itemId: string; grossMargin: string | null }[] | undefined,
+  overrides:
+    | { itemId: string; grossMargin: string | null; listPrice: string | null }[]
+    | undefined,
 ) {
   const sameDocument = and(
     eq(inboundPricingOverrides.tenantId, tenantId),
@@ -1024,6 +1045,7 @@ async function savePricingOverrides(
             documentId,
             itemId: row.itemId,
             grossMargin: row.grossMargin,
+            listPrice: row.listPrice,
           })),
         );
       }
@@ -1169,6 +1191,7 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
       .select({
         itemId: inboundPricingOverrides.itemId,
         grossMargin: inboundPricingOverrides.grossMargin,
+        listPrice: inboundPricingOverrides.listPrice,
       })
       .from(inboundPricingOverrides)
       .where(

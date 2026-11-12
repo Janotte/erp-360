@@ -1,0 +1,2 @@
+ALTER TABLE "inbound_pricing_overrides" ADD COLUMN "list_price" numeric(15, 4);--> statement-breakpoint
+ALTER TABLE "inbound_pricing_overrides" ADD CONSTRAINT "inbound_pricing_overrides_list_price_check" CHECK ("inbound_pricing_overrides"."list_price" is null or "inbound_pricing_overrides"."list_price" >= 0);

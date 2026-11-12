@@ -2,8 +2,10 @@ import {
   editPricingMargin,
   editPricingPrice,
   entryUnitCost,
+  parseMasked,
   parseStored,
   percentText,
+  priceText,
   type PricingContext,
   type PricingFields,
   type PricingItemInfo,
@@ -110,10 +112,17 @@ function linesFrom(document: InboundDocument): InboundDraftLine[] {
   }));
 }
 
+function listPriceForApi(value: string | undefined) {
+  const price = parseMasked(value ?? '');
+  if (price == null || price < 0) return null;
+  return price.toFixed(4);
+}
+
 function noteDraft(
   document: InboundDocument,
   lines: InboundDraftLine[],
   overrides: PricingOverrides,
+  fields: Record<string, PricingFields>,
 ): InboundDraft {
   return {
     supplierId: document.supplierId,
@@ -142,6 +151,7 @@ function noteDraft(
     pricingOverrides: Object.entries(overrides).map(([itemId, grossMargin]) => ({
       itemId,
       grossMargin,
+      listPrice: listPriceForApi(fields[itemId]?.price),
     })),
   };
 }
@@ -281,6 +291,14 @@ export function FormInboundLinks() {
           infosFromPricing(pricingData),
         )
       : { fields: {}, overrides: nextOverrides };
+    if (editable) {
+      for (const override of pricingData.overrides) {
+        const field = result.fields[override.itemId];
+        const price = Number(override.listPrice);
+        if (!field || override.listPrice == null || !Number.isFinite(price)) continue;
+        result.fields[override.itemId] = { ...field, price: priceText(price) };
+      }
+    }
     setLines(nextLines);
     setOverrides(nextOverrides);
     setFields(result.fields);
@@ -305,7 +323,10 @@ export function FormInboundLinks() {
   const save = useMutation({
     mutationFn: async () => {
       if (!document) throw new Error('Nota não carregada.');
-      const saved = await inboundService.save(id, noteDraft(document, lines, overrides));
+      const saved = await inboundService.save(
+        id,
+        noteDraft(document, lines, overrides, fields),
+      );
       const fresh = await inboundService.pricing(id);
       return { saved, fresh };
     },
@@ -376,7 +397,14 @@ export function FormInboundLinks() {
     const nextLines = lines.map((line) =>
       line.lineNumber === lineNumber ? { ...line, itemId: null } : line,
     );
-    const result = recomputePricing(context, [previousId], nextLines, overrides, fields, infos);
+    const result = recomputePricing(
+      context,
+      [previousId],
+      nextLines,
+      overrides,
+      fields,
+      infos,
+    );
     setLines(nextLines);
     setFields(result.fields);
     setOverrides(result.overrides);
@@ -392,7 +420,14 @@ export function FormInboundLinks() {
     const nextLines = lines.map((item) =>
       item.lineNumber === lineNumber ? { ...item, factor: value } : item,
     );
-    const result = recomputePricing(context, [line.itemId], nextLines, overrides, fields, infos);
+    const result = recomputePricing(
+      context,
+      [line.itemId],
+      nextLines,
+      overrides,
+      fields,
+      infos,
+    );
     setLines(nextLines);
     setFields(result.fields);
     setOverrides(result.overrides);
@@ -405,13 +440,29 @@ export function FormInboundLinks() {
   }
 
   function typeMargin(itemId: string, typed: string) {
-    const result = editPricingMargin(context, itemId, typed, lines, overrides, fields, infos);
+    const result = editPricingMargin(
+      context,
+      itemId,
+      typed,
+      lines,
+      overrides,
+      fields,
+      infos,
+    );
     setFields(result.fields);
     setOverrides(result.overrides);
   }
 
   function typePrice(itemId: string, typed: string) {
-    const result = editPricingPrice(context, itemId, typed, lines, overrides, fields, infos);
+    const result = editPricingPrice(
+      context,
+      itemId,
+      typed,
+      lines,
+      overrides,
+      fields,
+      infos,
+    );
     setFields(result.fields);
     setOverrides(result.overrides);
   }
@@ -468,9 +519,7 @@ export function FormInboundLinks() {
                     line.factor
                   )}
                 </td>
-                <td className="py-2 pr-2">
-                  {quantityText(stockQuantity(line))}
-                </td>
+                <td className="py-2 pr-2">{quantityText(stockQuantity(line))}</td>
                 <td className="py-2 pr-2">{money4(entryUnitCost(context, line))}</td>
                 <td className="py-2">
                   {showSearch && editable ? (
@@ -555,7 +604,9 @@ export function FormInboundLinks() {
         </span>
       </div>
 
-      {showUnchanged ? <p className="text-sm text-amber-700">{unchangedMessage}</p> : null}
+      {showUnchanged ? (
+        <p className="text-sm text-amber-700">{unchangedMessage}</p>
+      ) : null}
 
       {unlinked.length > 0 ? (
         <section className="space-y-3 rounded-lg border bg-white p-4">

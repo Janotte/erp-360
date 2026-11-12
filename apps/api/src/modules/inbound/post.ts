@@ -10,7 +10,7 @@ import {
   stockMovements,
 } from '@erp-360/mod-inbound';
 import { persons } from '@erp-360/mod-persons';
-import { civilDate, listPriceFromMargin } from '@erp-360/shared';
+import { civilDate, listPriceFromMargin, marginFromListPrice } from '@erp-360/shared';
 import { and, eq, inArray, isNull, lte, or } from 'drizzle-orm';
 
 import { db } from '../../db/index.ts';
@@ -270,22 +270,24 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
     }
 
     const pricedItemIds = [
-      ...new Set(
-        ordered.flatMap((line) => (line.itemId ? [line.itemId] : [])),
-      ),
+      ...new Set(ordered.flatMap((line) => (line.itemId ? [line.itemId] : []))),
     ];
     for (const itemId of pricedItemIds) {
       const [item] = await tx
         .select({
           tracksStock: catalogItems.tracksStock,
           grossMargin: catalogItems.grossMargin,
+          listPrice: catalogItems.listPrice,
         })
         .from(catalogItems)
         .where(and(eq(catalogItems.id, itemId), eq(catalogItems.tenantId, tenantId)))
         .for('update');
       if (!item) continue;
       const [override] = await tx
-        .select({ grossMargin: inboundPricingOverrides.grossMargin })
+        .select({
+          grossMargin: inboundPricingOverrides.grossMargin,
+          listPrice: inboundPricingOverrides.listPrice,
+        })
         .from(inboundPricingOverrides)
         .where(
           and(
@@ -318,7 +320,23 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
         )
         .limit(1);
       if (!balance) continue;
-      const price = listPriceFromMargin(money(balance.averageCost), Number(margin));
+      const average = money(balance.averageCost);
+      const marginNumber = Number(margin);
+      let price =
+        override?.listPrice != null
+          ? round4(money(override.listPrice))
+          : listPriceFromMargin(average, marginNumber);
+      if (price != null && override?.listPrice == null && item.listPrice != null) {
+        const current = money(item.listPrice);
+        const currentMargin = marginFromListPrice(average, current);
+        if (
+          currentMargin != null &&
+          currentMargin === round4(marginNumber) &&
+          Math.abs(current - price) <= 0.0001
+        ) {
+          price = current;
+        }
+      }
       if (price == null) continue;
       await tx
         .update(catalogItems)

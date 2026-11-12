@@ -7,6 +7,7 @@ import {
   inboundDocumentInstallments,
   inboundDocumentLines,
   inboundDocuments,
+  inboundPricingOverrides,
   operationNatures,
   stockBalances,
 } from '@erp-360/mod-inbound';
@@ -418,5 +419,110 @@ describe('confirmação da entrada', () => {
       .where(eq(inboundDocuments.id, document.id));
     assert.equal(posted.status, 'posted');
     assert.equal(posted.createsPayable, false);
+  });
+
+  it('grava 569,0000 da licença e não deixa o lançamento seguinte quebrar o preço', async () => {
+    const company = await createCompany('PrecoInteiro');
+    const [measure] = await db
+      .insert(measures)
+      .values({
+        tenantId: company.tenantId,
+        name: 'Unidade',
+        abbreviation: 'UN',
+        measureType: 'unit',
+        showOnProduct: true,
+      })
+      .returning({ id: measures.id });
+    const [item] = await db
+      .insert(catalogItems)
+      .values({
+        tenantId: company.tenantId,
+        code: '000034',
+        type: 'product',
+        fiscalItemType: 'resale',
+        tracksStock: true,
+        measureId: measure.id,
+        name: 'LICENCA FPP MICROSOFT 365 PERSONAL 12 MESES',
+        listPrice: '530.0000',
+        grossMargin: '26.2300',
+      })
+      .returning({ id: catalogItems.id });
+    await ensureInboundSetup(company.tenantId);
+    const [nature] = await db
+      .select({ id: operationNatures.id })
+      .from(operationNatures)
+      .where(
+        and(
+          eq(operationNatures.tenantId, company.tenantId),
+          eq(operationNatures.code, 'purchase_resale'),
+        ),
+      )
+      .limit(1);
+    const today = civilDate();
+
+    async function enter(listPrice: string | null) {
+      const [document] = await db
+        .insert(inboundDocuments)
+        .values({
+          tenantId: company.tenantId,
+          status: 'pre_note',
+          number: listPrice ? '11541' : '11542',
+          series: '1',
+          issueOn: today,
+          supplierId: company.personId,
+          natureId: nature.id,
+          hasProtocol: true,
+          totalAmount: 39099,
+        })
+        .returning({ id: inboundDocuments.id });
+      await db.insert(inboundDocumentLines).values({
+        tenantId: company.tenantId,
+        documentId: document.id,
+        lineNumber: 1,
+        supplierCode: '365',
+        description: 'Licenca',
+        xmlCfop: '1102',
+        entryCfop: '1102',
+        commercialQty: '1.0000',
+        commercialUnit: 'UN',
+        factor: '1.000000',
+        unitPrice: '390.9900',
+        lineAmount: 39099,
+        itemId: item.id,
+      });
+      await db.insert(inboundDocumentInstallments).values({
+        tenantId: company.tenantId,
+        documentId: document.id,
+        number: '001',
+        dueOn: today,
+        amount: 39099,
+      });
+      await db.insert(inboundPricingOverrides).values({
+        tenantId: company.tenantId,
+        documentId: document.id,
+        itemId: item.id,
+        grossMargin: '31.2847',
+        listPrice,
+      });
+      await postInboundDocument(company.tenantId, document.id);
+    }
+
+    await enter('569.0000');
+    const [priced] = await db
+      .select({ listPrice: catalogItems.listPrice })
+      .from(catalogItems)
+      .where(eq(catalogItems.id, item.id));
+    assert.equal(priced.listPrice, '569.0000');
+
+    await enter(null);
+    const [kept] = await db
+      .select({
+        listPrice: catalogItems.listPrice,
+        grossMargin: catalogItems.grossMargin,
+      })
+      .from(catalogItems)
+      .where(eq(catalogItems.id, item.id));
+    assert.equal(kept.listPrice, '569.0000');
+    assert.equal(kept.grossMargin, '31.2847');
   });
 });

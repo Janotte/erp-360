@@ -295,7 +295,11 @@ export interface InboundDraft {
   lines: InboundDraftLine[];
   installments: { number: string; dueOn: string; amount: number }[];
   finance?: InboundFinance;
-  pricingOverrides?: { itemId: string; grossMargin: string | null }[];
+  pricingOverrides?: {
+    itemId: string;
+    grossMargin: string | null;
+    listPrice?: string | null;
+  }[];
 }
 
 export interface InboundPricingStock {
@@ -314,7 +318,7 @@ export interface InboundPricing {
   updatesAverageCost: boolean;
   costFlags: CostFlags;
   stock: InboundPricingStock[];
-  overrides: { itemId: string; grossMargin: string | null }[];
+  overrides: { itemId: string; grossMargin: string | null; listPrice: string | null }[];
 }
 
 async function readBody(res: Response) {

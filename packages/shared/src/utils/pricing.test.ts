@@ -18,6 +18,12 @@ describe('preço de lista pela margem sobre a venda', () => {
     assert.equal(marginFromListPrice(60, 109.0909), 45);
   });
 
+  it('não recupera 569,0000 com o custo 390,99 da licença', () => {
+    const margin = marginFromListPrice(390.99, 569);
+    assert.equal(margin, 31.2847);
+    assert.equal(listPriceFromMargin(390.99, margin), 568.9999);
+  });
+
   it('recusa margem de 100% e preço abaixo do custo', () => {
     assert.equal(listPriceFromMargin(60, 100), null);
     assert.equal(marginFromListPrice(60, 59.99), null);

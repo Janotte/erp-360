@@ -414,6 +414,13 @@
       "when": 1794511873361,
       "tag": "0058_inbound_pricing_overrides",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1794526377546,
+      "tag": "0059_inbound_list_price",
+      "breakpoints": true
     }
   ]
 }

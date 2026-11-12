@@ -180,6 +180,8 @@ export const inboundPricingOverrides = pgTable(
     documentId: uuid('document_id').notNull(),
     itemId: uuid('item_id').notNull(),
     grossMargin: numeric('gross_margin', { precision: 8, scale: 4 }),
+    /** Preço informado na nota. O lançamento grava este valor, sem recalcular pela margem. */
+    listPrice: numeric('list_price', { precision: 15, scale: 4 }),
   },
   (table) => [
     unique('inbound_pricing_overrides_item_unique').on(
@@ -200,6 +202,10 @@ export const inboundPricingOverrides = pgTable(
     check(
       'inbound_pricing_overrides_margin_check',
       sql`${table.grossMargin} is null or (${table.grossMargin} >= 0 and ${table.grossMargin} < 100)`,
+    ),
+    check(
+      'inbound_pricing_overrides_list_price_check',
+      sql`${table.listPrice} is null or ${table.listPrice} >= 0`,
     ),
   ],
 );
