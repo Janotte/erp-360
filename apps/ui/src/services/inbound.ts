@@ -12,6 +12,16 @@ export type DiscoveryAction =
   | { kind: 'blocked'; message: string }
   | { kind: 'import' | 'manifest' | 'download' | 'none' };
 
+export type InboundListSort =
+  | 'inboundOn'
+  | 'issueOn'
+  | 'number'
+  | 'supplier'
+  | 'totalAmount'
+  | 'nature'
+  | 'manifestation'
+  | 'status';
+
 export interface InboundListFilter {
   search?: string;
   issueFrom?: string;
@@ -19,6 +29,10 @@ export interface InboundListFilter {
   inboundFrom?: string;
   inboundTo?: string;
   status?: InboundStatus | '';
+  manifestation?: RecipientManifestation | '';
+  queue?: 'to_post' | '';
+  sort?: InboundListSort | '';
+  dir?: 'asc' | 'desc' | '';
 }
 
 export type InboundDiscoveryResult =
@@ -229,6 +243,7 @@ export interface InboundListItem {
   natureName: string | null;
   recipientManifestation: RecipientManifestation;
   authorizationStatus: NfeAuthorizationStatus;
+  postBlocker: string | null;
 }
 
 export interface InboundDraftLine {
@@ -253,6 +268,7 @@ export interface InboundDraft {
   number: string;
   series: string;
   issueOn: string;
+  inboundOn?: string | null;
   lines: InboundDraftLine[];
   installments: { number: string; dueOn: string; amount: number }[];
   finance?: InboundFinance;

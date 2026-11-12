@@ -22,6 +22,13 @@ import {
 } from './cost.ts';
 import { InboundError } from './errors.ts';
 
+export function entryDateMessage(inboundOn: string | null | undefined, issueOn: string) {
+  if (inboundOn && inboundOn < issueOn) {
+    return 'A data de entrada não pode ser anterior à emissão.';
+  }
+  return null;
+}
+
 function money(value: string | number) {
   return Number(value);
 }
@@ -156,7 +163,9 @@ export async function postInboundDocument(tenantId: string, documentId: string) 
       card = found;
     }
 
-    const inboundOn = civilDate();
+    const inboundOn = document.inboundOn ?? civilDate();
+    const rejectedDate = entryDateMessage(inboundOn, document.issueOn);
+    if (rejectedDate) throw new InboundError(400, rejectedDate);
     const ordered = [...lines].sort((left, right) =>
       (left.itemId ?? '').localeCompare(right.itemId ?? ''),
     );

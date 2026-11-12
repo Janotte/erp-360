@@ -36,6 +36,7 @@ const child = spawn(
     'test/inbound-cost.test.ts',
     'test/nfe-billing.test.ts',
     'test/inbound-post.integration.test.ts',
+    'test/inbound-list-form.test.ts',
     'test/inbound-repair-setup.integration.test.ts',
     'test/register-supplier.integration.test.ts',
     'test/cnpj-overlay.test.ts',

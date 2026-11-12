@@ -30,7 +30,8 @@ import { PayableList } from './components/Financial/Payables/PayableList';
 import { ListPaymentMethods } from './components/Financial/PaymentMethods/ListPaymentMethods';
 import { ListPlanAccounts } from './components/Financial/PlanAccounts/ListPlanAccounts';
 import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
-import { InboundPage } from './components/Inbound/InboundPage';
+import { FormInbound } from './components/Inbound/FormInbound';
+import { ListInbounds } from './components/Inbound/ListInbounds';
 import { InboundSetupPage } from './components/Inbound/Setup/InboundSetupPage';
 import { Navbar } from './components/Navbar';
 import { ListPersons } from './components/Persons/ListPersons';
@@ -278,7 +279,15 @@ function App() {
               path="/inbound"
               element={
                 <Pagina>
-                  <InboundPage />
+                  <ListInbounds />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/inbound/:id"
+              element={
+                <Pagina>
+                  <FormInbound />
                 </Pagina>
               }
             />

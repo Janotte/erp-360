@@ -183,7 +183,7 @@ export const inboundDocuments = pgTable(
     number: varchar('number', { length: 9 }).notNull(),
     series: varchar('series', { length: 3 }).notNull(),
     issueOn: date('issue_on').notNull(),
-    /** Preenchida na efetivação, no fuso da empresa. */
+    /** Data de entrada. No lançamento, usa este valor ou a data civil de hoje. */
     inboundOn: date('inbound_on'),
     supplierId: uuid('supplier_id'),
     supplierTaxId: varchar('supplier_tax_id', { length: 14 }),

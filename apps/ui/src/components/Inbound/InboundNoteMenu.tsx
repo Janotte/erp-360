@@ -62,11 +62,15 @@ function formatAt(value: string | null) {
 
 export function InboundNoteMenu({
   cursor,
+  danfeRow,
   onClose,
+  onDanfeClose,
   onManifested,
 }: {
   cursor: { row: InboundListItem; x: number; y: number } | null;
+  danfeRow: InboundListItem | null;
   onClose: () => void;
+  onDanfeClose: () => void;
   onManifested: () => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -95,6 +99,12 @@ export function InboundNoteMenu({
       window.removeEventListener('scroll', onClose, true);
     };
   }, [cursor, onClose]);
+
+  useEffect(() => {
+    if (!danfeRow) return;
+    setActive(danfeRow);
+    setPanel('danfe');
+  }, [danfeRow]);
 
   useEffect(() => {
     const el = menuRef.current;
@@ -339,7 +349,14 @@ export function InboundNoteMenu({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={panel === 'danfe'} onOpenChange={(open) => !open && setPanel(null)}>
+      <Dialog
+        open={panel === 'danfe'}
+        onOpenChange={(open) => {
+          if (open) return;
+          setPanel(null);
+          onDanfeClose();
+        }}
+      >
         <DialogContent className="max-h-[92vh] max-w-[1100px]">
           <DialogHeader>
             <DialogTitle>DANFE</DialogTitle>

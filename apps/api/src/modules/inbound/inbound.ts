@@ -14,7 +14,20 @@ import {
 } from '@erp-360/mod-inbound';
 import { persons } from '@erp-360/mod-persons';
 import { escapeIlike, isValidCnpj, onlyDigits } from '@erp-360/shared';
-import { and, asc, desc, eq, gte, ilike, like, lte, ne, or } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  like,
+  lte,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -42,9 +55,12 @@ import { persistParsedNfe } from './persist-nfe.ts';
 import { registerInboundSupplier } from './register-supplier.ts';
 import {
   deleteInboundDocument,
+  entryDateMessage,
   postInboundDocument,
   reverseInboundDocument,
 } from './post.ts';
+
+export { entryDateMessage };
 import { cfopScope, ensureInboundSetup } from './setup.ts';
 
 const draftStatuses = new Set(['pre_note', 'divergent', 'pending']);
@@ -106,6 +122,11 @@ const draftBody = z.object({
   number: z.string().trim().min(1).max(9),
   series: z.string().trim().min(1).max(3),
   issueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  inboundOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
   lines: z.array(lineInput).min(1),
   installments: z.array(installmentInput),
   finance: financeInput.optional(),
@@ -168,7 +189,12 @@ async function entryCfopFor(
         eq(
           cfopEntryRules.fiscalPurpose,
           purpose as
-            'resale' | 'industrialization' | 'consumption' | 'fixed_asset' | 'service' | 'repair',
+            | 'resale'
+            | 'industrialization'
+            | 'consumption'
+            | 'fixed_asset'
+            | 'service'
+            | 'repair',
         ),
       ),
     )
@@ -341,6 +367,59 @@ async function hasCompleteXml(tenantId: string, accessKey: string) {
   return Boolean(archived);
 }
 
+function postBlockers(
+  document: {
+    status: string;
+    accessKey: string | null;
+    hasProtocol: boolean;
+    supplierId: string | null;
+    supplierActive: boolean | null;
+    natureId: string | null;
+    totalAmount: number;
+    financialStatus: 'pending' | 'classified' | 'waived';
+    paymentKind: 'supplier' | 'card' | null;
+    companyCardId: string | null;
+  },
+  lines: {
+    lineNumber: number;
+    itemId: string | null;
+    entryCfop: string | null;
+    factor: string;
+  }[],
+  installments: { amount: number }[],
+) {
+  const blockers: string[] = [];
+  if (!draftStatuses.has(document.status)) return blockers;
+  if (document.accessKey && !document.hasProtocol) {
+    blockers.push('A NF-e está sem protocolo de autorização.');
+  }
+  if (!document.supplierId) blockers.push('Fornecedor não vinculado.');
+  else if (document.supplierActive === false) blockers.push('Fornecedor inativo.');
+  if (!document.natureId) blockers.push('Informe a natureza de operação.');
+  if (lines.length === 0) blockers.push('A nota não tem itens.');
+  for (const line of lines) {
+    if (!line.itemId)
+      blockers.push(`Item ${line.lineNumber} sem vínculo com o catálogo.`);
+    if (!line.entryCfop) blockers.push(`Item ${line.lineNumber} sem CFOP de entrada.`);
+    if (Number(line.factor) <= 0) {
+      blockers.push(`Item ${line.lineNumber} sem fator de conversão.`);
+    }
+  }
+  const sum = installments.reduce((total, installment) => total + installment.amount, 0);
+  if (document.totalAmount > 0 && document.financialStatus === 'pending') {
+    blockers.push('Classifique o pagamento.');
+  } else if (document.totalAmount > 0 && document.financialStatus !== 'waived') {
+    if (installments.length === 0) {
+      blockers.push('Classifique o pagamento.');
+    } else if (Math.abs(sum - document.totalAmount) > 1) {
+      blockers.push('A soma das parcelas não fecha com o total da nota.');
+    } else if (document.paymentKind === 'card' && !document.companyCardId) {
+      blockers.push('Informe o cartão.');
+    }
+  }
+  return blockers;
+}
+
 async function loadDocument(tenantId: string, documentId: string) {
   const [document] = await db
     .select({
@@ -435,38 +514,7 @@ async function loadDocument(tenantId: string, documentId: string) {
     installments = await fillInstallmentsFromFile(tenantId, documentId);
   }
 
-  const blockers: string[] = [];
-  if (draftStatuses.has(document.status)) {
-    if (document.accessKey && !document.hasProtocol) {
-      blockers.push('A NF-e está sem protocolo de autorização.');
-    }
-    if (!document.supplierId) blockers.push('Fornecedor não vinculado.');
-    else if (document.supplierActive === false) blockers.push('Fornecedor inativo.');
-    if (!document.natureId) blockers.push('Informe a natureza de operação.');
-    if (lines.length === 0) blockers.push('A nota não tem itens.');
-    for (const line of lines) {
-      if (!line.itemId)
-        blockers.push(`Item ${line.lineNumber} sem vínculo com o catálogo.`);
-      if (!line.entryCfop) blockers.push(`Item ${line.lineNumber} sem CFOP de entrada.`);
-      if (Number(line.factor) <= 0)
-        blockers.push(`Item ${line.lineNumber} sem fator de conversão.`);
-    }
-    const sum = installments.reduce(
-      (total, installment) => total + installment.amount,
-      0,
-    );
-    if (document.totalAmount > 0 && document.financialStatus === 'pending') {
-      blockers.push('Classifique o pagamento.');
-    } else if (document.totalAmount > 0 && document.financialStatus !== 'waived') {
-      if (installments.length === 0) {
-        blockers.push('Classifique o pagamento.');
-      } else if (Math.abs(sum - document.totalAmount) > 1) {
-        blockers.push('A soma das parcelas não fecha com o total da nota.');
-      } else if (document.paymentKind === 'card' && !document.companyCardId) {
-        blockers.push('Informe o cartão.');
-      }
-    }
-  }
+  const blockers = postBlockers(document, lines, installments);
 
   const completeXml =
     document.status === 'discovered' && document.accessKey
@@ -488,7 +536,18 @@ async function loadDocument(tenantId: string, documentId: string) {
   };
 }
 
-const inboundListQuery = z.object({
+const inboundSorts = [
+  'inboundOn',
+  'issueOn',
+  'number',
+  'supplier',
+  'totalAmount',
+  'nature',
+  'manifestation',
+  'status',
+] as const;
+
+export const inboundListQuery = z.object({
   search: z.string().max(120).optional(),
   issueFrom: z
     .string()
@@ -517,6 +576,12 @@ const inboundListQuery = z.object({
       'discovered',
     ])
     .optional(),
+  manifestation: z
+    .enum(['none', 'aware', 'confirmed', 'unaware', 'not_performed'])
+    .optional(),
+  queue: z.enum(['to_post']).optional(),
+  sort: z.enum(inboundSorts).optional(),
+  dir: z.enum(['asc', 'desc']).optional(),
 });
 
 export async function listInboundDocuments(
@@ -525,6 +590,12 @@ export async function listInboundDocuments(
 ) {
   const filters = [eq(inboundDocuments.tenantId, tenantId)];
   if (query.status) filters.push(eq(inboundDocuments.status, query.status));
+  else if (query.queue === 'to_post') {
+    filters.push(inArray(inboundDocuments.status, ['pending', 'pre_note', 'divergent']));
+  }
+  if (query.manifestation) {
+    filters.push(eq(inboundDocuments.recipientManifestation, query.manifestation));
+  }
   if (query.issueFrom) filters.push(gte(inboundDocuments.issueOn, query.issueFrom));
   if (query.issueTo) filters.push(lte(inboundDocuments.issueOn, query.issueTo));
   if (query.inboundFrom) filters.push(gte(inboundDocuments.inboundOn, query.inboundFrom));
@@ -549,7 +620,26 @@ export async function listInboundDocuments(
     if (match) filters.push(match);
   }
 
-  return db
+  const direction = query.dir === 'asc' ? 'ASC' : 'DESC';
+  const sortSql = {
+    inboundOn: sql`${inboundDocuments.inboundOn} ${sql.raw(direction)} NULLS LAST`,
+    issueOn: sql`${inboundDocuments.issueOn} ${sql.raw(direction)}`,
+    number: sql`lpad(${inboundDocuments.number}, 9, '0') ${sql.raw(direction)}`,
+    supplier: sql`coalesce(${persons.name}, ${inboundDocuments.supplierName}) ${sql.raw(direction)}`,
+    totalAmount: sql`${inboundDocuments.totalAmount} ${sql.raw(direction)}`,
+    nature: sql`${operationNatures.name} ${sql.raw(direction)} NULLS LAST`,
+    manifestation: sql`${inboundDocuments.recipientManifestation} ${sql.raw(direction)}`,
+    status: sql`${inboundDocuments.status} ${sql.raw(direction)}`,
+  } as const;
+  const order = query.sort
+    ? [sortSql[query.sort], desc(inboundDocuments.createdAt)]
+    : [
+        sql`${inboundDocuments.inboundOn} DESC NULLS LAST`,
+        desc(inboundDocuments.issueOn),
+        desc(inboundDocuments.createdAt),
+      ];
+
+  const rows = await db
     .select({
       id: inboundDocuments.id,
       status: inboundDocuments.status,
@@ -564,12 +654,88 @@ export async function listInboundDocuments(
       natureName: operationNatures.name,
       recipientManifestation: inboundDocuments.recipientManifestation,
       authorizationStatus: inboundDocuments.authorizationStatus,
+      supplierId: inboundDocuments.supplierId,
+      supplierActive: persons.isActive,
+      natureId: inboundDocuments.natureId,
+      hasProtocol: inboundDocuments.hasProtocol,
+      financialStatus: inboundDocuments.financialStatus,
+      paymentKind: inboundDocuments.paymentKind,
+      companyCardId: inboundDocuments.companyCardId,
     })
     .from(inboundDocuments)
     .leftJoin(persons, eq(persons.id, inboundDocuments.supplierId))
     .leftJoin(operationNatures, eq(operationNatures.id, inboundDocuments.natureId))
     .where(and(...filters))
-    .orderBy(desc(inboundDocuments.issueOn), desc(inboundDocuments.createdAt));
+    .orderBy(...order);
+
+  const draftIds = rows
+    .filter((row) => draftStatuses.has(row.status))
+    .map((row) => row.id);
+  const lineRows =
+    draftIds.length === 0
+      ? []
+      : await db
+          .select({
+            documentId: inboundDocumentLines.documentId,
+            lineNumber: inboundDocumentLines.lineNumber,
+            itemId: inboundDocumentLines.itemId,
+            entryCfop: inboundDocumentLines.entryCfop,
+            factor: inboundDocumentLines.factor,
+          })
+          .from(inboundDocumentLines)
+          .where(
+            and(
+              eq(inboundDocumentLines.tenantId, tenantId),
+              inArray(inboundDocumentLines.documentId, draftIds),
+            ),
+          )
+          .orderBy(asc(inboundDocumentLines.lineNumber));
+  const installmentRows =
+    draftIds.length === 0
+      ? []
+      : await db
+          .select({
+            documentId: inboundDocumentInstallments.documentId,
+            amount: inboundDocumentInstallments.amount,
+          })
+          .from(inboundDocumentInstallments)
+          .where(
+            and(
+              eq(inboundDocumentInstallments.tenantId, tenantId),
+              inArray(inboundDocumentInstallments.documentId, draftIds),
+            ),
+          );
+
+  return rows.map((row) => {
+    const {
+      supplierId,
+      supplierActive,
+      natureId,
+      hasProtocol,
+      financialStatus,
+      paymentKind,
+      companyCardId,
+      ...item
+    } = row;
+    return {
+      ...item,
+      postBlocker:
+        postBlockers(
+          {
+            ...row,
+            supplierId,
+            supplierActive,
+            natureId,
+            hasProtocol,
+            financialStatus,
+            paymentKind,
+            companyCardId,
+          },
+          lineRows.filter((line) => line.documentId === row.id),
+          installmentRows.filter((installment) => installment.documentId === row.id),
+        )[0] ?? null,
+    };
+  });
 }
 
 async function markSupplier(tenantId: string, supplierId: string) {
@@ -786,12 +952,17 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
     }
 
     const body = request.body;
+    const issueOn = document.accessKey ? document.issueOn : body.issueOn;
+    const rejectedDate = entryDateMessage(body.inboundOn, issueOn);
+    if (rejectedDate) throw new InboundError(400, rejectedDate);
+    const inboundOn = body.inboundOn === undefined ? {} : { inboundOn: body.inboundOn };
     if (document.accessKey) {
       await db
         .update(inboundDocuments)
         .set({
           supplierId: body.supplierId ?? null,
           natureId: body.natureId ?? null,
+          ...inboundOn,
         })
         .where(eq(inboundDocuments.id, id));
       for (const line of body.lines) {
@@ -832,6 +1003,7 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
             number: body.number,
             series: body.series,
             issueOn: body.issueOn,
+            ...inboundOn,
             totalAmount,
             ...(finance
               ? {
