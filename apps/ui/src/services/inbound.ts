@@ -33,6 +33,18 @@ export interface InboundListFilter {
   queue?: 'to_post' | '';
   sort?: InboundListSort | '';
   dir?: 'asc' | 'desc' | '';
+  page?: number;
+  limit?: number;
+}
+
+export interface InboundListPage {
+  data: InboundListItem[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 export type InboundDiscoveryResult =
@@ -289,10 +301,10 @@ export const inboundService = {
     const res = await apiFetch('/inbound/natures');
     return parse(res, 'Falha ao carregar naturezas.');
   },
-  list: async (filter: InboundListFilter): Promise<InboundListItem[]> => {
+  list: async (filter: InboundListFilter): Promise<InboundListPage> => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(filter)) {
-      if (value) params.set(key, value);
+      if (value) params.set(key, String(value));
     }
     const query = params.size > 0 ? `?${params.toString()}` : '';
     const res = await apiFetch(`/inbound${query}`);

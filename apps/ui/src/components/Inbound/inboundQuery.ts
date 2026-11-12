@@ -34,7 +34,16 @@ export function filterFromSearch(search: string): InboundListFilter {
     queue: params.get('queue') === 'to_post' ? 'to_post' : undefined,
     sort: sorts.has(sort as InboundListSort) ? (sort as InboundListSort) : undefined,
     dir: dir === 'asc' || dir === 'desc' ? dir : undefined,
+    page: pageFrom(params.get('page')),
   };
+}
+
+export const inboundPageSize = 10;
+
+function pageFrom(value: string | null) {
+  const page = Number(value);
+  if (!Number.isInteger(page) || page < 2) return undefined;
+  return page;
 }
 
 export function todayInSaoPaulo() {

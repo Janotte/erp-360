@@ -17,6 +17,7 @@ import {
   filterFromSearch,
   freightLabels,
   groupKey,
+  inboundPageSize,
   labeledToken,
 } from '@/components/Inbound/inboundQuery';
 import {
@@ -421,15 +422,22 @@ export function FormInbound() {
 
   async function openNext() {
     const query = from.includes('?') ? from.slice(from.indexOf('?')) : '';
-    const rows = await inboundService.list(filterFromSearch(query));
-    const next = rows.find(
-      (row) => ['pending', 'pre_note', 'divergent'].includes(row.status) && row.id !== id,
-    );
-    if (!next) {
-      navigate(from);
-      return;
+    const filter = { ...filterFromSearch(query), limit: inboundPageSize };
+    let page = 1;
+    while (page < 1000) {
+      const result = await inboundService.list({ ...filter, page });
+      const next = result.data.find(
+        (row) =>
+          ['pending', 'pre_note', 'divergent'].includes(row.status) && row.id !== id,
+      );
+      if (next) {
+        navigate(`/inbound/${next.id}`, { state: { from } });
+        return;
+      }
+      if (page >= result.meta.totalPages) break;
+      page += 1;
     }
-    navigate(`/inbound/${next.id}`, { state: { from } });
+    navigate(from);
   }
 
   function goBack() {

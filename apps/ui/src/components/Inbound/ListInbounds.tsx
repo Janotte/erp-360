@@ -5,7 +5,13 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { FileText, MoreHorizontal, Search } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  MoreHorizontal,
+  Search,
+} from 'lucide-react';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
@@ -13,6 +19,7 @@ import { toast } from 'sonner';
 import { InboundNoteMenu } from '@/components/Inbound/InboundNoteMenu';
 import {
   filterFromSearch,
+  inboundPageSize,
   monthRange,
   shortKey,
   statusDetail,
@@ -117,7 +124,7 @@ export function ListInbounds() {
     y: number;
   } | null>(null);
   const [danfeRow, setDanfeRow] = useState<InboundListItem | null>(null);
-  const filter = filterFromSearch(location.search);
+  const filter = { ...filterFromSearch(location.search), limit: inboundPageSize };
   const today = todayInSaoPaulo();
   const month = monthRange(today);
 
@@ -142,6 +149,7 @@ export function ListInbounds() {
       const updated = new URLSearchParams(params);
       if (next) updated.set('q', next);
       else updated.delete('q');
+      updated.delete('page');
       setParams(updated, { replace: true });
     }, 500);
     return () => clearTimeout(timer);
@@ -156,6 +164,14 @@ export function ListInbounds() {
   function write(mutate: (next: URLSearchParams) => void) {
     const next = new URLSearchParams(params);
     mutate(next);
+    next.delete('page');
+    setParams(next, { replace: true });
+  }
+
+  function setPage(page: number) {
+    const next = new URLSearchParams(params);
+    if (page <= 1) next.delete('page');
+    else next.set('page', String(page));
     setParams(next, { replace: true });
   }
 
@@ -554,7 +570,7 @@ export function ListInbounds() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {(list.data ?? []).map((row) => {
+          {(list.data?.data ?? []).map((row) => {
             const detail = statusDetail(row);
             const supplier = row.linkedSupplierName || row.supplierName || '—';
             return (
@@ -654,6 +670,39 @@ export function ListInbounds() {
           })}
         </TableBody>
       </Table>
+
+      {list.data && list.data.meta.totalPages > 1 ? (
+        <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3">
+          <div className="text-sm text-zinc-500">
+            Mostrando página{' '}
+            <strong className="text-zinc-900">{list.data.meta.page}</strong> de{' '}
+            <strong className="text-zinc-900">{list.data.meta.totalPages}</strong> (
+            {list.data.meta.total} registros no total)
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              disabled={list.data.meta.page === 1}
+              onClick={() => setPage(list.data.meta.page - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" /> Anterior
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              disabled={list.data.meta.page === list.data.meta.totalPages}
+              onClick={() => setPage(list.data.meta.page + 1)}
+            >
+              Próximo <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <InboundNoteMenu
         cursor={noteMenu}

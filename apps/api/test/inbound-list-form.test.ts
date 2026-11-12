@@ -76,38 +76,56 @@ describe('lista e data de entrada', () => {
     ]);
 
     const listed = await listInboundDocuments(tenantId, {});
+    assert.equal(listed.meta.total, 4);
+    assert.equal(listed.meta.page, 1);
+    assert.equal(listed.meta.limit, 10);
     assert.deepEqual(
-      listed.map((row) => row.number),
+      listed.data.map((row) => row.number),
       ['20', '10', '30', '40'],
     );
     assert.equal(
-      listed.find((row) => row.number === '10')?.postBlocker,
+      listed.data.find((row) => row.number === '10')?.postBlocker,
       'Fornecedor não vinculado.',
     );
-    assert.equal(listed.find((row) => row.number === '30')?.postBlocker, null);
-    assert.equal(listed.find((row) => row.number === '40')?.postBlocker, null);
+    assert.equal(listed.data.find((row) => row.number === '30')?.postBlocker, null);
+    assert.equal(listed.data.find((row) => row.number === '40')?.postBlocker, null);
 
-    const queue = await listInboundDocuments(tenantId, { queue: 'to_post' });
-    assert.deepEqual(queue.map((row) => row.number).sort(), ['10', '20']);
+    const page = await listInboundDocuments(tenantId, { page: 2, limit: 2 });
+    assert.deepEqual(
+      page.data.map((row) => row.number),
+      ['30', '40'],
+    );
+    assert.equal(page.meta.total, 4);
+    assert.equal(page.meta.totalPages, 2);
+    assert.equal(page.meta.page, 2);
+    assert.equal(page.meta.limit, 2);
+
+    const queue = await listInboundDocuments(tenantId, { queue: 'to_post', limit: 1 });
+    assert.deepEqual(
+      queue.data.map((row) => row.number),
+      ['20'],
+    );
+    assert.equal(queue.meta.total, 2);
+    assert.equal(queue.meta.totalPages, 2);
 
     const statusWins = await listInboundDocuments(tenantId, {
       queue: 'to_post',
       status: 'posted',
     });
     assert.deepEqual(
-      statusWins.map((row) => row.number),
+      statusWins.data.map((row) => row.number),
       ['30'],
     );
 
     const unmanifested = await listInboundDocuments(tenantId, { manifestation: 'none' });
-    assert.deepEqual(unmanifested.map((row) => row.number).sort(), ['10', '40']);
+    assert.deepEqual(unmanifested.data.map((row) => row.number).sort(), ['10', '40']);
 
     const bySupplier = await listInboundDocuments(tenantId, {
       sort: 'supplier',
       dir: 'asc',
     });
     assert.deepEqual(
-      bySupplier.map((row) => row.supplierName),
+      bySupplier.data.map((row) => row.supplierName),
       ['Alfa', 'Beta', 'Delta', 'Gama'],
     );
 
@@ -116,7 +134,7 @@ describe('lista e data de entrada', () => {
       dir: 'desc',
     });
     assert.deepEqual(
-      byTotal.map((row) => row.totalAmount),
+      byTotal.data.map((row) => row.totalAmount),
       [9000, 2000, 100, 50],
     );
   });

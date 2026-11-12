@@ -127,9 +127,9 @@ describe('promoção do DF-e para a entrada', () => {
     const byKey = await listInboundDocuments(company.tenantId, { search: key });
     const byName = await listInboundDocuments(company.tenantId, { search: 'Fornecedor' });
     const byStatus = await listInboundDocuments(company.tenantId, { status: 'posted' });
-    assert.equal(byNumber.length, 1);
-    assert.equal(byKey.length, 1);
-    assert.equal(byName[0]?.supplierName, 'Fornecedor');
-    assert.equal(byStatus.length, 0);
+    assert.equal(byNumber.data.length, 1);
+    assert.equal(byKey.data.length, 1);
+    assert.equal(byName.data[0]?.supplierName, 'Fornecedor');
+    assert.equal(byStatus.data.length, 0);
   });
 });

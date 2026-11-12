@@ -582,6 +582,8 @@ export const inboundListQuery = z.object({
   queue: z.enum(['to_post']).optional(),
   sort: z.enum(inboundSorts).optional(),
   dir: z.enum(['asc', 'desc']).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
 export async function listInboundDocuments(
@@ -639,6 +641,16 @@ export async function listInboundDocuments(
         desc(inboundDocuments.createdAt),
       ];
 
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 10;
+  const where = and(...filters);
+  const [totalCount] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(inboundDocuments)
+    .leftJoin(persons, eq(persons.id, inboundDocuments.supplierId))
+    .leftJoin(operationNatures, eq(operationNatures.id, inboundDocuments.natureId))
+    .where(where);
+
   const rows = await db
     .select({
       id: inboundDocuments.id,
@@ -665,8 +677,10 @@ export async function listInboundDocuments(
     .from(inboundDocuments)
     .leftJoin(persons, eq(persons.id, inboundDocuments.supplierId))
     .leftJoin(operationNatures, eq(operationNatures.id, inboundDocuments.natureId))
-    .where(and(...filters))
-    .orderBy(...order);
+    .where(where)
+    .orderBy(...order)
+    .limit(limit)
+    .offset((page - 1) * limit);
 
   const draftIds = rows
     .filter((row) => draftStatuses.has(row.status))
@@ -706,36 +720,45 @@ export async function listInboundDocuments(
             ),
           );
 
-  return rows.map((row) => {
-    const {
-      supplierId,
-      supplierActive,
-      natureId,
-      hasProtocol,
-      financialStatus,
-      paymentKind,
-      companyCardId,
-      ...item
-    } = row;
-    return {
-      ...item,
-      postBlocker:
-        postBlockers(
-          {
-            ...row,
-            supplierId,
-            supplierActive,
-            natureId,
-            hasProtocol,
-            financialStatus,
-            paymentKind,
-            companyCardId,
-          },
-          lineRows.filter((line) => line.documentId === row.id),
-          installmentRows.filter((installment) => installment.documentId === row.id),
-        )[0] ?? null,
-    };
-  });
+  const total = Number(totalCount?.count ?? 0);
+  return {
+    data: rows.map((row) => {
+      const {
+        supplierId,
+        supplierActive,
+        natureId,
+        hasProtocol,
+        financialStatus,
+        paymentKind,
+        companyCardId,
+        ...item
+      } = row;
+      return {
+        ...item,
+        postBlocker:
+          postBlockers(
+            {
+              ...row,
+              supplierId,
+              supplierActive,
+              natureId,
+              hasProtocol,
+              financialStatus,
+              paymentKind,
+              companyCardId,
+            },
+            lineRows.filter((line) => line.documentId === row.id),
+            installmentRows.filter((installment) => installment.documentId === row.id),
+          )[0] ?? null,
+      };
+    }),
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
 }
 
 async function markSupplier(tenantId: string, supplierId: string) {
