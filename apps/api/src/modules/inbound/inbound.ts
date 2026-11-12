@@ -9,7 +9,9 @@ import {
   inboundDocumentInstallments,
   inboundDocumentLines,
   inboundDocuments,
+  inboundPricingOverrides,
   operationNatures,
+  stockBalances,
   supplierItemLinks,
 } from '@erp-360/mod-inbound';
 import { persons } from '@erp-360/mod-persons';
@@ -22,9 +24,11 @@ import {
   gte,
   ilike,
   inArray,
+  isNotNull,
   like,
   lte,
   ne,
+  notInArray,
   or,
   sql,
 } from 'drizzle-orm';
@@ -130,6 +134,9 @@ const draftBody = z.object({
   lines: z.array(lineInput).min(1),
   installments: z.array(installmentInput),
   finance: financeInput.optional(),
+  pricingOverrides: z
+    .array(z.object({ itemId: z.string().uuid(), grossMargin: z.string().nullable() }))
+    .optional(),
 });
 
 function lineRecord(
@@ -802,6 +809,240 @@ function documentId(params: unknown) {
     .parse((params as { id: string }).id);
 }
 
+export async function saveInboundDraft(
+  tenantId: string,
+  documentId: string,
+  body: z.infer<typeof draftBody>,
+) {
+  const id = documentId;
+  const [document] = await db
+    .select()
+    .from(inboundDocuments)
+    .where(and(eq(inboundDocuments.id, id), eq(inboundDocuments.tenantId, tenantId)))
+    .limit(1);
+  if (!document) throw new InboundError(404, 'Nota não encontrada.');
+  const overrides = validatedPricingOverrides(body.pricingOverrides);
+  const issueOn = document.accessKey ? document.issueOn : body.issueOn;
+  const rejectedDate = entryDateMessage(body.inboundOn, issueOn);
+  if (rejectedDate) throw new InboundError(400, rejectedDate);
+  const inboundOn = body.inboundOn === undefined ? {} : { inboundOn: body.inboundOn };
+  if (document.accessKey) {
+    await db
+      .update(inboundDocuments)
+      .set({
+        supplierId: body.supplierId ?? null,
+        natureId: body.natureId ?? null,
+        ...inboundOn,
+      })
+      .where(eq(inboundDocuments.id, id));
+    for (const line of body.lines) {
+      await db
+        .update(inboundDocumentLines)
+        .set({
+          itemId: line.itemId ?? null,
+          factor: line.factor.toFixed(6),
+          entryCfop: line.entryCfop ?? null,
+        })
+        .where(
+          and(
+            eq(inboundDocumentLines.documentId, id),
+            eq(inboundDocumentLines.tenantId, tenantId),
+            eq(inboundDocumentLines.lineNumber, line.lineNumber),
+          ),
+        );
+    }
+  } else {
+    const totalAmount = body.lines.reduce(
+      (sum, line) => sum + moneyToCents(line.commercialQty * line.unitPrice),
+      0,
+    );
+    const finance = body.finance
+      ? await normalizeInboundFinance(
+          tenantId,
+          body.finance,
+          body.installments,
+          totalAmount,
+        )
+      : null;
+    await db.transaction(async (tx) => {
+      await tx
+        .update(inboundDocuments)
+        .set({
+          supplierId: body.supplierId ?? null,
+          natureId: body.natureId ?? null,
+          number: body.number,
+          series: body.series,
+          issueOn: body.issueOn,
+          ...inboundOn,
+          totalAmount,
+          ...(finance
+            ? {
+                financialStatus: finance.financialStatus,
+                paymentKind: finance.paymentKind,
+                companyCardId: finance.companyCardId,
+                waiverReason: finance.waiverReason,
+              }
+            : {}),
+        })
+        .where(eq(inboundDocuments.id, id));
+      await tx
+        .delete(inboundDocumentInstallments)
+        .where(eq(inboundDocumentInstallments.documentId, id));
+      await tx
+        .delete(inboundDocumentLines)
+        .where(eq(inboundDocumentLines.documentId, id));
+      await tx
+        .insert(inboundDocumentLines)
+        .values(body.lines.map((line) => lineRecord(tenantId, id, line, true)));
+      const installments = finance
+        ? finance.installments
+        : body.installments.length > 0
+          ? body.installments
+          : totalAmount > 0
+            ? [{ number: '001', dueOn: body.issueOn, amount: totalAmount }]
+            : [];
+      if (installments.length > 0 && installments[0].amount > 0) {
+        await tx.insert(inboundDocumentInstallments).values(
+          installments.map((installment) => ({
+            tenantId,
+            documentId: id,
+            number: installment.number,
+            dueOn: installment.dueOn,
+            amount: installment.amount,
+          })),
+        );
+      }
+    });
+  }
+
+  if (document.accessKey && body.finance) {
+    const normalized = await normalizeInboundFinance(
+      tenantId,
+      body.finance,
+      body.installments,
+      document.totalAmount,
+    );
+    await db
+      .update(inboundDocuments)
+      .set({
+        financialStatus: normalized.financialStatus,
+        paymentKind: normalized.paymentKind,
+        companyCardId: normalized.companyCardId,
+        waiverReason: normalized.waiverReason,
+      })
+      .where(eq(inboundDocuments.id, id));
+    await db
+      .delete(inboundDocumentInstallments)
+      .where(eq(inboundDocumentInstallments.documentId, id));
+    if (normalized.installments.length > 0) {
+      await db.insert(inboundDocumentInstallments).values(
+        normalized.installments.map((installment) => ({
+          tenantId,
+          documentId: id,
+          number: installment.number,
+          dueOn: installment.dueOn,
+          amount: installment.amount,
+        })),
+      );
+    }
+  } else if (document.accessKey && body.installments.length > 0) {
+    await db
+      .delete(inboundDocumentInstallments)
+      .where(eq(inboundDocumentInstallments.documentId, id));
+    await db.insert(inboundDocumentInstallments).values(
+      body.installments.map((installment) => ({
+        tenantId,
+        documentId: id,
+        number: installment.number,
+        dueOn: installment.dueOn,
+        amount: installment.amount,
+      })),
+    );
+  }
+
+  if (body.supplierId) await markSupplier(tenantId, body.supplierId);
+  const purpose = body.natureId
+    ? ((
+        await db
+          .select({ fiscalPurpose: operationNatures.fiscalPurpose })
+          .from(operationNatures)
+          .where(eq(operationNatures.id, body.natureId))
+          .limit(1)
+      )[0]?.fiscalPurpose ?? null)
+    : null;
+  await alignDraft(tenantId, id, purpose);
+  await savePricingOverrides(tenantId, id, overrides);
+  return loadDocument(tenantId, id);
+}
+
+const pricingMarginMessage = 'Informe a margem bruta entre 0 e 100, sem incluir 100.';
+
+function validatedPricingOverrides(
+  overrides: z.infer<typeof draftBody>['pricingOverrides'],
+) {
+  if (!overrides) return undefined;
+  return overrides.map((override) => {
+    if (override.grossMargin === null)
+      return { itemId: override.itemId, grossMargin: null };
+    const margin = Number(override.grossMargin.trim().replace(',', '.'));
+    if (
+      override.grossMargin.trim() === '' ||
+      !Number.isFinite(margin) ||
+      margin < 0 ||
+      margin >= 100
+    ) {
+      throw new InboundError(400, pricingMarginMessage);
+    }
+    return { itemId: override.itemId, grossMargin: margin.toFixed(4) };
+  });
+}
+
+async function savePricingOverrides(
+  tenantId: string,
+  documentId: string,
+  overrides: { itemId: string; grossMargin: string | null }[] | undefined,
+) {
+  const sameDocument = and(
+    eq(inboundPricingOverrides.tenantId, tenantId),
+    eq(inboundPricingOverrides.documentId, documentId),
+  );
+  if (overrides) {
+    await db.transaction(async (tx) => {
+      await tx.delete(inboundPricingOverrides).where(sameDocument);
+      const distinct = [...new Map(overrides.map((row) => [row.itemId, row])).values()];
+      if (distinct.length > 0) {
+        await tx.insert(inboundPricingOverrides).values(
+          distinct.map((row) => ({
+            tenantId,
+            documentId,
+            itemId: row.itemId,
+            grossMargin: row.grossMargin,
+          })),
+        );
+      }
+    });
+  }
+
+  const linked = await db
+    .selectDistinct({ itemId: inboundDocumentLines.itemId })
+    .from(inboundDocumentLines)
+    .where(
+      and(
+        eq(inboundDocumentLines.tenantId, tenantId),
+        eq(inboundDocumentLines.documentId, documentId),
+        isNotNull(inboundDocumentLines.itemId),
+      ),
+    );
+  const itemIds = linked.flatMap((row) => (row.itemId ? [row.itemId] : []));
+  await db
+    .delete(inboundPricingOverrides)
+    .where(
+      itemIds.length > 0
+        ? and(sameDocument, notInArray(inboundPricingOverrides.itemId, itemIds))
+        : sameDocument,
+    );
+}
+
 export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
 
@@ -840,6 +1081,113 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
       .safeParse((request.params as { id: string }).id);
     if (!id.success) return reply.status(400).send({ message: 'Nota inválida.' });
     return loadDocument(request.user.tenantId, id.data);
+  });
+
+  fastify.get('/:id/pricing', async (request, reply) => {
+    const tenantId = request.user.tenantId;
+    const id = z
+      .string()
+      .uuid()
+      .safeParse((request.params as { id: string }).id);
+    if (!id.success) return reply.status(400).send({ message: 'Nota inválida.' });
+    const [document] = await db
+      .select({ status: inboundDocuments.status, natureId: inboundDocuments.natureId })
+      .from(inboundDocuments)
+      .where(
+        and(eq(inboundDocuments.id, id.data), eq(inboundDocuments.tenantId, tenantId)),
+      )
+      .limit(1);
+    if (!document) throw new InboundError(404, 'Nota não encontrada.');
+
+    const [nature] = document.natureId
+      ? await db
+          .select({
+            suggestsListPrice: operationNatures.suggestsListPrice,
+            updatesAverageCost: operationNatures.updatesAverageCost,
+            freightInCost: operationNatures.freightInCost,
+            insuranceInCost: operationNatures.insuranceInCost,
+            otherInCost: operationNatures.otherInCost,
+            discountInCost: operationNatures.discountInCost,
+            ipiInCost: operationNatures.ipiInCost,
+            stInCost: operationNatures.stInCost,
+            icmsInCost: operationNatures.icmsInCost,
+          })
+          .from(operationNatures)
+          .where(
+            and(
+              eq(operationNatures.id, document.natureId),
+              eq(operationNatures.tenantId, tenantId),
+            ),
+          )
+          .limit(1)
+      : [];
+
+    const linked = await db
+      .selectDistinct({ itemId: inboundDocumentLines.itemId })
+      .from(inboundDocumentLines)
+      .where(
+        and(
+          eq(inboundDocumentLines.tenantId, tenantId),
+          eq(inboundDocumentLines.documentId, id.data),
+          isNotNull(inboundDocumentLines.itemId),
+        ),
+      );
+    const itemIds = linked.flatMap((row) => (row.itemId ? [row.itemId] : []));
+    const stock =
+      itemIds.length > 0
+        ? await db
+            .select({
+              itemId: catalogItems.id,
+              quantity: sql<string>`coalesce(${stockBalances.quantity}, 0)::text`,
+              averageCost: sql<string>`coalesce(${stockBalances.averageCost}, 0)::text`,
+              grossMargin: catalogItems.grossMargin,
+              code: catalogItems.code,
+              name: catalogItems.name,
+            })
+            .from(catalogItems)
+            .leftJoin(
+              stockBalances,
+              and(
+                eq(stockBalances.itemId, catalogItems.id),
+                eq(stockBalances.tenantId, catalogItems.tenantId),
+              ),
+            )
+            .where(
+              and(eq(catalogItems.tenantId, tenantId), inArray(catalogItems.id, itemIds)),
+            )
+            .orderBy(asc(catalogItems.code))
+        : [];
+
+    const overrides = await db
+      .select({
+        itemId: inboundPricingOverrides.itemId,
+        grossMargin: inboundPricingOverrides.grossMargin,
+      })
+      .from(inboundPricingOverrides)
+      .where(
+        and(
+          eq(inboundPricingOverrides.tenantId, tenantId),
+          eq(inboundPricingOverrides.documentId, id.data),
+        ),
+      );
+
+    return {
+      editable: draftStatuses.has(document.status),
+      discovered: document.status === 'discovered',
+      suggestsListPrice: nature?.suggestsListPrice ?? false,
+      updatesAverageCost: nature?.updatesAverageCost ?? false,
+      costFlags: {
+        freightInCost: nature?.freightInCost ?? false,
+        insuranceInCost: nature?.insuranceInCost ?? false,
+        otherInCost: nature?.otherInCost ?? false,
+        discountInCost: nature?.discountInCost ?? false,
+        ipiInCost: nature?.ipiInCost ?? false,
+        stInCost: nature?.stInCost ?? false,
+        icmsInCost: nature?.icmsInCost ?? false,
+      },
+      stock,
+      overrides,
+    };
   });
 
   fastify.post('/manual', { schema: { body: draftBody } }, async (request, reply) => {
@@ -965,7 +1313,7 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
       .uuid()
       .parse((request.params as { id: string }).id);
     const [document] = await db
-      .select()
+      .select({ status: inboundDocuments.status })
       .from(inboundDocuments)
       .where(and(eq(inboundDocuments.id, id), eq(inboundDocuments.tenantId, tenantId)))
       .limit(1);
@@ -973,158 +1321,7 @@ export const inboundRoutes: FastifyPluginAsyncZod = async (fastify) => {
     if (!draftStatuses.has(document.status)) {
       throw new InboundError(400, 'Esta nota não pode mais ser alterada.');
     }
-
-    const body = request.body;
-    const issueOn = document.accessKey ? document.issueOn : body.issueOn;
-    const rejectedDate = entryDateMessage(body.inboundOn, issueOn);
-    if (rejectedDate) throw new InboundError(400, rejectedDate);
-    const inboundOn = body.inboundOn === undefined ? {} : { inboundOn: body.inboundOn };
-    if (document.accessKey) {
-      await db
-        .update(inboundDocuments)
-        .set({
-          supplierId: body.supplierId ?? null,
-          natureId: body.natureId ?? null,
-          ...inboundOn,
-        })
-        .where(eq(inboundDocuments.id, id));
-      for (const line of body.lines) {
-        await db
-          .update(inboundDocumentLines)
-          .set({
-            itemId: line.itemId ?? null,
-            factor: line.factor.toFixed(6),
-            entryCfop: line.entryCfop ?? null,
-          })
-          .where(
-            and(
-              eq(inboundDocumentLines.documentId, id),
-              eq(inboundDocumentLines.tenantId, tenantId),
-              eq(inboundDocumentLines.lineNumber, line.lineNumber),
-            ),
-          );
-      }
-    } else {
-      const totalAmount = body.lines.reduce(
-        (sum, line) => sum + moneyToCents(line.commercialQty * line.unitPrice),
-        0,
-      );
-      const finance = body.finance
-        ? await normalizeInboundFinance(
-            tenantId,
-            body.finance,
-            body.installments,
-            totalAmount,
-          )
-        : null;
-      await db.transaction(async (tx) => {
-        await tx
-          .update(inboundDocuments)
-          .set({
-            supplierId: body.supplierId ?? null,
-            natureId: body.natureId ?? null,
-            number: body.number,
-            series: body.series,
-            issueOn: body.issueOn,
-            ...inboundOn,
-            totalAmount,
-            ...(finance
-              ? {
-                  financialStatus: finance.financialStatus,
-                  paymentKind: finance.paymentKind,
-                  companyCardId: finance.companyCardId,
-                  waiverReason: finance.waiverReason,
-                }
-              : {}),
-          })
-          .where(eq(inboundDocuments.id, id));
-        await tx
-          .delete(inboundDocumentInstallments)
-          .where(eq(inboundDocumentInstallments.documentId, id));
-        await tx
-          .delete(inboundDocumentLines)
-          .where(eq(inboundDocumentLines.documentId, id));
-        await tx
-          .insert(inboundDocumentLines)
-          .values(body.lines.map((line) => lineRecord(tenantId, id, line, true)));
-        const installments = finance
-          ? finance.installments
-          : body.installments.length > 0
-            ? body.installments
-            : totalAmount > 0
-              ? [{ number: '001', dueOn: body.issueOn, amount: totalAmount }]
-              : [];
-        if (installments.length > 0 && installments[0].amount > 0) {
-          await tx.insert(inboundDocumentInstallments).values(
-            installments.map((installment) => ({
-              tenantId,
-              documentId: id,
-              number: installment.number,
-              dueOn: installment.dueOn,
-              amount: installment.amount,
-            })),
-          );
-        }
-      });
-    }
-
-    if (document.accessKey && body.finance) {
-      const normalized = await normalizeInboundFinance(
-        tenantId,
-        body.finance,
-        body.installments,
-        document.totalAmount,
-      );
-      await db
-        .update(inboundDocuments)
-        .set({
-          financialStatus: normalized.financialStatus,
-          paymentKind: normalized.paymentKind,
-          companyCardId: normalized.companyCardId,
-          waiverReason: normalized.waiverReason,
-        })
-        .where(eq(inboundDocuments.id, id));
-      await db
-        .delete(inboundDocumentInstallments)
-        .where(eq(inboundDocumentInstallments.documentId, id));
-      if (normalized.installments.length > 0) {
-        await db.insert(inboundDocumentInstallments).values(
-          normalized.installments.map((installment) => ({
-            tenantId,
-            documentId: id,
-            number: installment.number,
-            dueOn: installment.dueOn,
-            amount: installment.amount,
-          })),
-        );
-      }
-    } else if (document.accessKey && body.installments.length > 0) {
-      await db
-        .delete(inboundDocumentInstallments)
-        .where(eq(inboundDocumentInstallments.documentId, id));
-      await db.insert(inboundDocumentInstallments).values(
-        body.installments.map((installment) => ({
-          tenantId,
-          documentId: id,
-          number: installment.number,
-          dueOn: installment.dueOn,
-          amount: installment.amount,
-        })),
-      );
-    }
-
-    if (body.supplierId) await markSupplier(tenantId, body.supplierId);
-    const purpose = body.natureId
-      ? ((
-          await db
-            .select({ fiscalPurpose: operationNatures.fiscalPurpose })
-            .from(operationNatures)
-            .where(eq(operationNatures.id, body.natureId))
-            .limit(1)
-        )[0]?.fiscalPurpose ?? null)
-      : null;
-    await alignDraft(tenantId, id, purpose);
-    return loadDocument(tenantId, id);
+    return saveInboundDraft(tenantId, id, request.body);
   });
 
   fastify.post('/:id/supplier', async (request) => {

@@ -14,6 +14,8 @@ import { civilDate } from '@erp-360/shared';
 import { and, eq } from 'drizzle-orm';
 
 import { db } from '../src/db/index.ts';
+import { InboundError } from '../src/modules/inbound/errors.ts';
+import { saveInboundDraft } from '../src/modules/inbound/inbound.ts';
 import { postInboundDocument } from '../src/modules/inbound/post.ts';
 import { ensureInboundSetup } from '../src/modules/inbound/setup.ts';
 import { createCompany } from './fixtures.ts';
@@ -202,5 +204,172 @@ describe('preço de lista pelo custo médio no lançamento', () => {
     assert.equal(Number(balance.quantity), 30);
     assert.equal(Number(balance.averageCost), 60);
     assert.equal(posted.listPrice, '109.0909');
+  });
+});
+
+async function saveFixture(label: string, linked: boolean) {
+  const company = await createCompany(label);
+  const [measure] = await db
+    .insert(measures)
+    .values({
+      tenantId: company.tenantId,
+      name: 'Unidade',
+      abbreviation: 'UN',
+      measureType: 'unit',
+      showOnProduct: true,
+    })
+    .returning({ id: measures.id });
+  const [item] = await db
+    .insert(catalogItems)
+    .values({
+      tenantId: company.tenantId,
+      code: '000001',
+      type: 'product',
+      fiscalItemType: 'resale',
+      tracksStock: true,
+      measureId: measure.id,
+      name: 'ITEM DE SALVAR',
+      grossMargin: '10.0000',
+      listPrice: '80.0000',
+    })
+    .returning({ id: catalogItems.id });
+  await ensureInboundSetup(company.tenantId);
+  const [nature] = await db
+    .select({ id: operationNatures.id })
+    .from(operationNatures)
+    .where(
+      and(
+        eq(operationNatures.tenantId, company.tenantId),
+        eq(operationNatures.code, 'purchase_resale'),
+      ),
+    )
+    .limit(1);
+  const today = civilDate();
+  const [document] = await db
+    .insert(inboundDocuments)
+    .values({
+      tenantId: company.tenantId,
+      status: 'pre_note',
+      number: '1',
+      series: '1',
+      issueOn: today,
+      supplierId: company.personId,
+      natureId: nature.id,
+      hasProtocol: true,
+      totalAmount: 130000,
+    })
+    .returning({ id: inboundDocuments.id });
+  await db.insert(inboundDocumentLines).values({
+    tenantId: company.tenantId,
+    documentId: document.id,
+    lineNumber: 1,
+    supplierCode: 'ITEM1',
+    description: 'Item de salvar',
+    xmlCfop: '1102',
+    entryCfop: '1102',
+    commercialQty: '20.0000',
+    commercialUnit: 'UN',
+    factor: '1.000000',
+    unitPrice: '65.0000',
+    lineAmount: 130000,
+    itemId: linked ? item.id : null,
+  });
+  const body = (itemId: string | null) => ({
+    supplierId: company.personId,
+    natureId: nature.id,
+    number: '1',
+    series: '1',
+    issueOn: today,
+    lines: [
+      {
+        lineNumber: 1,
+        supplierCode: 'ITEM1',
+        description: 'Item de salvar',
+        xmlCfop: '1102',
+        entryCfop: '1102',
+        commercialQty: 20,
+        commercialUnit: 'UN',
+        unitPrice: 65,
+        factor: 1,
+        itemId,
+      },
+    ],
+    installments: [{ number: '001', dueOn: today, amount: 130000 }],
+  });
+  return { company, item, document, body };
+}
+
+async function overridesOf(documentId: string) {
+  return db
+    .select({
+      itemId: inboundPricingOverrides.itemId,
+      grossMargin: inboundPricingOverrides.grossMargin,
+    })
+    .from(inboundPricingOverrides)
+    .where(eq(inboundPricingOverrides.documentId, documentId));
+}
+
+async function catalogOf(itemId: string) {
+  const [row] = await db
+    .select({ listPrice: catalogItems.listPrice, grossMargin: catalogItems.grossMargin })
+    .from(catalogItems)
+    .where(eq(catalogItems.id, itemId));
+  return row;
+}
+
+describe('salvar o rascunho com a margem ajustada', () => {
+  it('grava a margem na nota sem mexer no preço nem na margem do item', async () => {
+    const { company, item, document, body } = await saveFixture('SalvaMargem', true);
+    await saveInboundDraft(company.tenantId, document.id, {
+      ...body(item.id),
+      pricingOverrides: [{ itemId: item.id, grossMargin: '45.0000' }],
+    });
+    const rows = await overridesOf(document.id);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].itemId, item.id);
+    assert.equal(rows[0].grossMargin, '45.0000');
+    const catalog = await catalogOf(item.id);
+    assert.equal(catalog.listPrice, '80.0000');
+    assert.equal(catalog.grossMargin, '10.0000');
+  });
+
+  it('remove o ajuste quando o item sai da linha', async () => {
+    const { company, item, document, body } = await saveFixture('SalvaDesvincula', true);
+    await saveInboundDraft(company.tenantId, document.id, {
+      ...body(item.id),
+      pricingOverrides: [{ itemId: item.id, grossMargin: '45.0000' }],
+    });
+    assert.equal((await overridesOf(document.id)).length, 1);
+    await saveInboundDraft(company.tenantId, document.id, body(null));
+    assert.equal((await overridesOf(document.id)).length, 0);
+    assert.equal((await catalogOf(item.id)).listPrice, '80.0000');
+  });
+
+  it('mantém o ajuste quando o salvamento não envia pricingOverrides', async () => {
+    const { company, item, document, body } = await saveFixture('SalvaMantem', true);
+    await db.insert(inboundPricingOverrides).values({
+      tenantId: company.tenantId,
+      documentId: document.id,
+      itemId: item.id,
+      grossMargin: '45.0000',
+    });
+    await saveInboundDraft(company.tenantId, document.id, body(item.id));
+    const rows = await overridesOf(document.id);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].grossMargin, '45.0000');
+  });
+
+  it('recusa margem de 100%', async () => {
+    const { company, item, document, body } = await saveFixture('SalvaCem', true);
+    await assert.rejects(
+      saveInboundDraft(company.tenantId, document.id, {
+        ...body(item.id),
+        pricingOverrides: [{ itemId: item.id, grossMargin: '100' }],
+      }),
+      (error: unknown) =>
+        error instanceof InboundError &&
+        error.status === 400 &&
+        error.message === 'Informe a margem bruta entre 0 e 100, sem incluir 100.',
+    );
   });
 });
