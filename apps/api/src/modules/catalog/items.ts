@@ -125,7 +125,8 @@ export function grossMarginRangeMessage(value: string | null | undefined) {
   const trimmed = value?.trim() ?? '';
   if (!trimmed) return null;
   const margin = Number(trimmed.replace(',', '.'));
-  if (!Number.isFinite(margin) || margin < 0 || margin >= 100) {
+  if (!Number.isFinite(margin)) return null;
+  if (margin < 0 || margin >= 100) {
     return 'Informe a margem bruta entre 0 e 100, sem incluir 100.';
   }
   return null;

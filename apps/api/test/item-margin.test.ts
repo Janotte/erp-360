@@ -19,5 +19,6 @@ describe('margem bruta do item', () => {
     assert.equal(grossMarginRangeMessage(''), null);
     assert.equal(grossMarginRangeMessage('45.0000'), null);
     assert.equal(grossMarginRangeMessage(null), null);
+    assert.equal(grossMarginRangeMessage('abc'), null);
   });
 });
