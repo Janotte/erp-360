@@ -1,7 +1,7 @@
 # Desenvolvimento local. As variáveis vêm de apps/api/.env via --env-file.
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18.1-alpine
     container_name: erp-360-postgres
     environment:
       POSTGRES_USER: ${DATABASE_USER:-postgres}
