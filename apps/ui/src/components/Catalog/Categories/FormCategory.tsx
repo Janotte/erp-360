@@ -3,6 +3,16 @@ import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -19,15 +29,24 @@ const selectClassName =
 interface FormCategoryProps {
   categoryToUpdate?: Category | null;
   onSuccess?: () => void;
+  onCancel?: () => void;
+  onDeleted?: () => void;
 }
 
-export function FormCategory({ categoryToUpdate, onSuccess }: FormCategoryProps) {
+export function FormCategory({
+  categoryToUpdate,
+  onSuccess,
+  onCancel,
+  onDeleted,
+}: FormCategoryProps) {
   const queryClient = useQueryClient();
   const [categoryId, setCategoryId] = useState(categoryToUpdate?.id);
   const [name, setName] = useState(categoryToUpdate?.name ?? '');
   const [description, setDescription] = useState(categoryToUpdate?.description ?? '');
   const [parentId, setParentId] = useState(categoryToUpdate?.parentId ?? '');
   const [isActive, setIsActive] = useState(categoryToUpdate?.isActive !== false);
+  const [openDelete, setOpenDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const { data: loaded } = useQuery({
     queryKey: ['category', categoryId],
@@ -70,6 +89,20 @@ export function FormCategory({ categoryToUpdate, onSuccess }: FormCategoryProps)
     },
     onError: (error) => {
       toast.error(`Falha ao salvar: ${error.message || 'Erro inesperado'}`);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => categoriesService.delete(categoryId ?? ''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['listaCategories'] });
+      queryClient.invalidateQueries({ queryKey: ['categories', 'options'] });
+      if (categoryId) queryClient.removeQueries({ queryKey: ['category', categoryId] });
+      toast.success('Categoria removida com sucesso!');
+      onDeleted?.();
+    },
+    onError: (error: Error) => {
+      setDeleteError(error.message);
     },
   });
 
@@ -142,11 +175,54 @@ export function FormCategory({ categoryToUpdate, onSuccess }: FormCategoryProps)
         </p>
       ) : null}
 
-      <div className="flex justify-end pt-2">
-        <Button type="submit" disabled={mutation.isPending}>
+      <div className="flex flex-wrap justify-end gap-2 pt-2">
+        {onCancel ? (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancelar
+          </Button>
+        ) : null}
+        {categoryId ? (
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={mutation.isPending || deleteMutation.isPending}
+            onClick={() => {
+              setDeleteError(null);
+              setOpenDelete(true);
+            }}
+          >
+            Excluir
+          </Button>
+        ) : null}
+        <Button type="submit" disabled={mutation.isPending || deleteMutation.isPending}>
           {mutation.isPending ? 'Salvando...' : categoryId ? 'Atualizar' : 'Cadastrar'}
         </Button>
       </div>
+
+      <AlertDialog open={openDelete} onOpenChange={setOpenDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir categoria</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteError ??
+                `Deseja excluir ${name || 'esta categoria'}? Essa ação não pode ser desfeita.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteMutation.isPending || !!deleteError}
+              onClick={(event) => {
+                event.preventDefault();
+                if (categoryId) deleteMutation.mutate();
+              }}
+            >
+              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </form>
   );
 }

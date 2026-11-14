@@ -1,43 +1,18 @@
 import { measureTypeLabels } from '@erp-360/shared';
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal,
-  Pencil,
   Plus,
   Search,
-  Trash2,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -55,32 +30,45 @@ function visibilityLabel(measure: Measure) {
   return 'Serviço';
 }
 
-import { FormMeasure } from './FormMeasure';
-
 type SortField = 'abbreviation' | 'name';
 
+function readPage(params: URLSearchParams) {
+  const page = Number(params.get('page') ?? '1');
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function readSort(params: URLSearchParams): SortField {
+  return params.get('sortField') === 'name' ? 'name' : 'abbreviation';
+}
+
+function readOrder(params: URLSearchParams): 'asc' | 'desc' {
+  return params.get('sortOrder') === 'desc' ? 'desc' : 'asc';
+}
+
 export function ListMeasures() {
-  const queryClient = useQueryClient();
-  const [openDialog, setOpenDialog] = useState(false);
-  const [openAlert, setOpenAlert] = useState(false);
-  const [selected, setSelected] = useState<Measure | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [searchText, setSearchText] = useState('');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState<SortField>('abbreviation');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  const [searchText, setSearchText] = useState(params.get('busca') ?? '');
+  const page = readPage(params);
+  const sortField = readSort(params);
+  const sortOrder = readOrder(params);
+  const search = params.get('busca') ?? '';
+  const from = `/measures${location.search}`;
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setSearch((current) => {
-        const next = searchText.trim();
-        if (current !== next) setPage(1);
-        return next;
-      });
+      const next = searchText.trim();
+      const current = params.get('busca') ?? '';
+      if (next === current) return;
+      const updated = new URLSearchParams(params);
+      if (next) updated.set('busca', next);
+      else updated.delete('busca');
+      updated.delete('page');
+      setParams(updated, { replace: true });
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchText]);
+  }, [searchText, params, setParams]);
 
   const { data: response, isLoading } = useQuery({
     queryKey: ['listaMeasures', { page, search, sortField, sortOrder }],
@@ -96,13 +84,21 @@ export function ListMeasures() {
   });
 
   const changeSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-    setPage(1);
+    const next = new URLSearchParams(params);
+    const order = sortField === field && sortOrder === 'asc' ? 'desc' : 'asc';
+    if (field === 'abbreviation') next.delete('sortField');
+    else next.set('sortField', field);
+    if (order === 'asc') next.delete('sortOrder');
+    else next.set('sortOrder', order);
+    next.delete('page');
+    setParams(next, { replace: true });
+  };
+
+  const setPage = (nextPage: number) => {
+    const next = new URLSearchParams(params);
+    if (nextPage <= 1) next.delete('page');
+    else next.set('page', String(nextPage));
+    setParams(next, { replace: true });
   };
 
   const renderSortIcon = (field: SortField) => {
@@ -114,27 +110,18 @@ export function ListMeasures() {
     );
   };
 
+  const openMeasure = (id: string) => {
+    navigate(`/measures/${id}`, { state: { from } });
+  };
+
   const meta = response?.meta;
   const rows = response?.data;
-
-  const deleteMutation = useMutation({
-    mutationFn: measuresService.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['listaMeasures'] });
-      setOpenAlert(false);
-      setDeleteError(null);
-      toast.success('Medida removida com sucesso!');
-    },
-    onError: (error: Error) => {
-      setDeleteError(error.message);
-    },
-  });
 
   if (isLoading && !response) return <p>Carregando registros...</p>;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-4 rounded-lg border border-zinc-200">
+      <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
           <Input
@@ -144,13 +131,10 @@ export function ListMeasures() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelected(null);
-            setOpenDialog(true);
-          }}
-        >
-          <Plus className="h-4 w-4" /> Nova medida
+        <Button asChild>
+          <Link to="/measures/new" state={{ from }}>
+            <Plus className="h-4 w-4" /> Nova medida
+          </Link>
         </Button>
       </div>
 
@@ -181,51 +165,36 @@ export function ListMeasures() {
               <TableHead>Tipo</TableHead>
               <TableHead>Exibir em</TableHead>
               <TableHead>Situação</TableHead>
-              <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows?.map((measure) => (
-              <TableRow key={measure.id}>
-                <TableCell className="font-medium">{measure.abbreviation}</TableCell>
+              <TableRow
+                key={measure.id}
+                className={
+                  measure.isActive ? 'cursor-pointer' : 'cursor-pointer text-zinc-400'
+                }
+                onClick={() => openMeasure(measure.id)}
+              >
+                <TableCell className="font-medium">
+                  <Link
+                    to={`/measures/${measure.id}`}
+                    state={{ from }}
+                    className="font-medium"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {measure.abbreviation}
+                  </Link>
+                </TableCell>
                 <TableCell>{measure.name}</TableCell>
                 <TableCell>{measureTypeLabels[measure.measureType]}</TableCell>
                 <TableCell>{visibilityLabel(measure)}</TableCell>
                 <TableCell>{measure.isActive ? 'Ativa' : 'Inativa'}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label="Ações">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSelected(measure);
-                          setOpenDialog(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" /> Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-red-600"
-                        onClick={() => {
-                          setSelected(measure);
-                          setDeleteError(null);
-                          setOpenAlert(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" /> Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
               </TableRow>
             ))}
             {rows && rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-4 text-center text-zinc-500">
+                <TableCell colSpan={5} className="py-4 text-center text-zinc-500">
                   Nenhuma medida encontrada.
                 </TableCell>
               </TableRow>
@@ -245,7 +214,7 @@ export function ListMeasures() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage((old) => Math.max(old - 1, 1))}
+              onClick={() => setPage(Math.max(page - 1, 1))}
               disabled={page === 1}
               className="gap-1"
             >
@@ -254,7 +223,7 @@ export function ListMeasures() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage((old) => (page < meta.totalPages ? old + 1 : old))}
+              onClick={() => setPage(page < meta.totalPages ? page + 1 : page)}
               disabled={page === meta.totalPages}
               className="gap-1"
             >
@@ -263,50 +232,6 @@ export function ListMeasures() {
           </div>
         </div>
       ) : null}
-
-      <Dialog
-        open={openDialog}
-        onOpenChange={(open) => {
-          setOpenDialog(open);
-          if (!open) setSelected(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{selected ? 'Editar medida' : 'Nova medida'}</DialogTitle>
-          </DialogHeader>
-          <FormMeasure
-            key={selected?.id ?? 'new'}
-            measureToUpdate={selected}
-            onSuccess={() => setOpenDialog(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={openAlert} onOpenChange={setOpenAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir medida</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteError ??
-                `Deseja excluir ${selected?.name ?? 'esta medida'}? Essa ação não pode ser desfeita.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              disabled={deleteMutation.isPending || !!deleteError}
-              onClick={(event) => {
-                event.preventDefault();
-                if (selected) deleteMutation.mutate(selected.id);
-              }}
-            >
-              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

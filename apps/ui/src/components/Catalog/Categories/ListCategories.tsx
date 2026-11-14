@@ -1,42 +1,16 @@
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   ArrowDown,
   ArrowUp,
-  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal,
-  Pencil,
   Plus,
   Search,
-  Trash2,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -46,89 +20,81 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { categoriesService,type Category } from '@/services/categories';
+import { categoriesService } from '@/services/categories';
 
-import { FormCategory } from './FormCategory';
+function readPage(params: URLSearchParams) {
+  const page = Number(params.get('page') ?? '1');
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
 
-type SortField = 'name';
+function readOrder(params: URLSearchParams): 'asc' | 'desc' {
+  return params.get('sortOrder') === 'desc' ? 'desc' : 'asc';
+}
 
 export function ListCategories() {
-  const queryClient = useQueryClient();
-  const [openDialog, setOpenDialog] = useState(false);
-  const [openAlert, setOpenAlert] = useState(false);
-  const [selected, setSelected] = useState<Category | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [searchText, setSearchText] = useState('');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState<SortField>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  const [searchText, setSearchText] = useState(params.get('busca') ?? '');
+  const page = readPage(params);
+  const sortOrder = readOrder(params);
+  const search = params.get('busca') ?? '';
+  const from = `/categories${location.search}`;
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setSearch((current) => {
-        const next = searchText.trim();
-        if (current !== next) setPage(1);
-        return next;
-      });
+      const next = searchText.trim();
+      const current = params.get('busca') ?? '';
+      if (next === current) return;
+      const updated = new URLSearchParams(params);
+      if (next) updated.set('busca', next);
+      else updated.delete('busca');
+      updated.delete('page');
+      setParams(updated, { replace: true });
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchText]);
+  }, [searchText, params, setParams]);
 
   const { data: response, isLoading } = useQuery({
-    queryKey: ['listaCategories', { page, search, sortField, sortOrder }],
+    queryKey: ['listaCategories', { page, search, sortField: 'name', sortOrder }],
     placeholderData: keepPreviousData,
     queryFn: () =>
       categoriesService.list({
         page,
         limit: 10,
-        sortField,
+        sortField: 'name',
         sortOrder,
         search: search || undefined,
       }),
   });
 
-  const changeSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-    setPage(1);
+  const changeSort = () => {
+    const next = new URLSearchParams(params);
+    if (sortOrder === 'asc') next.set('sortOrder', 'desc');
+    else next.delete('sortOrder');
+    next.delete('page');
+    setParams(next, { replace: true });
   };
 
-  const renderSortIcon = (field: SortField) => {
-    if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4 shrink-0" />;
-    return sortOrder === 'asc' ? (
-      <ArrowUp className="ml-2 h-4 w-4 shrink-0 text-primary" />
-    ) : (
-      <ArrowDown className="ml-2 h-4 w-4 shrink-0 text-primary" />
-    );
+  const setPage = (nextPage: number) => {
+    const next = new URLSearchParams(params);
+    if (nextPage <= 1) next.delete('page');
+    else next.set('page', String(nextPage));
+    setParams(next, { replace: true });
+  };
+
+  const openCategory = (id: string) => {
+    navigate(`/categories/${id}`, { state: { from } });
   };
 
   const meta = response?.meta;
   const rows = response?.data;
 
-  const deleteMutation = useMutation({
-    mutationFn: categoriesService.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['listaCategories'] });
-      queryClient.invalidateQueries({ queryKey: ['categories', 'options'] });
-      setOpenAlert(false);
-      setDeleteError(null);
-      toast.success('Categoria removida com sucesso!');
-    },
-    onError: (error: Error) => {
-      setDeleteError(error.message);
-    },
-  });
-
   if (isLoading && !response) return <p>Carregando registros...</p>;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-4 rounded-lg border border-zinc-200">
+      <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
           <Input
@@ -138,13 +104,10 @@ export function ListCategories() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelected(null);
-            setOpenDialog(true);
-          }}
-        >
-          <Plus className="h-4 w-4" /> Nova categoria
+        <Button asChild>
+          <Link to="/categories/new" state={{ from }}>
+            <Plus className="h-4 w-4" /> Nova categoria
+          </Link>
         </Button>
       </div>
 
@@ -153,60 +116,45 @@ export function ListCategories() {
           <TableHeader>
             <TableRow>
               <TableHead>
-                <Button
-                  variant="ghost"
-                  className="px-0"
-                  onClick={() => changeSort('name')}
-                >
+                <Button variant="ghost" className="px-0" onClick={changeSort}>
                   Nome
-                  {renderSortIcon('name')}
+                  {sortOrder === 'asc' ? (
+                    <ArrowUp className="ml-2 h-4 w-4 shrink-0 text-primary" />
+                  ) : (
+                    <ArrowDown className="ml-2 h-4 w-4 shrink-0 text-primary" />
+                  )}
                 </Button>
               </TableHead>
               <TableHead>Categoria pai</TableHead>
               <TableHead>Situação</TableHead>
-              <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows?.map((category) => (
-              <TableRow key={category.id}>
-                <TableCell className="font-medium">{category.name}</TableCell>
+              <TableRow
+                key={category.id}
+                className={
+                  category.isActive ? 'cursor-pointer' : 'cursor-pointer text-zinc-400'
+                }
+                onClick={() => openCategory(category.id)}
+              >
+                <TableCell className="font-medium">
+                  <Link
+                    to={`/categories/${category.id}`}
+                    state={{ from }}
+                    className="font-medium"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {category.name}
+                  </Link>
+                </TableCell>
                 <TableCell>{category.parentName ?? 'Raiz'}</TableCell>
                 <TableCell>{category.isActive ? 'Ativa' : 'Inativa'}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label="Ações">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSelected(category);
-                          setOpenDialog(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" /> Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-red-600"
-                        onClick={() => {
-                          setSelected(category);
-                          setDeleteError(null);
-                          setOpenAlert(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" /> Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
               </TableRow>
             ))}
             {rows && rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="py-4 text-center text-zinc-500">
+                <TableCell colSpan={3} className="py-4 text-center text-zinc-500">
                   Nenhuma categoria encontrada.
                 </TableCell>
               </TableRow>
@@ -226,7 +174,7 @@ export function ListCategories() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage((old) => Math.max(old - 1, 1))}
+              onClick={() => setPage(Math.max(page - 1, 1))}
               disabled={page === 1}
               className="gap-1"
             >
@@ -235,7 +183,7 @@ export function ListCategories() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage((old) => (page < meta.totalPages ? old + 1 : old))}
+              onClick={() => setPage(page < meta.totalPages ? page + 1 : page)}
               disabled={page === meta.totalPages}
               className="gap-1"
             >
@@ -244,50 +192,6 @@ export function ListCategories() {
           </div>
         </div>
       ) : null}
-
-      <Dialog
-        open={openDialog}
-        onOpenChange={(open) => {
-          setOpenDialog(open);
-          if (!open) setSelected(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{selected ? 'Editar categoria' : 'Nova categoria'}</DialogTitle>
-          </DialogHeader>
-          <FormCategory
-            key={selected?.id ?? 'new'}
-            categoryToUpdate={selected}
-            onSuccess={() => setOpenDialog(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={openAlert} onOpenChange={setOpenAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir categoria</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteError ??
-                `Deseja excluir ${selected?.name ?? 'esta categoria'}? Essa ação não pode ser desfeita.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              disabled={deleteMutation.isPending || !!deleteError}
-              onClick={(event) => {
-                event.preventDefault();
-                if (selected) deleteMutation.mutate(selected.id);
-              }}
-            >
-              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

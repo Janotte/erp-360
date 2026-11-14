@@ -14,6 +14,16 @@ import type { FormEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -114,9 +124,11 @@ interface FormItemProps {
   itemToUpdate?: CatalogItem | null;
   seed?: CatalogItemSeed | null;
   onSuccess?: (item: CatalogItem) => void;
+  onCancel?: () => void;
+  onDeleted?: () => void;
 }
 
-export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
+export function FormItem({ itemToUpdate, seed, onSuccess, onCancel, onDeleted }: FormItemProps) {
   const queryClient = useQueryClient();
   const [itemId, setItemId] = useState(itemToUpdate?.id);
   const [code, setCode] = useState(itemToUpdate?.code ?? '');
@@ -151,6 +163,8 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
   const [heightCm, setHeightCm] = useState(itemToUpdate?.heightCm ?? '');
   const [isActive, setIsActive] = useState(itemToUpdate?.isActive !== false);
   const [ncmSearch, setNcmSearch] = useState('');
+  const [openDelete, setOpenDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const { data: loaded } = useQuery({
     queryKey: ['item', itemId],
@@ -249,6 +263,19 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
     },
     onError: (error) => {
       toast.error(`Falha ao salvar: ${error.message || 'Erro inesperado'}`);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => itemsService.delete(itemId ?? ''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['listaItems'] });
+      if (itemId) queryClient.removeQueries({ queryKey: ['item', itemId] });
+      toast.success('Item removido com sucesso!');
+      onDeleted?.();
+    },
+    onError: (error: Error) => {
+      setDeleteError(error.message);
     },
   });
 
@@ -704,11 +731,54 @@ export function FormItem({ itemToUpdate, seed, onSuccess }: FormItemProps) {
         </p>
       ) : null}
 
-      <div className="flex justify-end pt-2">
-        <Button type="submit" data-item-field disabled={mutation.isPending || !measureId || Boolean(listPriceError)}>
+      <div className="flex flex-wrap justify-end gap-2 pt-2">
+        {onCancel ? (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancelar
+          </Button>
+        ) : null}
+        {itemId ? (
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={mutation.isPending || deleteMutation.isPending}
+            onClick={() => {
+              setDeleteError(null);
+              setOpenDelete(true);
+            }}
+          >
+            Excluir
+          </Button>
+        ) : null}
+        <Button type="submit" data-item-field disabled={mutation.isPending || deleteMutation.isPending || !measureId || Boolean(listPriceError)}>
           {mutation.isPending ? 'Salvando...' : itemId ? 'Atualizar' : 'Cadastrar'}
         </Button>
       </div>
+
+      <AlertDialog open={openDelete} onOpenChange={setOpenDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir item</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteError ??
+                `Deseja excluir ${name || 'este item'}? Essa ação não pode ser desfeita.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteMutation.isPending || !!deleteError}
+              onClick={(event) => {
+                event.preventDefault();
+                if (itemId) deleteMutation.mutate();
+              }}
+            >
+              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </form>
   );
 }

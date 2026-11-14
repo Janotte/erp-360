@@ -4,6 +4,16 @@ import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -20,9 +30,16 @@ function parseMeasureType(value: unknown): MeasureType | '' {
 interface FormMeasureProps {
   measureToUpdate?: Measure | null;
   onSuccess?: () => void;
+  onCancel?: () => void;
+  onDeleted?: () => void;
 }
 
-export function FormMeasure({ measureToUpdate, onSuccess }: FormMeasureProps) {
+export function FormMeasure({
+  measureToUpdate,
+  onSuccess,
+  onCancel,
+  onDeleted,
+}: FormMeasureProps) {
   const queryClient = useQueryClient();
   const [measureId, setMeasureId] = useState(measureToUpdate?.id);
   const [name, setName] = useState(measureToUpdate?.name ?? '');
@@ -37,6 +54,8 @@ export function FormMeasure({ measureToUpdate, onSuccess }: FormMeasureProps) {
     measureToUpdate?.showOnService === true,
   );
   const [isActive, setIsActive] = useState(measureToUpdate?.isActive !== false);
+  const [openDelete, setOpenDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const { data: loaded } = useQuery({
     queryKey: ['measure', measureId],
@@ -73,6 +92,20 @@ export function FormMeasure({ measureToUpdate, onSuccess }: FormMeasureProps) {
     },
     onError: (error) => {
       toast.error(`Falha ao salvar: ${error.message || 'Erro inesperado'}`);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => measuresService.delete(measureId ?? ''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['listaMeasures'] });
+      queryClient.invalidateQueries({ queryKey: ['measures', 'options'] });
+      if (measureId) queryClient.removeQueries({ queryKey: ['measure', measureId] });
+      toast.success('Medida removida com sucesso!');
+      onDeleted?.();
+    },
+    onError: (error: Error) => {
+      setDeleteError(error.message);
     },
   });
 
@@ -184,14 +217,61 @@ export function FormMeasure({ measureToUpdate, onSuccess }: FormMeasureProps) {
         </p>
       ) : null}
 
-      <div className="flex justify-end pt-2">
+      <div className="flex flex-wrap justify-end gap-2 pt-2">
+        {onCancel ? (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancelar
+          </Button>
+        ) : null}
+        {measureId ? (
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={mutation.isPending || deleteMutation.isPending}
+            onClick={() => {
+              setDeleteError(null);
+              setOpenDelete(true);
+            }}
+          >
+            Excluir
+          </Button>
+        ) : null}
         <Button
           type="submit"
-          disabled={mutation.isPending || (!showOnProduct && !showOnService)}
+          disabled={
+            mutation.isPending ||
+            deleteMutation.isPending ||
+            (!showOnProduct && !showOnService)
+          }
         >
           {mutation.isPending ? 'Salvando...' : measureId ? 'Atualizar' : 'Cadastrar'}
         </Button>
       </div>
+
+      <AlertDialog open={openDelete} onOpenChange={setOpenDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir medida</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteError ??
+                `Deseja excluir ${name || 'esta medida'}? Essa ação não pode ser desfeita.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteMutation.isPending || !!deleteError}
+              onClick={(event) => {
+                event.preventDefault();
+                if (measureId) deleteMutation.mutate();
+              }}
+            >
+              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </form>
   );
 }

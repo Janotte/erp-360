@@ -1,4 +1,28 @@
 import { catalogItemTypeLabels, formatRawDate } from '@erp-360/shared';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Search,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { itemsService } from '@/services/items';
 
 function formatMoney4(value: string | null) {
   if (!value) return '—';
@@ -25,82 +49,46 @@ function formatAvailable(item: { tracksStock: boolean; quantity: string | null }
   if (!Number.isFinite(number)) return '—';
   return number.toLocaleString('pt-BR', { maximumFractionDigits: 4 });
 }
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
-
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { type CatalogItem, itemsService } from '@/services/items';
-
-import { FormItem } from './FormItem';
 
 type SortField = 'code' | 'name';
 
+function readPage(params: URLSearchParams) {
+  const page = Number(params.get('page') ?? '1');
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function readSort(params: URLSearchParams): SortField {
+  return params.get('sortField') === 'name' ? 'name' : 'code';
+}
+
+function readOrder(params: URLSearchParams): 'asc' | 'desc' {
+  return params.get('sortOrder') === 'desc' ? 'desc' : 'asc';
+}
+
 export function ListItems() {
-  const queryClient = useQueryClient();
-  const [openDialog, setOpenDialog] = useState(false);
-  const [openAlert, setOpenAlert] = useState(false);
-  const [selected, setSelected] = useState<CatalogItem | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [searchText, setSearchText] = useState('');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState<SortField>('code');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  const [searchText, setSearchText] = useState(params.get('busca') ?? '');
+  const page = readPage(params);
+  const sortField = readSort(params);
+  const sortOrder = readOrder(params);
+  const search = params.get('busca') ?? '';
+  const from = `/items${location.search}`;
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setSearch((current) => {
-        const next = searchText.trim();
-        if (current !== next) setPage(1);
-        return next;
-      });
+      const next = searchText.trim();
+      const current = params.get('busca') ?? '';
+      if (next === current) return;
+      const updated = new URLSearchParams(params);
+      if (next) updated.set('busca', next);
+      else updated.delete('busca');
+      updated.delete('page');
+      setParams(updated, { replace: true });
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchText]);
+  }, [searchText, params, setParams]);
 
   const { data: response, isLoading } = useQuery({
     queryKey: ['listaItems', { page, search, sortField, sortOrder }],
@@ -116,13 +104,21 @@ export function ListItems() {
   });
 
   const changeSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-    setPage(1);
+    const next = new URLSearchParams(params);
+    const order = sortField === field && sortOrder === 'asc' ? 'desc' : 'asc';
+    if (field === 'code') next.delete('sortField');
+    else next.set('sortField', field);
+    if (order === 'asc') next.delete('sortOrder');
+    else next.set('sortOrder', order);
+    next.delete('page');
+    setParams(next, { replace: true });
+  };
+
+  const setPage = (nextPage: number) => {
+    const next = new URLSearchParams(params);
+    if (nextPage <= 1) next.delete('page');
+    else next.set('page', String(nextPage));
+    setParams(next, { replace: true });
   };
 
   const renderSortIcon = (field: SortField) => {
@@ -134,21 +130,12 @@ export function ListItems() {
     );
   };
 
+  const openItem = (id: string) => {
+    navigate(`/items/${id}`, { state: { from } });
+  };
+
   const meta = response?.meta;
   const rows = response?.data;
-
-  const deleteMutation = useMutation({
-    mutationFn: itemsService.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['listaItems'] });
-      setOpenAlert(false);
-      setDeleteError(null);
-      toast.success('Item removido com sucesso!');
-    },
-    onError: (error: Error) => {
-      setDeleteError(error.message);
-    },
-  });
 
   if (isLoading && !response) return <p>Carregando registros...</p>;
 
@@ -164,13 +151,10 @@ export function ListItems() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelected(null);
-            setOpenDialog(true);
-          }}
-        >
-          <Plus className="h-4 w-4" /> Novo item
+        <Button asChild>
+          <Link to="/items/new" state={{ from }}>
+            <Plus className="h-4 w-4" /> Novo item
+          </Link>
         </Button>
       </div>
 
@@ -179,22 +163,14 @@ export function ListItems() {
           <TableHeader>
             <TableRow>
               <TableHead>
-                <Button
-                  variant="ghost"
-                  className="px-0"
-                  onClick={() => changeSort('code')}
-                >
+                <Button variant="ghost" className="px-0" onClick={() => changeSort('code')}>
                   Código
                   {renderSortIcon('code')}
                 </Button>
               </TableHead>
               <TableHead>SKU</TableHead>
               <TableHead>
-                <Button
-                  variant="ghost"
-                  className="px-0"
-                  onClick={() => changeSort('name')}
-                >
+                <Button variant="ghost" className="px-0" onClick={() => changeSort('name')}>
                   Nome
                   {renderSortIcon('name')}
                 </Button>
@@ -206,13 +182,25 @@ export function ListItems() {
               <TableHead>Custo médio</TableHead>
               <TableHead>Margem</TableHead>
               <TableHead>Última entrada</TableHead>
-              <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows?.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell className="font-medium">{item.code}</TableCell>
+              <TableRow
+                key={item.id}
+                className={item.isActive ? 'cursor-pointer' : 'cursor-pointer text-zinc-400'}
+                onClick={() => openItem(item.id)}
+              >
+                <TableCell className="font-medium">
+                  <Link
+                    to={`/items/${item.id}`}
+                    state={{ from }}
+                    className="font-medium"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {item.code}
+                  </Link>
+                </TableCell>
                 <TableCell>{item.sku || '—'}</TableCell>
                 <TableCell>{item.name}</TableCell>
                 <TableCell>{catalogItemTypeLabels[item.type]}</TableCell>
@@ -222,40 +210,11 @@ export function ListItems() {
                 <TableCell>{formatMoney4(item.averageCost)}</TableCell>
                 <TableCell>{formatPercent(item.grossMargin)}</TableCell>
                 <TableCell>{formatRawDate(item.lastInboundOn) || '—'}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label="Ações">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSelected(item);
-                          setOpenDialog(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" /> Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-red-600"
-                        onClick={() => {
-                          setSelected(item);
-                          setDeleteError(null);
-                          setOpenAlert(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" /> Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
               </TableRow>
             ))}
             {rows && rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="py-4 text-center text-zinc-500">
+                <TableCell colSpan={10} className="py-4 text-center text-zinc-500">
                   Nenhum item encontrado.
                 </TableCell>
               </TableRow>
@@ -275,7 +234,7 @@ export function ListItems() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage((old) => Math.max(old - 1, 1))}
+              onClick={() => setPage(Math.max(page - 1, 1))}
               disabled={page === 1}
               className="gap-1"
             >
@@ -284,7 +243,7 @@ export function ListItems() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage((old) => (page < meta.totalPages ? old + 1 : old))}
+              onClick={() => setPage(page < meta.totalPages ? page + 1 : page)}
               disabled={page === meta.totalPages}
               className="gap-1"
             >
@@ -293,50 +252,6 @@ export function ListItems() {
           </div>
         </div>
       ) : null}
-
-      <Dialog
-        open={openDialog}
-        onOpenChange={(open) => {
-          setOpenDialog(open);
-          if (!open) setSelected(null);
-        }}
-      >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{selected ? 'Editar item' : 'Novo item'}</DialogTitle>
-          </DialogHeader>
-          <FormItem
-            key={selected?.id ?? 'new'}
-            itemToUpdate={selected}
-            onSuccess={() => setOpenDialog(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={openAlert} onOpenChange={setOpenAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir item</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteError ??
-                `Deseja excluir ${selected?.name ?? 'este item'}? Essa ação não pode ser desfeita.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              disabled={deleteMutation.isPending || !!deleteError}
-              onClick={(event) => {
-                event.preventDefault();
-                if (selected) deleteMutation.mutate(selected.id);
-              }}
-            >
-              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

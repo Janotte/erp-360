@@ -92,12 +92,19 @@ const itensMenu: ItemMenu[] = [
   { title: 'Configurações', icon: Settings, url: '/settings' },
 ];
 
+function rotaDoFilho(url: string, path: string) {
+  if (url === '/categories' || url === '/items' || url === '/measures') {
+    return path === url || path.startsWith(`${url}/`);
+  }
+  return path === url;
+}
+
 export function AppSidebar() {
   const { pathname } = useLocation();
   const pathAtivo = pathname.replace(/\/$/, '') || '/';
   const { isMobile, setOpenMobile } = useSidebar();
   const grupoDaRota = itensMenu.find((item) =>
-    item.filhos?.some((filho) => filho.url === pathAtivo),
+    item.filhos?.some((filho) => rotaDoFilho(filho.url, pathAtivo)),
   )?.title;
   const [abertos, setAbertos] = useState<Record<string, boolean>>(() =>
     grupoDaRota ? { [grupoDaRota]: true } : {},
@@ -131,7 +138,9 @@ export function AppSidebar() {
               {itensMenu.map((item) => {
                 if (item.filhos?.length) {
                   const aberto = abertos[item.title] ?? false;
-                  const ativo = item.filhos.some((filho) => filho.url === pathAtivo);
+                  const ativo = item.filhos.some((filho) =>
+                    rotaDoFilho(filho.url, pathAtivo),
+                  );
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
@@ -159,7 +168,7 @@ export function AppSidebar() {
                             <SidebarMenuSubItem key={filho.url}>
                               <SidebarMenuSubButton
                                 asChild
-                                isActive={pathAtivo === filho.url}
+                                isActive={rotaDoFilho(filho.url, pathAtivo)}
                               >
                                 <Link to={filho.url} onClick={fecharNoCelular}>
                                   <filho.icon className="h-4 w-4" />

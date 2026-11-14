@@ -15,9 +15,12 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from './components/AppSidebar';
 import { Login } from './components/Auth/Login';
 import { Register } from './components/Auth/Register';
+import { CategoryPage } from './components/Catalog/Categories/CategoryPage';
 import { ListCategories } from './components/Catalog/Categories/ListCategories';
+import { ItemPage } from './components/Catalog/Items/ItemPage';
 import { ListItems } from './components/Catalog/Items/ListItems';
 import { ListMeasures } from './components/Catalog/Measures/ListMeasures';
+import { MeasurePage } from './components/Catalog/Measures/MeasurePage';
 import { FormContract } from './components/Contracts/FormContract';
 import { ListContracts } from './components/Contracts/ListContracts';
 import { Dashboard } from './components/Dashboard';
@@ -189,6 +192,22 @@ function App() {
               }
             />
             <Route
+              path="/categories/new"
+              element={
+                <Pagina>
+                  <CategoryPage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/categories/:id"
+              element={
+                <Pagina>
+                  <CategoryPage />
+                </Pagina>
+              }
+            />
+            <Route
               path="/items"
               element={
                 <Pagina>
@@ -197,10 +216,42 @@ function App() {
               }
             />
             <Route
+              path="/items/new"
+              element={
+                <Pagina>
+                  <ItemPage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/items/:id"
+              element={
+                <Pagina>
+                  <ItemPage />
+                </Pagina>
+              }
+            />
+            <Route
               path="/measures"
               element={
                 <Pagina>
                   <ListMeasures />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/measures/new"
+              element={
+                <Pagina>
+                  <MeasurePage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/measures/:id"
+              element={
+                <Pagina>
+                  <MeasurePage />
                 </Pagina>
               }
             />
