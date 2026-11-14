@@ -1,13 +1,15 @@
 import '../../types/fastify.ts';
 
-import { bankAccounts, cardBrands, companyCards } from '@erp-360/mod-financial';
+import { bankAccounts, cardBrands, companyCards, payables } from '@erp-360/mod-financial';
+import { inboundDocumentInstallments, inboundDocuments } from '@erp-360/mod-inbound';
 import { persons } from '@erp-360/mod-persons';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
 import { uniqueViolation } from '../../lib/postgres-errors.ts';
+import { cardStatement, type CardChargeInput } from './card-statement.ts';
 
 const cardBody = z.object({
   name: z.string().trim().min(1).max(60),
@@ -52,37 +54,93 @@ async function assertBrand(cardBrandId: string | null | undefined) {
   return brand ? null : 'A bandeira informada não existe.';
 }
 
-function listCards(tenantId: string) {
-  return db
+async function openBalances(tenantId: string) {
+  const rows = await db
     .select({
-      id: companyCards.id,
-      name: companyCards.name,
-      issuerId: companyCards.issuerId,
-      issuerName: persons.name,
-      cardBrandId: companyCards.cardBrandId,
-      closingDay: companyCards.closingDay,
-      dueDay: companyCards.dueDay,
-      bankAccountId: companyCards.bankAccountId,
-      bankAccountName: bankAccounts.name,
-      isActive: companyCards.isActive,
+      companyCardId: payables.companyCardId,
+      openBalance: sql<string>`coalesce(sum(${payables.installmentAmount}), 0)`,
     })
-    .from(companyCards)
-    .innerJoin(
-      persons,
+    .from(payables)
+    .where(
       and(
-        eq(persons.id, companyCards.issuerId),
-        eq(persons.tenantId, companyCards.tenantId),
+        eq(payables.tenantId, tenantId),
+        eq(payables.status, 'pendente'),
+        isNotNull(payables.companyCardId),
+      ),
+    )
+    .groupBy(payables.companyCardId);
+  return new Map(rows.map((row) => [row.companyCardId, Number(row.openBalance)]));
+}
+
+async function listCards(tenantId: string) {
+  const [cards, balances] = await Promise.all([
+    db
+      .select({
+        id: companyCards.id,
+        name: companyCards.name,
+        issuerId: companyCards.issuerId,
+        issuerName: persons.name,
+        cardBrandId: companyCards.cardBrandId,
+        closingDay: companyCards.closingDay,
+        dueDay: companyCards.dueDay,
+        bankAccountId: companyCards.bankAccountId,
+        bankAccountName: bankAccounts.name,
+        isActive: companyCards.isActive,
+      })
+      .from(companyCards)
+      .innerJoin(
+        persons,
+        and(
+          eq(persons.id, companyCards.issuerId),
+          eq(persons.tenantId, companyCards.tenantId),
+        ),
+      )
+      .leftJoin(
+        bankAccounts,
+        and(
+          eq(bankAccounts.id, companyCards.bankAccountId),
+          eq(bankAccounts.tenantId, companyCards.tenantId),
+        ),
+      )
+      .where(eq(companyCards.tenantId, tenantId))
+      .orderBy(asc(companyCards.name)),
+    openBalances(tenantId),
+  ]);
+  return cards.map((card) => ({ ...card, openBalance: balances.get(card.id) ?? 0 }));
+}
+
+async function cardCharges(tenantId: string, cardId: string): Promise<CardChargeInput[]> {
+  const rows = await db
+    .select({
+      id: payables.id,
+      issueOn: payables.issueOn,
+      dueOn: payables.dueOn,
+      description: payables.description,
+      supplierName: inboundDocuments.supplierName,
+      documentNumber: inboundDocuments.number,
+      documentSeries: inboundDocuments.series,
+      installmentNumber: inboundDocumentInstallments.number,
+      documentId: inboundDocuments.id,
+      amount: payables.installmentAmount,
+      status: payables.status,
+    })
+    .from(payables)
+    .leftJoin(
+      inboundDocumentInstallments,
+      and(
+        eq(inboundDocumentInstallments.payableId, payables.id),
+        eq(inboundDocumentInstallments.tenantId, payables.tenantId),
       ),
     )
     .leftJoin(
-      bankAccounts,
+      inboundDocuments,
       and(
-        eq(bankAccounts.id, companyCards.bankAccountId),
-        eq(bankAccounts.tenantId, companyCards.tenantId),
+        eq(inboundDocuments.id, inboundDocumentInstallments.documentId),
+        eq(inboundDocuments.tenantId, inboundDocumentInstallments.tenantId),
       ),
     )
-    .where(eq(companyCards.tenantId, tenantId))
-    .orderBy(asc(companyCards.name));
+    .where(and(eq(payables.tenantId, tenantId), eq(payables.companyCardId, cardId)));
+  return rows;
 }
 
 export const companyCardRoutes: FastifyPluginAsyncZod = async (fastify) => {
@@ -91,6 +149,21 @@ export const companyCardRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.get('/company-cards', async (request) => {
     return listCards(request.user.tenantId);
   });
+
+  fastify.get(
+    '/company-cards/:id/statement',
+    { schema: { params: z.object({ id: z.string().uuid() }) } },
+    async (request, reply) => {
+      const tenantId = request.user.tenantId;
+      const { id } = request.params;
+      const cards = await listCards(tenantId);
+      const card = cards.find((item) => item.id === id);
+      if (!card) return reply.status(404).send({ message: 'Cartão não encontrado.' });
+      const charges = await cardCharges(tenantId, id);
+      const statement = cardStatement(charges);
+      return { card: { ...card, openBalance: statement.openBalance }, ...statement };
+    },
+  );
 
   fastify.post(
     '/company-cards',

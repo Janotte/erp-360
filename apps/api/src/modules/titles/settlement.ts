@@ -506,6 +506,7 @@ async function loadTitle(
       planAccountId: row.planAccountId,
       personId: row.creditorId,
       issueOn: row.issueOn,
+      companyCardId: row.companyCardId,
     };
   }
 
@@ -526,6 +527,7 @@ async function loadTitle(
     planAccountId: row.planAccountId,
     personId: row.debtorId,
     issueOn: row.issueOn,
+    companyCardId: null,
   };
 }
 
@@ -557,6 +559,7 @@ async function insertRemainderTitle(
         dueOn: params.dueOn,
         planAccountId: params.original.planAccountId,
         originalTitleId: params.original.id,
+        companyCardId: params.original.companyCardId,
         status: 'pendente',
       })
       .returning({ id: payables.id });

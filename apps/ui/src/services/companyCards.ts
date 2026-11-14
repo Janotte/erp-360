@@ -11,6 +11,24 @@ export interface CompanyCard {
   bankAccountId: string | null;
   bankAccountName: string | null;
   isActive: boolean;
+  openBalance: number;
+}
+
+export interface CardStatementEntry {
+  id: string;
+  occurredOn: string;
+  dueOn: string;
+  description: string;
+  documentId: string | null;
+  amount: number;
+  status: 'pendente' | 'pago' | 'cancelado';
+  balance: number;
+}
+
+export interface CardStatement {
+  card: CompanyCard;
+  openBalance: number;
+  entries: CardStatementEntry[];
 }
 
 export interface CompanyCardInput {
@@ -33,6 +51,10 @@ export const companyCardService = {
   list: async (): Promise<CompanyCard[]> => {
     const res = await apiFetch('/financial/company-cards');
     return parse(res, 'Falha ao carregar os cartões.');
+  },
+  statement: async (id: string): Promise<CardStatement> => {
+    const res = await apiFetch(`/financial/company-cards/${id}/statement`);
+    return parse(res, 'Falha ao carregar o extrato do cartão.');
   },
   create: async (dados: CompanyCardInput): Promise<CompanyCard> => {
     const res = await apiFetch('/financial/company-cards', {

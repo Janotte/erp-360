@@ -1,7 +1,10 @@
+import { civilDate, formatCurrency, formatRawDate } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { toast } from 'sonner';
 
+import { titleRowTextClass } from '@/components/Financial/titleRowTone';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -18,6 +21,13 @@ import { type CompanyCard, companyCardService } from '@/services/companyCards';
 import { personsService } from '@/services/persons';
 import { treasuryService } from '@/services/treasury';
 
+function chargeLabel(status: string, dueOn: string, today = civilDate()) {
+  if (status === 'pago') return 'Pago';
+  if (status === 'cancelado') return 'Cancelado';
+  if (dueOn < today) return 'Atrasado';
+  return 'Pendente';
+}
+
 const emptyForm = {
   name: '',
   issuerId: '',
@@ -30,6 +40,7 @@ const emptyForm = {
 
 export function CompanyCardsPage() {
   const queryClient = useQueryClient();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -38,6 +49,11 @@ export function CompanyCardsPage() {
   const cards = useQuery({
     queryKey: ['company-cards'],
     queryFn: companyCardService.list,
+  });
+  const statement = useQuery({
+    queryKey: ['company-cards', selectedId, 'statement'],
+    queryFn: () => companyCardService.statement(selectedId!),
+    enabled: Boolean(selectedId),
   });
   const accounts = useQuery({
     queryKey: ['treasury', 'bank-accounts'],
@@ -81,9 +97,10 @@ export function CompanyCardsPage() {
         ? companyCardService.update(editingId, payload)
         : companyCardService.create(payload);
     },
-    onSuccess: async () => {
+    onSuccess: async (saved) => {
       await queryClient.invalidateQueries({ queryKey: ['company-cards'] });
       setOpen(false);
+      setSelectedId(saved.id);
       toast.success('Cartão salvo.');
     },
     onError: (error: Error) => toast.error(error.message),
@@ -111,6 +128,9 @@ export function CompanyCardsPage() {
     setOpen(true);
   };
 
+  const selectedStatement =
+    statement.data?.card.id === selectedId ? statement.data : undefined;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -120,37 +140,120 @@ export function CompanyCardsPage() {
         </Button>
       </div>
       <p className="text-sm text-zinc-500">
-        A compra paga no cartão gera título para o emissor, no vencimento da fatura. O
-        fornecedor não fica em aberto.
+        Cada compra lançada no cartão entra no extrato. O saldo em aberto é o que ainda
+        não foi pago ao emissor.
       </p>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Nome</TableHead>
-            <TableHead>Emissor</TableHead>
-            <TableHead>Fechamento</TableHead>
-            <TableHead>Vencimento</TableHead>
-            <TableHead>Conta</TableHead>
-            <TableHead>Situação</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {(cards.data ?? []).map((card) => (
-            <TableRow
-              key={card.id}
-              className="cursor-pointer"
-              onClick={() => openEdit(card)}
-            >
-              <TableCell>{card.name}</TableCell>
-              <TableCell>{card.issuerName}</TableCell>
-              <TableCell>Dia {card.closingDay}</TableCell>
-              <TableCell>Dia {card.dueDay}</TableCell>
-              <TableCell>{card.bankAccountName || '—'}</TableCell>
-              <TableCell>{card.isActive ? 'Ativo' : 'Inativo'}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+        <div className="rounded-md border bg-white">
+          {cards.isLoading ? (
+            <p className="p-4 text-sm text-zinc-500">Carregando cartões...</p>
+          ) : (cards.data ?? []).length ? (
+            (cards.data ?? []).map((card) => (
+              <button
+                key={card.id}
+                type="button"
+                className={`flex w-full flex-col items-start border-b px-4 py-3 text-left last:border-b-0 ${
+                  selectedId === card.id ? 'bg-zinc-100' : 'hover:bg-zinc-50'
+                } ${card.isActive ? '' : 'text-zinc-400'}`}
+                onClick={() => setSelectedId(card.id)}
+              >
+                <span className="font-medium">{card.name}</span>
+                <span className="text-sm text-zinc-500">{card.issuerName}</span>
+                <span className="text-sm tabular-nums text-zinc-500">
+                  Em aberto {formatCurrency(card.openBalance ?? 0)}
+                </span>
+              </button>
+            ))
+          ) : (
+            <p className="p-4 text-sm text-zinc-500">Nenhum cartão cadastrado.</p>
+          )}
+        </div>
+
+        <div className="rounded-md border bg-white">
+          {selectedStatement ? (
+            <>
+              <div className="flex items-center justify-between border-b px-4 py-3">
+                <div>
+                  <p className="font-medium">{selectedStatement.card.name}</p>
+                  <p className="text-sm text-zinc-500">
+                    {selectedStatement.card.issuerName} · Fecha dia{' '}
+                    {selectedStatement.card.closingDay} · Vence dia{' '}
+                    {selectedStatement.card.dueDay}
+                  </p>
+                  <p className="text-sm text-zinc-500">
+                    Em aberto {formatCurrency(selectedStatement.openBalance)}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openEdit(selectedStatement.card)}
+                >
+                  Editar
+                </Button>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Histórico</TableHead>
+                    <TableHead>Vencimento</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead>Situação</TableHead>
+                    <TableHead className="text-right">Saldo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {selectedStatement.entries.length ? (
+                    selectedStatement.entries.map((entry) => (
+                      <TableRow
+                        key={entry.id}
+                        className={titleRowTextClass(entry.status, entry.dueOn)}
+                      >
+                        <TableCell>{formatRawDate(entry.occurredOn)}</TableCell>
+                        <TableCell>
+                          {entry.documentId ? (
+                            <Link
+                              to={`/inbound/${entry.documentId}`}
+                              className="hover:underline"
+                            >
+                              {entry.description}
+                            </Link>
+                          ) : (
+                            entry.description
+                          )}
+                        </TableCell>
+                        <TableCell>{formatRawDate(entry.dueOn)}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(entry.amount)}
+                        </TableCell>
+                        <TableCell>{chargeLabel(entry.status, entry.dueOn)}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(entry.balance)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-4 text-center text-zinc-500">
+                        Nenhuma compra neste cartão.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </>
+          ) : (
+            <p className="p-6 text-sm text-zinc-500">
+              {statement.isLoading
+                ? 'Carregando extrato...'
+                : statement.isError
+                  ? 'Não foi possível carregar o extrato.'
+                  : 'Selecione um cartão para ver o extrato.'}
+            </p>
+          )}
+        </div>
+      </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

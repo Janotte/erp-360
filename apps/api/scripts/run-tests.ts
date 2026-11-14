@@ -31,6 +31,7 @@ const child = spawn(
     'tsx',
     '--test',
     'test/cash-flow.test.ts',
+    'test/card-statement.test.ts',
     'test/certificate.test.ts',
     'test/certificate-delete.test.ts',
     'test/inbound-cost.test.ts',
