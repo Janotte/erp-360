@@ -202,7 +202,7 @@ export function ListItems() {
               <TableHead>Tipo</TableHead>
               <TableHead>Medida</TableHead>
               <TableHead>Disponível</TableHead>
-              <TableHead>Situação</TableHead>
+              <TableHead>Preço de lista</TableHead>
               <TableHead>Custo médio</TableHead>
               <TableHead>Margem</TableHead>
               <TableHead>Última entrada</TableHead>
@@ -218,7 +218,7 @@ export function ListItems() {
                 <TableCell>{catalogItemTypeLabels[item.type]}</TableCell>
                 <TableCell>{item.measureAbbreviation}</TableCell>
                 <TableCell>{formatAvailable(item)}</TableCell>
-                <TableCell>{item.isActive ? 'Ativo' : 'Inativo'}</TableCell>
+                <TableCell>{formatMoney4(item.listPrice)}</TableCell>
                 <TableCell>{formatMoney4(item.averageCost)}</TableCell>
                 <TableCell>{formatPercent(item.grossMargin)}</TableCell>
                 <TableCell>{formatRawDate(item.lastInboundOn) || '—'}</TableCell>
