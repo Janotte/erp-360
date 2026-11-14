@@ -28,6 +28,7 @@ export interface FinancialAccount {
   status: 'pendente' | 'pago' | 'recebido' | 'cancelado';
   personName?: string;
   planAccountId?: string;
+  companyCardId?: string | null;
   invoiceNumber?: string;
   bearerName?: string;
   barcode?: string;
@@ -66,6 +67,7 @@ function fromPayable(row: PayableTitle): FinancialAccount {
     status: row.status,
     personName: definedText(row.personName),
     planAccountId: definedText(row.planAccountId),
+    companyCardId: definedText(row.companyCardId),
   };
 }
 
@@ -124,6 +126,7 @@ function toCreatePayload(
       installmentAmount: dados.installmentAmount,
       dueOn: dados.dueOn,
       planAccountId: dados.planAccountId,
+      companyCardId: 'companyCardId' in dados ? (dados.companyCardId ?? null) : null,
     };
   }
 
@@ -157,6 +160,7 @@ export interface CreatePayableInput {
   installmentAmount: number;
   dueOn: string;
   planAccountId?: string;
+  companyCardId?: string | null;
 }
 
 export interface CreateReceivableInput {

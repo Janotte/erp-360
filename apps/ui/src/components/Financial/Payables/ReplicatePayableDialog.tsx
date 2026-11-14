@@ -113,6 +113,7 @@ export function ReplicatePayableDialog({
           description: source.description,
           installmentAmount,
           planAccountId: source.planAccountId || undefined,
+          companyCardId: source.companyCardId || null,
           issueOn: dates.issueOn,
           dueOn: dates.dueOn,
           documentNumber:
@@ -129,6 +130,7 @@ export function ReplicatePayableDialog({
     },
     onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ['financial', 'payable'] });
+      queryClient.invalidateQueries({ queryKey: ['company-cards'] });
       toast.success(
         count === 1
           ? 'Conta a pagar replicada com sucesso!'

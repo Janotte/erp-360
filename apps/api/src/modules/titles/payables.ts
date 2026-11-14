@@ -1,6 +1,6 @@
 import '../../types/fastify.ts';
 
-import { payables } from '@erp-360/mod-financial';
+import { companyCards, payables } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
 import {
   escapeIlike,
@@ -37,7 +37,27 @@ const createPayableSchema = z.object({
     .positive('O valor deve ser maior que zero.'),
   dueOn: dateString,
   planAccountId: z.string().uuid().optional(),
+  companyCardId: z.string().uuid().nullable().optional(),
 });
+
+type CardCharge =
+  | { ok: true; companyCardId: string | null; creditorId: string | null }
+  | { ok: false; message: string };
+
+/** Cobrança de cartão fica com o emissor, para entrar na fatura e não no fornecedor. */
+async function cardCharge(
+  tenantId: string,
+  companyCardId: string | null | undefined,
+): Promise<CardCharge> {
+  if (!companyCardId) return { ok: true, companyCardId: null, creditorId: null };
+  const [card] = await db
+    .select({ id: companyCards.id, issuerId: companyCards.issuerId })
+    .from(companyCards)
+    .where(and(eq(companyCards.id, companyCardId), eq(companyCards.tenantId, tenantId)))
+    .limit(1);
+  if (!card) return { ok: false, message: 'Cartão não encontrado.' };
+  return { ok: true, companyCardId: card.id, creditorId: card.issuerId };
+}
 
 const paySchema = z.object({
   settledOn: dateString,
@@ -79,21 +99,29 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
   fastify.post(
     '/',
-    { schema: { body: createPayableSchema, response: { 201: payableTitleSchema } } },
+    {
+      schema: {
+        body: createPayableSchema,
+        response: { 201: payableTitleSchema, 400: errorMessageSchema },
+      },
+    },
     async (request, reply) => {
       const { tenantId } = request.user;
       const data = request.body;
+      const charge = await cardCharge(tenantId, data.companyCardId);
+      if (!charge.ok) return reply.status(400).send({ message: charge.message });
 
       const [newAccount] = await db
         .insert(payables)
         .values({
-          creditorId: data.creditorId,
+          creditorId: charge.creditorId ?? data.creditorId,
           documentNumber: data.documentNumber || null,
           description: data.description,
           issueOn: data.issueOn,
           installmentAmount: data.installmentAmount,
           dueOn: data.dueOn,
           planAccountId: data.planAccountId || null,
+          companyCardId: charge.companyCardId,
           tenantId,
           status: 'pendente',
         })
@@ -287,16 +315,20 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
         });
       }
 
+      const charge = await cardCharge(tenantId, data.companyCardId);
+      if (!charge.ok) return reply.status(400).send({ message: charge.message });
+
       const [updated] = await db
         .update(payables)
         .set({
-          creditorId: data.creditorId,
+          creditorId: charge.creditorId ?? data.creditorId,
           documentNumber: data.documentNumber || null,
           description: data.description,
           issueOn: data.issueOn,
           installmentAmount: data.installmentAmount,
           dueOn: data.dueOn,
           planAccountId: data.planAccountId || null,
+          companyCardId: charge.companyCardId,
         })
         .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
         .returning();

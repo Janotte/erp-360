@@ -16,6 +16,7 @@ export const payableTitleSchema = z.object({
   paidAmount: cents,
   status: z.enum(['pendente', 'pago', 'cancelado']),
   planAccountId: id,
+  companyCardId: id,
   personName: text,
 });
 

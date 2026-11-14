@@ -5,6 +5,7 @@ import {
   formatRawDate,
   maskCurrencyInput,
   parseCurrencyToCents,
+  statementDueDates,
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
@@ -15,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { companyCardService } from '@/services/companyCards';
 import {
   type CreatePayableInput,
   type FinancialAccount,
@@ -42,6 +44,7 @@ export function PayableForm({
   const [dueOn, setDueOn] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [planAccountId, setPlanAccountId] = useState('');
+  const [companyCardId, setCompanyCardId] = useState('');
 
   useEffect(() => {
     if (!accountToUpdate) return;
@@ -52,11 +55,16 @@ export function PayableForm({
     setDueOn(accountToUpdate.dueOn?.slice(0, 10) || '');
     setAmountStr(formatCurrencyInput(accountToUpdate.installmentAmount));
     setPlanAccountId(accountToUpdate.planAccountId || '');
+    setCompanyCardId(accountToUpdate.companyCardId || '');
   }, [accountToUpdate]);
 
   const { data: planAccounts = [] } = useQuery({
     queryKey: ['financial', 'plan-accounts'],
     queryFn: () => financialService.listPlanAccounts({ acceptsEntries: true }),
+  });
+  const cards = useQuery({
+    queryKey: ['company-cards'],
+    queryFn: companyCardService.list,
   });
 
   const mutation = useMutation({
@@ -66,6 +74,7 @@ export function PayableForm({
         : financialService.create('payable', dados),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['financial', 'payable'] });
+      queryClient.invalidateQueries({ queryKey: ['company-cards'] });
       toast.success(
         accountToUpdate
           ? 'Conta a pagar atualizada com sucesso!'
@@ -90,7 +99,23 @@ export function PayableForm({
       installmentAmount,
       dueOn,
       planAccountId: planAccountId || undefined,
+      companyCardId: companyCardId || null,
     });
+  };
+
+  const selectCard = (nextId: string) => {
+    setCompanyCardId(nextId);
+    const card = (cards.data ?? []).find((item) => item.id === nextId);
+    if (!card) return;
+    setPersonId(card.issuerId);
+    if (dueOn) return;
+    const base = issueOn || civilDate();
+    try {
+      const [due] = statementDueDates(base, card.closingDay, card.dueDay, 1);
+      if (due) setDueOn(due);
+    } catch {
+      // A emissão informada segue editável e o vencimento fica para o usuário.
+    }
   };
 
   const showSettlement =
@@ -119,6 +144,28 @@ export function PayableForm({
       )}
 
       <div className="space-y-1">
+        <Label>Cartão</Label>
+        <CatalogSearchSelect
+          value={companyCardId}
+          onChange={selectCard}
+          options={(cards.data ?? [])
+            .filter((card) => card.isActive || card.id === companyCardId)
+            .map((card) => ({ id: card.id, label: card.name }))}
+          placeholder="Sem cartão"
+          emptyMessage="Nenhum cartão cadastrado."
+          allowClear={!readOnly}
+          disabled={readOnly}
+          isLoading={cards.isLoading}
+        />
+        {companyCardId ? (
+          <p className="text-sm text-zinc-500">
+            Entra na fatura do cartão. O credor fica o emissor; a descrição identifica o
+            gasto.
+          </p>
+        ) : null}
+      </div>
+
+      <div className="space-y-1">
         <Label>Credor</Label>
         <PersonSearchSelect
           value={personId}
@@ -126,7 +173,7 @@ export function PayableForm({
           type={['fornecedor', 'colaborador', 'instituicao']}
           placeholder="Buscar fornecedor, colaborador ou instituição..."
           required={!readOnly}
-          disabled={readOnly}
+          disabled={readOnly || Boolean(companyCardId)}
         />
       </div>
 
