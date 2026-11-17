@@ -56,6 +56,8 @@ const listItemsQuery = z.object({
   sortField: z.enum(['code', 'name']).default('code'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
   busca: z.string().optional(),
+  type: z.enum(catalogItemTypes).optional(),
+  isActive: z.enum(['true', 'false']).optional(),
 });
 
 type ItemBody = z.infer<typeof itemBodySchema>;
@@ -359,9 +361,19 @@ export const itemRoutes: FastifyPluginAsyncZod = async (fastify) => {
 
   fastify.get('/', { schema: { querystring: listItemsQuery } }, async (request) => {
     const { tenantId } = request.user;
-    const { page, limit, sortField, sortOrder, busca: search } = request.query;
+    const {
+      page,
+      limit,
+      sortField,
+      sortOrder,
+      busca: search,
+      type,
+      isActive,
+    } = request.query;
     const offset = (page - 1) * limit;
     const conditions = [eq(catalogItems.tenantId, tenantId)];
+    if (type) conditions.push(eq(catalogItems.type, type));
+    if (isActive) conditions.push(eq(catalogItems.isActive, isActive === 'true'));
 
     if (search?.trim()) {
       const like = `%${escapeIlike(search.trim())}%`;

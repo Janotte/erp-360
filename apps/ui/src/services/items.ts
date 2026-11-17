@@ -66,6 +66,8 @@ export interface ItemFilters {
   sortField: 'code' | 'name';
   sortOrder: 'asc' | 'desc';
   search?: string;
+  type?: CatalogItemType;
+  isActive?: boolean;
 }
 
 export interface ItemListResponse {
@@ -96,6 +98,8 @@ export const itemsService = {
       sortField: filters.sortField,
       sortOrder: filters.sortOrder,
       ...(filters.search && { busca: filters.search }),
+      ...(filters.type && { type: filters.type }),
+      ...(filters.isActive !== undefined && { isActive: String(filters.isActive) }),
     });
     const res = await apiFetch(`/catalog/items?${params.toString()}`);
     const body = await readBody(res);

@@ -22,6 +22,8 @@ interface CatalogSearchSelectProps {
   disabled?: boolean;
   id?: string;
   enterSequence?: boolean;
+  /** Quando informado, a busca vai para quem chamou em vez de filtrar as opções locais. */
+  onSearch?: (term: string) => void;
 }
 
 export function CatalogSearchSelect({
@@ -36,6 +38,7 @@ export function CatalogSearchSelect({
   disabled = false,
   id,
   enterSequence = false,
+  onSearch,
 }: CatalogSearchSelectProps) {
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -62,11 +65,21 @@ export function CatalogSearchSelect({
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, []);
 
+  const onSearchRef = useRef(onSearch);
+  onSearchRef.current = onSearch;
+
+  useEffect(() => {
+    if (!onSearch) return;
+    const timer = setTimeout(() => onSearchRef.current?.(searchText.trim()), 400);
+    return () => clearTimeout(timer);
+  }, [onSearch, searchText]);
+
   const results = useMemo(() => {
+    if (onSearch) return options;
     const term = fold(searchText.trim());
     if (!term) return options;
     return options.filter((item) => fold(item.label).includes(term));
-  }, [options, searchText]);
+  }, [onSearch, options, searchText]);
 
   const pick = (item: CatalogOption) => {
     onChange(item.id);

@@ -571,11 +571,6 @@ export function FormServiceOrder() {
     queryFn: () => serviceOrdersService.get(id ?? ''),
     enabled: Boolean(id),
   });
-  const catalog = useQuery({
-    queryKey: ['catalog-items', 'service-order'],
-    queryFn: () =>
-      itemsService.list({ page: 1, limit: 100, sortField: 'name', sortOrder: 'asc' }),
-  });
   const methods = useQuery({
     queryKey: ['payment-methods', 'service-order'],
     queryFn: () =>
@@ -714,12 +709,6 @@ export function FormServiceOrder() {
   );
   const allocationTerms = [...(allocationMethod?.terms ?? [])].sort(
     (left, right) => left.installmentCount - right.installmentCount,
-  );
-  const products = (catalog.data?.data ?? []).filter(
-    (item) => item.type === 'product' && item.isActive,
-  );
-  const services = (catalog.data?.data ?? []).filter(
-    (item) => item.type === 'service' && item.isActive,
   );
   const {
     productAmount,
@@ -1312,7 +1301,6 @@ export function FormServiceOrder() {
         title={productsTitle}
         kind="product"
         lines={draft.lines}
-        items={products}
         pickerKey={productPicker}
         locked={locked}
         onAdd={(item) => {
@@ -1327,7 +1315,6 @@ export function FormServiceOrder() {
         title={servicesTitle}
         kind="service"
         lines={draft.lines}
-        items={services}
         pickerKey={servicePicker}
         locked={locked}
         onAdd={(item) => {
@@ -1655,7 +1642,6 @@ function LineTable({
   title,
   kind,
   lines,
-  items,
   pickerKey,
   locked,
   onAdd,
@@ -1666,7 +1652,6 @@ function LineTable({
   title: string;
   kind: 'product' | 'service';
   lines: DraftLine[];
-  items: CatalogItem[];
   pickerKey: number;
   locked: boolean;
   onAdd: (item: CatalogItem) => void;
@@ -1674,6 +1659,27 @@ function LineTable({
   onRemove: (index: number) => void;
   onTechnician: (index: number, personId: string) => void;
 }) {
+  const [term, setTerm] = useState('');
+
+  useEffect(() => {
+    setTerm('');
+  }, [pickerKey]);
+
+  const search = useQuery({
+    queryKey: ['catalog-items', 'service-order', kind, term],
+    queryFn: () =>
+      itemsService.list({
+        page: 1,
+        limit: 100,
+        sortField: 'name',
+        sortOrder: 'asc',
+        search: term,
+        type: kind,
+        isActive: true,
+      }),
+    enabled: term.length > 0,
+  });
+  const items = search.data?.data ?? [];
   const visible = lines
     .map((line, index) => ({ line, index }))
     .filter((entry) => entry.line.kind === kind);
@@ -1693,11 +1699,15 @@ function LineTable({
             id: item.id,
             label: `${item.code} — ${item.name}`,
           }))}
+          onSearch={setTerm}
+          isLoading={search.isFetching}
           placeholder={
             kind === 'product' ? 'Buscar produto ativo...' : 'Buscar serviço ativo...'
           }
           emptyMessage={
-            kind === 'product' ? 'Nenhum produto ativo.' : 'Nenhum serviço ativo.'
+            kind === 'product'
+              ? 'Digite para buscar um produto.'
+              : 'Digite para buscar um serviço.'
           }
         />
       )}
