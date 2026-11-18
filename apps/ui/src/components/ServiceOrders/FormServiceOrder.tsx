@@ -1777,11 +1777,24 @@ function LineTable({
   onRemove: (index: number) => void;
   onTechnician: (index: number, personId: string) => void;
 }) {
+  const sectionRef = useRef<HTMLElement>(null);
+  const focusNewLine = useRef(false);
   const [term, setTerm] = useState('');
 
   useEffect(() => {
     setTerm('');
   }, [pickerKey]);
+
+  useEffect(() => {
+    if (!focusNewLine.current) return;
+    focusNewLine.current = false;
+    const section = sectionRef.current;
+    requestAnimationFrame(() => {
+      section
+        ?.querySelector<HTMLElement>('tbody tr:last-child [data-enter-sequence]')
+        ?.focus();
+    });
+  }, [lines]);
 
   const search = useQuery({
     queryKey: ['catalog-items', 'service-order', kind, term],
@@ -1803,15 +1816,18 @@ function LineTable({
     .filter((entry) => entry.line.kind === kind);
 
   return (
-    <section className="space-y-3 rounded-lg border bg-white p-6">
+    <section ref={sectionRef} className="space-y-3 rounded-lg border bg-white p-6">
       <h3 className="text-lg font-semibold text-zinc-900">{title}</h3>
       {locked ? null : (
         <CatalogSearchSelect
           key={pickerKey}
           value=""
+          enterSequence
           onChange={(itemId) => {
             const item = items.find((entry) => entry.id === itemId);
-            if (item) onAdd(item);
+            if (!item) return;
+            focusNewLine.current = true;
+            onAdd(item);
           }}
           options={items.map((item) => ({
             id: item.id,
@@ -1891,6 +1907,7 @@ function LineTable({
                         placeholder="Técnico"
                         allowClear
                         disabled={locked}
+                        enterSequence
                       />
                     </td>
                   ) : null}
