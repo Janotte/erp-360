@@ -146,6 +146,8 @@ type Draft = {
   customerEmail: string;
   customerPostalCode: string;
   customerStreetLine: string;
+  customerStreetNumber: string;
+  customerStreetComplement: string;
   customerNeighborhood: string;
   customerCityLine: string;
   freight: string;
@@ -249,6 +251,31 @@ function splitStreetPostal(value: string) {
   };
 }
 
+function splitAddress(line: string) {
+  const parts = line
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length <= 1) {
+    return { street: parts[0] ?? '', number: '', complement: '' };
+  }
+  if (parts.length === 2) {
+    return { street: parts[0] ?? '', number: parts[1] ?? '', complement: '' };
+  }
+  return {
+    street: parts.slice(0, -2).join(', '),
+    number: parts[parts.length - 2] ?? '',
+    complement: parts[parts.length - 1] ?? '',
+  };
+}
+
+function joinAddress(street: string, number: string, complement: string) {
+  return [street, number, complement]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(', ');
+}
+
 function joinStreetPostal(street: string, postal: string) {
   const line = street.trim();
   const digits = onlyDigits(postal);
@@ -313,6 +340,8 @@ function emptyDraft(settings: ServiceOrderSettings): Draft {
     customerEmail: '',
     customerPostalCode: '',
     customerStreetLine: '',
+    customerStreetNumber: '',
+    customerStreetComplement: '',
     customerNeighborhood: '',
     customerCityLine: '',
     freight: '',
@@ -339,6 +368,7 @@ function emptyDraft(settings: ServiceOrderSettings): Draft {
 
 function draftFromOrder(order: ServiceOrderDetail): Draft {
   const address = splitStreetPostal(order.customerStreetLine ?? '');
+  const street = splitAddress(address.street);
   return {
     personId: order.personId,
     attendance: order.attendance,
@@ -355,7 +385,9 @@ function draftFromOrder(order: ServiceOrderDetail): Draft {
     customerWhatsapp: formatPhone(order.customerWhatsapp ?? ''),
     customerEmail: order.customerEmail ?? '',
     customerPostalCode: address.postal,
-    customerStreetLine: address.street,
+    customerStreetLine: street.street,
+    customerStreetNumber: street.number,
+    customerStreetComplement: street.complement,
     customerNeighborhood: order.customerNeighborhood ?? '',
     customerCityLine: order.customerCityLine ?? '',
     freight: formatInput(order.freightAmount),
@@ -443,7 +475,14 @@ function toWrite(draft: Draft, status: ServiceOrderStatus): ServiceOrderWrite {
     customerWhatsapp: emptyToNull(draft.customerWhatsapp),
     customerEmail: emptyToNull(draft.customerEmail),
     customerStreetLine: emptyToNull(
-      joinStreetPostal(draft.customerStreetLine, draft.customerPostalCode),
+      joinStreetPostal(
+        joinAddress(
+          draft.customerStreetLine,
+          draft.customerStreetNumber,
+          draft.customerStreetComplement,
+        ),
+        draft.customerPostalCode,
+      ),
     ),
     customerNeighborhood: emptyToNull(draft.customerNeighborhood),
     customerCityLine: emptyToNull(draft.customerCityLine),
@@ -536,12 +575,6 @@ async function copyFromPerson(personId: string) {
   const contact = contacts.find((item) => item.type === 'Principal');
   const address = addresses.find((item) => item.type === 'Principal');
   const postal = address?.postalCode ? formatPostalCode(address.postalCode) : '';
-  const street = address
-    ? [address.street, address.number, address.complement]
-        .map((part) => part?.trim() ?? '')
-        .filter(Boolean)
-        .join(', ')
-    : '';
   return {
     customerName: person.name,
     customerTaxId: formatCpfOrCnpj(person.taxId?.trim() ?? ''),
@@ -550,7 +583,9 @@ async function copyFromPerson(personId: string) {
     customerWhatsapp: formatPhone(contact?.whatsapp?.trim() ?? ''),
     customerEmail: contact?.email?.trim() ?? '',
     customerPostalCode: postal,
-    customerStreetLine: street.slice(0, 200),
+    customerStreetLine: address?.street?.trim() ?? '',
+    customerStreetNumber: address?.number?.trim() ?? '',
+    customerStreetComplement: address?.complement?.trim() ?? '',
     customerNeighborhood: address?.neighborhood?.trim() ?? '',
     customerCityLine:
       address?.cityName && address.stateAbbreviation
@@ -1028,11 +1063,6 @@ export function FormServiceOrder() {
           <h2 className="text-2xl font-bold text-zinc-900">
             {order.data ? `Ordem ${order.data.numberLabel}` : 'Nova ordem'}
           </h2>
-          <p className="text-sm text-zinc-500">
-            {closed
-              ? 'Ordem encerrada. Só a nota interna ainda pode mudar.'
-              : 'Cliente, campos do objeto, itens e previsão de pagamento.'}
-          </p>
         </div>
         <Button variant="outline" asChild>
           <Link to="/service-orders">Voltar à lista</Link>
@@ -1041,7 +1071,7 @@ export function FormServiceOrder() {
 
       <section className="space-y-4 rounded-lg border bg-white p-6">
         <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 space-y-1.5 md:col-span-8">
+          <div className="col-span-12 space-y-1.5 md:col-span-12">
             <Label>Cliente</Label>
             <PersonSearchSelect
               value={draft.personId}
@@ -1052,138 +1082,6 @@ export function FormServiceOrder() {
               enterSequence
               allowCreate={!locked}
             />
-          </div>
-          <div className="col-span-6 space-y-1.5 md:col-span-2">
-            <Label htmlFor="service-order-attendance">Tipo de atendimento</Label>
-            <select
-              id="service-order-attendance"
-              className={selectClass}
-              data-enter-sequence=""
-              value={draft.attendance}
-              disabled={locked}
-              onChange={(event) => {
-                const attendance = event.target.value as ServiceOrderAttendance;
-                patch({
-                  attendance,
-                  originOrderId:
-                    attendance === 'contract'
-                      ? ''
-                      : needsOrigin(attendance)
-                        ? draft.originOrderId
-                        : '',
-                  contractId: attendance === 'contract' ? draft.contractId : '',
-                });
-              }}
-            >
-              {(Object.keys(attendanceLabels) as ServiceOrderAttendance[]).map(
-                (value) => (
-                  <option key={value} value={value}>
-                    {attendanceLabels[value]}
-                  </option>
-                ),
-              )}
-            </select>
-          </div>
-          <div className="col-span-6 space-y-1.5 md:col-span-2">
-            <Label htmlFor="service-order-location">Local de atendimento</Label>
-            <select
-              id="service-order-location"
-              className={selectClass}
-              data-enter-sequence=""
-              value={draft.location}
-              disabled={locked}
-              onChange={(event) =>
-                patch({ location: event.target.value as ServiceOrderLocation })
-              }
-            >
-              {(Object.keys(locationLabels) as ServiceOrderLocation[]).map((value) => (
-                <option key={value} value={value}>
-                  {locationLabels[value]}
-                </option>
-              ))}
-            </select>
-          </div>
-          {needsOrigin(draft.attendance) ? (
-            <div className="col-span-12 space-y-1.5 md:col-span-4">
-              <Label htmlFor="service-order-origin">Ordem de origem</Label>
-              <select
-                id="service-order-origin"
-                className={selectClass}
-                data-enter-sequence=""
-                value={draft.originOrderId}
-                disabled={locked}
-                onChange={(event) => patch({ originOrderId: event.target.value })}
-              >
-                <option value="">Sem origem</option>
-                {(origins.data?.data ?? [])
-                  .filter((item) => item.id !== (id ?? createdId.current))
-                  .map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.numberLabel} — {item.customerName}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          ) : null}
-          {draft.attendance === 'contract' ? (
-            <div className="col-span-12 space-y-1.5 md:col-span-6">
-              <Label htmlFor="service-order-contract">Contrato</Label>
-              <select
-                id="service-order-contract"
-                className={selectClass}
-                value={draft.contractId}
-                disabled={locked || !draft.personId}
-                onChange={(event) => patch({ contractId: event.target.value })}
-              >
-                <option value="">Sem contrato</option>
-                {contractOptions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.title
-                      ? `${item.numberLabel} — ${item.title}`
-                      : item.numberLabel}
-                  </option>
-                ))}
-              </select>
-              <p className="text-sm text-zinc-500">
-                A cobrança do período não abate os itens desta ordem.
-              </p>
-            </div>
-          ) : null}
-          <div className="col-span-12 space-y-1.5 md:col-span-6">
-            <Label htmlFor="service-order-promised">Previsão</Label>
-            <Input
-              id="service-order-promised"
-              type="datetime-local"
-              data-enter-sequence=""
-              value={toLocalInput(draft.promisedAt)}
-              disabled={locked}
-              onChange={(event) =>
-                patch({
-                  promisedAt: event.target.value
-                    ? new Date(event.target.value).toISOString()
-                    : null,
-                })
-              }
-            />
-          </div>
-          <div className="col-span-12 space-y-1.5 md:col-span-6">
-            <Label htmlFor="service-order-status">Situação</Label>
-            <select
-              id="service-order-status"
-              className={selectClass}
-              data-enter-sequence=""
-              value={draft.status}
-              disabled={locked}
-              onChange={(event) =>
-                patch({ status: event.target.value as ServiceOrderStatus })
-              }
-            >
-              {destinations.map((value) => (
-                <option key={value} value={value}>
-                  {statusLabels[value]}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
 
@@ -1249,7 +1147,7 @@ export function FormServiceOrder() {
             <div className="grid grid-cols-12 gap-4 md:col-span-2">
               <CopyField
                 id="service-order-customer-postal-code"
-                className="col-span-12 sm:col-span-3"
+                className="col-span-12 sm:col-span-2"
                 label="CEP"
                 value={draft.customerPostalCode}
                 disabled={locked}
@@ -1261,15 +1159,33 @@ export function FormServiceOrder() {
               />
               <CopyField
                 id="service-order-customer-street"
-                className="col-span-12 sm:col-span-9"
+                className="col-span-12 sm:col-span-8"
                 label="Endereço"
                 value={draft.customerStreetLine}
                 disabled={locked}
                 onChange={(customerStreetLine) => patch({ customerStreetLine })}
               />
               <CopyField
+                id="service-order-customer-street-number"
+                className="col-span-12 sm:col-span-2"
+                label="Número"
+                value={draft.customerStreetNumber}
+                disabled={locked}
+                onChange={(customerStreetNumber) => patch({ customerStreetNumber })}
+              />
+              <CopyField
+                id="service-order-customer-street-complement"
+                className="col-span-12 sm:col-span-4"
+                label="Complemento"
+                value={draft.customerStreetComplement}
+                disabled={locked}
+                onChange={(customerStreetComplement) =>
+                  patch({ customerStreetComplement })
+                }
+              />
+              <CopyField
                 id="service-order-customer-neighborhood"
-                className="col-span-12 sm:col-span-6"
+                className="col-span-12 sm:col-span-4"
                 label="Bairro"
                 value={draft.customerNeighborhood}
                 disabled={locked}
@@ -1277,7 +1193,7 @@ export function FormServiceOrder() {
               />
               <CopyField
                 id="service-order-customer-city"
-                className="col-span-12 sm:col-span-6"
+                className="col-span-12 sm:col-span-4"
                 label="Cidade"
                 value={draft.customerCityLine}
                 disabled={locked}
@@ -1550,6 +1466,145 @@ export function FormServiceOrder() {
       ) : null}
 
       <section className="space-y-4 rounded-lg border bg-white p-6">
+        <h3 className="text-lg font-semibold text-zinc-900">Informações adicionais</h3>
+        <div className="grid grid-cols-12 gap-4">
+          <div className="col-span-12 space-y-1.5 md:col-span-6">
+            <Label htmlFor="service-order-promised">Previsão</Label>
+            <Input
+              id="service-order-promised"
+              type="datetime-local"
+              data-enter-sequence=""
+              value={toLocalInput(draft.promisedAt)}
+              disabled={locked}
+              onChange={(event) =>
+                patch({
+                  promisedAt: event.target.value
+                    ? new Date(event.target.value).toISOString()
+                    : null,
+                })
+              }
+            />
+          </div>
+          <div className="col-span-12 space-y-1.5 md:col-span-6">
+            <Label htmlFor="service-order-status">Situação</Label>
+            <select
+              id="service-order-status"
+              className={selectClass}
+              data-enter-sequence=""
+              value={draft.status}
+              disabled={locked}
+              onChange={(event) =>
+                patch({ status: event.target.value as ServiceOrderStatus })
+              }
+            >
+              {destinations.map((value) => (
+                <option key={value} value={value}>
+                  {statusLabels[value]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-span-6 space-y-1.5 md:col-span-6">
+            <Label htmlFor="service-order-location">Local de atendimento</Label>
+            <select
+              id="service-order-location"
+              className={selectClass}
+              data-enter-sequence=""
+              value={draft.location}
+              disabled={locked}
+              onChange={(event) =>
+                patch({ location: event.target.value as ServiceOrderLocation })
+              }
+            >
+              {(Object.keys(locationLabels) as ServiceOrderLocation[]).map((value) => (
+                <option key={value} value={value}>
+                  {locationLabels[value]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-span-6 space-y-1.5 md:col-span-6">
+            <Label htmlFor="service-order-attendance">Tipo de atendimento</Label>
+            <select
+              id="service-order-attendance"
+              className={selectClass}
+              data-enter-sequence=""
+              value={draft.attendance}
+              disabled={locked}
+              onChange={(event) => {
+                const attendance = event.target.value as ServiceOrderAttendance;
+                patch({
+                  attendance,
+                  originOrderId:
+                    attendance === 'contract'
+                      ? ''
+                      : needsOrigin(attendance)
+                        ? draft.originOrderId
+                        : '',
+                  contractId: attendance === 'contract' ? draft.contractId : '',
+                });
+              }}
+            >
+              {(Object.keys(attendanceLabels) as ServiceOrderAttendance[]).map(
+                (value) => (
+                  <option key={value} value={value}>
+                    {attendanceLabels[value]}
+                  </option>
+                ),
+              )}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-12 gap-4">
+          {needsOrigin(draft.attendance) ? (
+            <div className="col-span-12 space-y-1.5 md:col-span-4">
+              <Label htmlFor="service-order-origin">Ordem de origem</Label>
+              <select
+                id="service-order-origin"
+                className={selectClass}
+                data-enter-sequence=""
+                value={draft.originOrderId}
+                disabled={locked}
+                onChange={(event) => patch({ originOrderId: event.target.value })}
+              >
+                <option value="">Sem origem</option>
+                {(origins.data?.data ?? [])
+                  .filter((item) => item.id !== (id ?? createdId.current))
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.numberLabel} — {item.customerName}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          ) : null}
+          {draft.attendance === 'contract' ? (
+            <div className="col-span-12 space-y-1.5 md:col-span-6">
+              <Label htmlFor="service-order-contract">Contrato</Label>
+              <select
+                id="service-order-contract"
+                className={selectClass}
+                value={draft.contractId}
+                disabled={locked || !draft.personId}
+                onChange={(event) => patch({ contractId: event.target.value })}
+              >
+                <option value="">Sem contrato</option>
+                {contractOptions.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.title
+                      ? `${item.numberLabel} — ${item.title}`
+                      : item.numberLabel}
+                  </option>
+                ))}
+              </select>
+              <p className="text-sm text-zinc-500">
+                A cobrança do período não abate os itens desta ordem.
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </section>
+      <section className="space-y-4 rounded-lg border bg-white p-6">
         <h3 className="text-lg font-semibold text-zinc-900">Observações</h3>
         {visibleNotes.length ? (
           <div className="space-y-3">
@@ -1619,7 +1674,9 @@ export function FormServiceOrder() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={reverseDelivery.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={reverseDelivery.isPending}>
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
               disabled={reverseDelivery.isPending}
               onClick={(event) => {
