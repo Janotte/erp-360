@@ -243,6 +243,14 @@ export async function generateServiceOrderBillings(
 
   try {
     await db.transaction(async (tx) => {
+      const [locked] = await tx
+        .select({ status: serviceOrders.status })
+        .from(serviceOrders)
+        .where(and(eq(serviceOrders.id, orderId), eq(serviceOrders.tenantId, tenantId)))
+        .limit(1)
+        .for('update');
+      if (!locked || locked.status !== 'delivered') httpError(messages.notDelivered, 400);
+
       let planId = order.paymentPlanId;
       if (!planId) {
         const [plan] = await tx

@@ -289,6 +289,13 @@ export const serviceOrdersService = {
     return body as unknown as ServiceOrderDetail;
   },
 
+  reverse: async (id: string): Promise<ServiceOrderDetail> => {
+    const res = await apiFetch(`/service-orders/${id}/reversal`, { method: 'POST' });
+    const body = await readBody(res);
+    if (!res.ok) throw new Error(messageOf(body, 'Não foi possível estornar a entrega.'));
+    return body as unknown as ServiceOrderDetail;
+  },
+
   save: async (id: string, input: ServiceOrderWrite): Promise<ServiceOrderDetail> => {
     const res = await apiFetch(`/service-orders/${id}`, {
       method: 'PUT',

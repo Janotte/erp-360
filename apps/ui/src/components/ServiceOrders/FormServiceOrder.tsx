@@ -18,6 +18,16 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 
 import { PersonSearchSelect } from '@/components/Persons/PersonSearchSelect';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
 import { Input } from '@/components/ui/input';
@@ -560,6 +570,7 @@ export function FormServiceOrder() {
   const [allocationMethodId, setAllocationMethodId] = useState('');
   const [allocationInstallments, setAllocationInstallments] = useState('');
   const [allocationAmount, setAllocationAmount] = useState('');
+  const [reverseOpen, setReverseOpen] = useState(false);
   const amountTouched = useRef(false);
 
   const settings = useQuery({
@@ -644,6 +655,22 @@ export function FormServiceOrder() {
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Falha ao salvar a ordem.');
+    },
+  });
+
+  const reverseDelivery = useMutation({
+    mutationFn: async () => {
+      if (!id) throw new Error('A ordem ainda não foi gravada.');
+      return serviceOrdersService.reverse(id);
+    },
+    onSuccess: (saved) => {
+      queryClient.setQueryData(['service-order', saved.id], saved);
+      void queryClient.invalidateQueries({ queryKey: ['service-orders'] });
+      setReverseOpen(false);
+      toast.success('Entrega estornada.');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Não foi possível estornar a entrega.');
     },
   });
 
@@ -1564,13 +1591,47 @@ export function FormServiceOrder() {
         {canDeliver && !locked ? (
           <Button
             type="button"
-            disabled={save.isPending}
+            disabled={save.isPending || reverseDelivery.isPending}
             onClick={() => submit('delivered')}
           >
             Entregar
           </Button>
         ) : null}
+        {order.data?.status === 'delivered' ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={save.isPending || reverseDelivery.isPending}
+            onClick={() => setReverseOpen(true)}
+          >
+            Estornar
+          </Button>
+        ) : null}
       </div>
+
+      <AlertDialog open={reverseOpen} onOpenChange={setReverseOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Estornar entrega</AlertDialogTitle>
+            <AlertDialogDescription>
+              A ordem volta para Pronta e pode ser alterada. Títulos pendentes são
+              cancelados. Um recebimento já feito impede o estorno.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={reverseDelivery.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={reverseDelivery.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                reverseDelivery.mutate();
+              }}
+            >
+              {reverseDelivery.isPending ? 'Estornando...' : 'Estornar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </form>
   );
 }

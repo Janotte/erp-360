@@ -7,10 +7,12 @@ import {
   paymentMethodTerms,
   paymentPlanLines,
   paymentPlans,
+  receivables,
 } from '@erp-360/mod-financial';
 import { cities, personAddresses, personContacts, persons, states } from '@erp-360/mod-persons';
 import {
   serviceOrderAttendances,
+  serviceOrderBillings,
   serviceOrderCounters,
   serviceOrderFieldValues,
   serviceOrderLineKinds,
@@ -1098,6 +1100,85 @@ async function updateServiceOrder(tenantId: string, id: string, body: OrderBody)
   return present(loaded);
 }
 
+/** Desfaz a entrega. Volta para pronta e cancela títulos que ainda não foram recebidos. */
+async function reverseServiceOrder(tenantId: string, id: string) {
+  await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ id: serviceOrders.id, status: serviceOrders.status })
+      .from(serviceOrders)
+      .where(and(eq(serviceOrders.id, id), eq(serviceOrders.tenantId, tenantId)))
+      .limit(1)
+      .for('update');
+    if (!current) {
+      const missing = new Error('Ordem não encontrada.') as Error & { status: number };
+      missing.status = 404;
+      throw missing;
+    }
+    if (current.status !== 'delivered') {
+      reject('Só uma ordem entregue pode ser estornada.');
+    }
+
+    const titles = await tx
+      .select({
+        receivableId: serviceOrderBillings.receivableId,
+        status: receivables.status,
+      })
+      .from(serviceOrderBillings)
+      .innerJoin(
+        receivables,
+        and(
+          eq(receivables.id, serviceOrderBillings.receivableId),
+          eq(receivables.tenantId, serviceOrderBillings.tenantId),
+        ),
+      )
+      .where(
+        and(eq(serviceOrderBillings.tenantId, tenantId), eq(serviceOrderBillings.serviceOrderId, id)),
+      );
+
+    if (titles.some((title) => title.status === 'recebido')) {
+      reject('Não é possível estornar porque já existe recebimento nesta ordem.');
+    }
+
+    const pendingIds = titles
+      .filter((title) => title.status === 'pendente')
+      .map((title) => title.receivableId);
+    if (pendingIds.length > 0) {
+      await tx
+        .update(receivables)
+        .set({ status: 'cancelado' })
+        .where(
+          and(
+            eq(receivables.tenantId, tenantId),
+            inArray(receivables.id, pendingIds),
+            eq(receivables.status, 'pendente'),
+          ),
+        );
+    }
+
+    await tx
+      .delete(serviceOrderBillings)
+      .where(
+        and(eq(serviceOrderBillings.tenantId, tenantId), eq(serviceOrderBillings.serviceOrderId, id)),
+      );
+
+    await tx
+      .update(serviceOrderFieldValues)
+      .set({ label: null, width: null, isActive: null })
+      .where(
+        and(eq(serviceOrderFieldValues.tenantId, tenantId), eq(serviceOrderFieldValues.orderId, id)),
+      );
+
+    await tx
+      .update(serviceOrders)
+      .set({ status: 'ready', deliveredAt: null, labelFrozenAt: null })
+      .where(and(eq(serviceOrders.id, id), eq(serviceOrders.tenantId, tenantId)));
+  });
+
+  const loaded = await loadOrder(tenantId, id);
+  if (!loaded) throw new Error('Não foi possível estornar a ordem.');
+  return present(loaded);
+}
+
 async function listServiceOrders(
   tenantId: string,
   query: z.infer<typeof listQuery>,
@@ -1210,6 +1291,14 @@ export const serviceOrderRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const printed = await buildServiceOrderPrint(request.user.tenantId, request.params.id);
       if (!printed) return reply.status(404).send({ message: 'Ordem não encontrada.' });
       return printed;
+    },
+  );
+
+  fastify.post(
+    '/:id/reversal',
+    { schema: { params: z.object({ id: z.string().uuid() }) } },
+    async (request) => {
+      return reverseServiceOrder(request.user.tenantId, request.params.id);
     },
   );
 

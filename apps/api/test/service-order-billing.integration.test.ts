@@ -505,4 +505,112 @@ describe('cobrança da ordem de serviço', { concurrency: false }, () => {
       [{ amount: 1000, name: 'Dinheiro' }],
     );
   });
+
+  async function reverse(id: string) {
+    return app.inject({
+      method: 'POST',
+      url: `/service-orders/${id}/reversal`,
+      headers: headers(),
+    });
+  }
+
+  it('estorna a entrega e libera a ordem para correção', async () => {
+    const detail = await deliver([
+      { paymentMethodId: cashMethodId, installmentCount: 1, dueOn: '2026-11-10', amount: 1000 },
+    ]);
+    const response = await reverse(detail.id);
+    assert.equal(response.statusCode, 200, response.body);
+    const reversed = response.json() as OrderDetail & { labelFrozenAt: string | null };
+    assert.equal(reversed.status, 'ready');
+    assert.equal(reversed.deliveredAt, null);
+    assert.equal(reversed.labelFrozenAt, null);
+    assert.deepEqual(reversed.billings, []);
+
+    const edited = await save(reversed, {
+      fields: reversed.fields.map((field) =>
+        field.slot === 'field01' ? { ...field, value: 'Corrigido' } : field,
+      ),
+    });
+    assert.equal(edited.fields.find((field) => field.slot === 'field01')?.value, 'Corrigido');
+  });
+
+  it('cancela títulos pendentes e permite gerar o financeiro de novo', async () => {
+    const payments: Payment[] = [
+      { paymentMethodId: cashMethodId, installmentCount: 1, dueOn: '2026-11-10', amount: 1000 },
+    ];
+    const detail = await deliver(payments);
+    const billedOrder = await bill(detail.id, payments);
+    assert.equal(billedOrder.statusCode, 200, billedOrder.body);
+    const documentNumber = (billedOrder.json() as { billings: BillingLine[] }).billings[0]
+      ?.documentNumber;
+    assert.ok(documentNumber);
+
+    const response = await reverse(detail.id);
+    assert.equal(response.statusCode, 200, response.body);
+    const reversed = response.json() as OrderDetail;
+    assert.equal(reversed.status, 'ready');
+    assert.deepEqual(reversed.billings, []);
+
+    const cancelled = await db
+      .select({ status: receivables.status })
+      .from(receivables)
+      .where(
+        and(eq(receivables.tenantId, tenantId), eq(receivables.documentNumber, documentNumber)),
+      );
+    assert.deepEqual(
+      cancelled.map((row) => row.status),
+      ['cancelado'],
+    );
+
+    const delivered = await save(reversed, { status: 'delivered' });
+    const again = await bill(delivered.id, payments);
+    assert.equal(again.statusCode, 200, again.body);
+    const titles = await db
+      .select({ status: receivables.status })
+      .from(receivables)
+      .where(
+        and(eq(receivables.tenantId, tenantId), eq(receivables.documentNumber, documentNumber)),
+      );
+    assert.deepEqual(
+      titles.map((row) => row.status).sort(),
+      ['cancelado', 'pendente'],
+    );
+  });
+
+  it('recusa o estorno quando já existe recebimento', async () => {
+    const payments: Payment[] = [
+      { paymentMethodId: cashMethodId, installmentCount: 1, dueOn: '2026-11-10', amount: 1000 },
+    ];
+    const detail = await deliver(payments);
+    const billedOrder = await bill(detail.id, payments);
+    assert.equal(billedOrder.statusCode, 200, billedOrder.body);
+    const receivableId = (
+      billedOrder.json() as { billings: { receivableId: string }[] }
+    ).billings[0]?.receivableId;
+    assert.ok(receivableId);
+    await db
+      .update(receivables)
+      .set({ status: 'recebido' })
+      .where(and(eq(receivables.tenantId, tenantId), eq(receivables.id, receivableId)));
+
+    const response = await reverse(detail.id);
+    assert.equal(response.statusCode, 400, response.body);
+    assert.match(response.body, /já existe recebimento/);
+
+    const loaded = await app.inject({
+      method: 'GET',
+      url: `/service-orders/${detail.id}`,
+      headers: headers(),
+    });
+    const order = loaded.json() as OrderDetail;
+    assert.equal(order.status, 'delivered');
+    assert.equal(order.billings.length, 1);
+  });
+
+  it('recusa estornar uma ordem que não está entregue', async () => {
+    const detail = await open();
+    const response = await reverse(detail.id);
+    assert.equal(response.statusCode, 400, response.body);
+    assert.match(response.body, /Só uma ordem entregue pode ser estornada/);
+  });
 });
