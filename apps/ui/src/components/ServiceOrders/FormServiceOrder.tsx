@@ -942,11 +942,11 @@ export function FormServiceOrder() {
     return true;
   }
 
-  function submit(status: ServiceOrderStatus, backToList = false) {
+  function submit(status: ServiceOrderStatus) {
     if (!canSubmit(status)) return;
     save.mutate(status, {
-      onSuccess: () => {
-        if (backToList) navigate('/service-orders');
+      onSuccess: (saved) => {
+        if (!id) navigate(`/service-orders/${saved.id}`, { replace: true });
       },
     });
   }
@@ -993,7 +993,7 @@ export function FormServiceOrder() {
       onKeyDown={onEnterSequence}
       onSubmit={(event) => {
         event.preventDefault();
-        submit(draft.status, true);
+        submit(draft.status);
       }}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
