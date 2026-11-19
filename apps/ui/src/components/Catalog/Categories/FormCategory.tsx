@@ -44,6 +44,12 @@ export function FormCategory({
   const [name, setName] = useState(categoryToUpdate?.name ?? '');
   const [description, setDescription] = useState(categoryToUpdate?.description ?? '');
   const [parentId, setParentId] = useState(categoryToUpdate?.parentId ?? '');
+  const [showOnProduct, setShowOnProduct] = useState(
+    categoryToUpdate?.showOnProduct === true,
+  );
+  const [showOnService, setShowOnService] = useState(
+    categoryToUpdate?.showOnService === true,
+  );
   const [isActive, setIsActive] = useState(categoryToUpdate?.isActive !== false);
   const [openDelete, setOpenDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -67,6 +73,8 @@ export function FormCategory({
     setName(category.name ?? '');
     setDescription(category.description ?? '');
     setParentId(category.parentId ?? '');
+    setShowOnProduct(category.showOnProduct === true);
+    setShowOnService(category.showOnService === true);
     setIsActive(category.isActive !== false);
   }, [loaded, categoryToUpdate]);
 
@@ -114,11 +122,14 @@ export function FormCategory({
       toast.error('Informe o nome.');
       return;
     }
+    if (!showOnProduct && !showOnService) return;
     setNameError('');
     mutation.mutate({
       name,
       description,
       parentId: parentId || null,
+      showOnProduct,
+      showOnService,
       isActive,
     });
   };
@@ -161,6 +172,35 @@ export function FormCategory({
         onChange={(event) => setDescription(event.target.value)}
       />
 
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-zinc-900">Exibir em</p>
+        <div className="flex gap-6">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="showOnProduct"
+              checked={showOnProduct}
+              onCheckedChange={(value) => setShowOnProduct(!!value)}
+            />
+            <label htmlFor="showOnProduct" className="text-sm font-medium">
+              Produto
+            </label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="showOnService"
+              checked={showOnService}
+              onCheckedChange={(value) => setShowOnService(!!value)}
+            />
+            <label htmlFor="showOnService" className="text-sm font-medium">
+              Serviço
+            </label>
+          </div>
+        </div>
+        {!showOnProduct && !showOnService ? (
+          <p className="text-sm text-destructive">Marque produto, serviço ou os dois.</p>
+        ) : null}
+      </div>
+
       <div className="flex items-center space-x-2">
         <Checkbox
           id="categoryActive"
@@ -197,7 +237,14 @@ export function FormCategory({
             Excluir
           </Button>
         ) : null}
-        <Button type="submit" disabled={mutation.isPending || deleteMutation.isPending}>
+        <Button
+          type="submit"
+          disabled={
+            mutation.isPending ||
+            deleteMutation.isPending ||
+            (!showOnProduct && !showOnService)
+          }
+        >
           {mutation.isPending ? 'Salvando...' : categoryId ? 'Atualizar' : 'Cadastrar'}
         </Button>
       </div>

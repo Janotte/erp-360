@@ -245,11 +245,15 @@ function itemValues(values: {
 async function relationProblem(
   tenantId: string,
   values: ReturnType<typeof itemValues>,
-  current: { measureId: string; ncmCode: string | null } | null,
+  current: { categoryId: string | null; measureId: string; ncmCode: string | null } | null,
 ) {
   if (values.categoryId) {
     const [category] = await db
-      .select({ id: catalogCategories.id })
+      .select({
+        id: catalogCategories.id,
+        showOnProduct: catalogCategories.showOnProduct,
+        showOnService: catalogCategories.showOnService,
+      })
       .from(catalogCategories)
       .where(
         and(
@@ -258,6 +262,16 @@ async function relationProblem(
         ),
       );
     if (!category) return 'A categoria informada não existe.';
+    const keepsCategory = current?.categoryId === values.categoryId;
+    if (!keepsCategory) {
+      const visible =
+        values.type === 'product' ? category.showOnProduct : category.showOnService;
+      if (!visible) {
+        return values.type === 'product'
+          ? 'Esta categoria não aparece em produto.'
+          : 'Esta categoria não aparece em serviço.';
+      }
+    }
   }
 
   const [measure] = await db

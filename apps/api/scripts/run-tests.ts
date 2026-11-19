@@ -30,6 +30,7 @@ const child = spawn(
     '--import',
     'tsx',
     '--test',
+    'test/category-visibility.integration.test.ts',
     'test/cash-flow.test.ts',
     'test/card-statement.test.ts',
     'test/certificate.test.ts',

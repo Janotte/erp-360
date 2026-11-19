@@ -6,6 +6,8 @@ export interface Category {
   description: string | null;
   parentId: string | null;
   parentName: string | null;
+  showOnProduct: boolean;
+  showOnService: boolean;
   isActive: boolean;
 }
 
@@ -13,6 +15,8 @@ export interface CategoryInput {
   name: string;
   description?: string | null;
   parentId?: string | null;
+  showOnProduct: boolean;
+  showOnService: boolean;
   isActive?: boolean;
 }
 
@@ -76,9 +80,13 @@ export const categoriesService = {
     };
   },
 
-  options: async (exclude?: string): Promise<CategoryOption[]> => {
+  options: async (
+    exclude?: string,
+    usage?: 'product' | 'service',
+  ): Promise<CategoryOption[]> => {
     const params = new URLSearchParams();
     if (exclude) params.set('exclude', exclude);
+    if (usage) params.set('usage', usage);
     const query = params.toString();
     const res = await apiFetch(`/catalog/categories/options${query ? `?${query}` : ''}`);
     const body = await readBody(res);

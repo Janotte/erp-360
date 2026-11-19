@@ -100,6 +100,9 @@ function checkMessage(error: unknown): string | null {
   ) {
     return 'Preencha nome e sigla.';
   }
+  if (name.includes('catalog_categories_visibility')) {
+    return 'Marque produto, serviço ou os dois.';
+  }
   if (name.includes('catalog_categories_name')) return 'Informe o nome.';
   if (name.includes('catalog_categories_parent_not_self')) {
     return 'A categoria não pode ser pai de si mesma.';

@@ -14,11 +14,20 @@ const categoryBodySchema = z
     name: z.string().min(1, 'Informe o nome.').max(80),
     description: z.string().max(2000).nullable().optional(),
     parentId: z.string().uuid().nullable().optional(),
+    showOnProduct: z.boolean().optional().default(false),
+    showOnService: z.boolean().optional().default(false),
     isActive: z.boolean().optional().default(true),
   })
   .superRefine((data, ctx) => {
     if (!data.name.trim()) {
       ctx.addIssue({ code: 'custom', path: ['name'], message: 'Informe o nome.' });
+    }
+    if (!data.showOnProduct && !data.showOnService) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['showOnProduct'],
+        message: 'Marque produto, serviço ou os dois.',
+      });
     }
   });
 
@@ -36,6 +45,8 @@ type CategoryNode = {
   id: string;
   name: string;
   parentId: string | null;
+  showOnProduct: boolean;
+  showOnService: boolean;
 };
 
 type CategoryBody = z.infer<typeof categoryBodySchema>;
@@ -46,6 +57,8 @@ function toCategoryValues(data: CategoryBody) {
     name: data.name.trim(),
     description: description || null,
     parentId: data.parentId ?? null,
+    showOnProduct: data.showOnProduct ?? false,
+    showOnService: data.showOnService ?? false,
     isActive: data.isActive ?? true,
   };
 }
@@ -56,6 +69,8 @@ async function loadTree(tenantId: string): Promise<CategoryNode[]> {
       id: catalogCategories.id,
       name: catalogCategories.name,
       parentId: catalogCategories.parentId,
+      showOnProduct: catalogCategories.showOnProduct,
+      showOnService: catalogCategories.showOnService,
     })
     .from(catalogCategories)
     .where(eq(catalogCategories.tenantId, tenantId));
@@ -132,6 +147,8 @@ const categoryColumns = {
   description: catalogCategories.description,
   parentId: catalogCategories.parentId,
   parentName: parentCategory.name,
+  showOnProduct: catalogCategories.showOnProduct,
+  showOnService: catalogCategories.showOnService,
   isActive: catalogCategories.isActive,
 };
 
@@ -207,6 +224,7 @@ export const categoryRoutes: FastifyPluginAsyncZod = async (fastify) => {
       schema: {
         querystring: z.object({
           exclude: z.string().uuid().optional(),
+          usage: z.enum(['product', 'service']).optional(),
         }),
       },
     },
@@ -215,8 +233,14 @@ export const categoryRoutes: FastifyPluginAsyncZod = async (fastify) => {
       const blocked = request.query.exclude
         ? blockedIds(rows, request.query.exclude)
         : new Set<string>();
+      const usage = request.query.usage;
       return rows
-        .filter((row) => !blocked.has(row.id))
+        .filter((row) => {
+          if (blocked.has(row.id)) return false;
+          if (usage === 'product') return row.showOnProduct;
+          if (usage === 'service') return row.showOnService;
+          return true;
+        })
         .map((row) => ({
           id: row.id,
           name: row.name,

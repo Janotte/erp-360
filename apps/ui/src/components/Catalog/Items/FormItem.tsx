@@ -200,14 +200,32 @@ export function FormItem({
   });
 
   const categoriesQuery = useQuery({
-    queryKey: ['categories', 'options', null],
-    queryFn: () => categoriesService.options(),
+    queryKey: ['categories', 'options', type],
+    queryFn: () => categoriesService.options(undefined, type),
   });
   const categories = categoriesQuery.data ?? [];
-  const categoryOptions = useMemo(
-    () => categories.map((category) => ({ id: category.id, label: category.path })),
-    [categories],
-  );
+  const categoryOptions = useMemo(() => {
+    const options = categories.map((category) => ({
+      id: category.id,
+      label: category.path,
+    }));
+    if (
+      categoryId &&
+      loaded?.categoryId === categoryId &&
+      loaded.type === type &&
+      loaded.categoryName &&
+      !options.some((option) => option.id === categoryId)
+    ) {
+      return [{ id: categoryId, label: loaded.categoryName }, ...options];
+    }
+    return options;
+  }, [categories, categoryId, loaded, type]);
+
+  useEffect(() => {
+    if (!categoryId || categoriesQuery.isFetching) return;
+    if (categoryOptions.some((option) => option.id === categoryId)) return;
+    setCategoryId('');
+  }, [categoryId, categoryOptions, categoriesQuery.isFetching]);
 
   const { data: measureOptions = [], isLoading: measuresLoading } = useQuery({
     queryKey: ['measures', 'options', type],
@@ -514,7 +532,7 @@ export function FormItem({
             onChange={setCategoryId}
             options={categoryOptions}
             placeholder="Buscar categoria..."
-            emptyMessage="Nenhuma categoria cadastrada."
+            emptyMessage={`Nenhuma categoria marcada para ${type === 'product' ? 'produto' : 'serviço'}.`}
             allowClear
             isLoading={categoriesQuery.isLoading}
           />

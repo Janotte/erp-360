@@ -421,6 +421,13 @@
       "when": 1794526377546,
       "tag": "0059_inbound_list_price",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1795120235826,
+      "tag": "0060_category_visibility",
+      "breakpoints": true
     }
   ]
 }

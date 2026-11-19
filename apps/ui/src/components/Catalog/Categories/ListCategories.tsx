@@ -14,9 +14,16 @@ import {
 import { StatusBadge, StatusListHeader, StatusListRow } from '@/components/ui/StatusList';
 import { type StatusTone } from '@/components/ui/statusTone';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
-import { categoriesService } from '@/services/categories';
+import { type Category, categoriesService } from '@/services/categories';
 
-const columns = 'grid grid-cols-[minmax(180px,1.4fr)_minmax(160px,1fr)_132px]';
+const columns =
+  'grid grid-cols-[minmax(180px,1.4fr)_minmax(140px,1fr)_minmax(140px,1fr)_132px]';
+
+function visibilityLabel(category: Category) {
+  if (category.showOnProduct && category.showOnService) return 'Produto e serviço';
+  if (category.showOnProduct) return 'Produto';
+  return 'Serviço';
+}
 
 const activeTone: StatusTone = {
   background: '#EFF6FF',
@@ -115,7 +122,10 @@ export function ListCategories() {
 
   return (
     <div className="space-y-4">
-      <ListPageHeader title="Categorias" description="Nome, categoria pai e situação.">
+      <ListPageHeader
+        title="Categorias"
+        description="Nome, categoria pai, onde a categoria aparece e situação."
+      >
         <Button asChild>
           <Link to="/categories/new" state={{ from }}>
             <Plus className="h-4 w-4" />
@@ -137,7 +147,7 @@ export function ListCategories() {
         }
       >
         <div className="overflow-x-auto">
-          <div className="min-w-[560px]">
+          <div className="min-w-[720px]">
             <StatusListHeader columns={columns}>
               <button
                 type="button"
@@ -152,6 +162,7 @@ export function ListCategories() {
                 )}
               </button>
               <span>Categoria pai</span>
+              <span>Exibir em</span>
               <span>Situação</span>
             </StatusListHeader>
 
@@ -168,12 +179,13 @@ export function ListCategories() {
             ) : (
               rows.map((category) => {
                 const status = category.isActive ? 'Ativa' : 'Inativa';
+                const visibility = visibilityLabel(category);
                 return (
                   <StatusListRow
                     key={category.id}
                     columns={columns}
                     tone={category.isActive ? activeTone : inactiveTone}
-                    label={`${category.name}, ${category.parentName ?? 'Raiz'}, ${status}`}
+                    label={`${category.name}, ${category.parentName ?? 'Raiz'}, ${visibility}, ${status}`}
                     onOpen={() =>
                       navigate(`/categories/${category.id}`, { state: { from } })
                     }
@@ -182,6 +194,7 @@ export function ListCategories() {
                     <span className="min-w-0 truncate">
                       {category.parentName ?? 'Raiz'}
                     </span>
+                    <span className="min-w-0 truncate">{visibility}</span>
                     <span>
                       <StatusBadge label={status} />
                     </span>

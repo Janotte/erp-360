@@ -22,6 +22,10 @@ export const catalogCategories = pgTable(
     parentId: uuid('parent_id'),
     name: varchar('name', { length: 80 }).notNull(),
     description: text('description'),
+    /** Oferece a categoria no cadastro de produto. Nasce desmarcado. */
+    showOnProduct: boolean('show_on_product').default(false).notNull(),
+    /** Oferece a categoria no cadastro de serviço. Nasce desmarcado. */
+    showOnService: boolean('show_on_service').default(false).notNull(),
     isActive: boolean('is_active').default(true).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
@@ -44,6 +48,10 @@ export const catalogCategories = pgTable(
     check(
       'catalog_categories_parent_not_self',
       sql`${table.parentId} is null or ${table.parentId} <> ${table.id}`,
+    ),
+    check(
+      'catalog_categories_visibility_check',
+      sql`${table.showOnProduct} or ${table.showOnService}`,
     ),
   ],
 );
