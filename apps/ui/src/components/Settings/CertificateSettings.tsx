@@ -22,8 +22,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FloatingInput, FloatingSelect } from '@/components/ui/FloatingField';
 import { certificateService } from '@/services/certificates';
 
 const environmentLabel: Record<CertificateEnvironment, string> = {
@@ -87,7 +86,7 @@ function CertificateCard({ certificate }: { certificate: TenantCertificateView }
   return (
     <li className="rounded-lg border bg-white p-4 text-sm">
       <div className="flex items-baseline justify-between gap-3">
-        <p className="font-medium text-zinc-900">
+        <p className="font-medium text-[#172337]">
           {certificate.label || environmentLabel[certificate.environment]}
         </p>
         <span
@@ -100,12 +99,12 @@ function CertificateCard({ certificate }: { certificate: TenantCertificateView }
           {validityText(certificate.daysLeft, certificate.expired)}
         </span>
       </div>
-      <p className="mt-1 text-zinc-500">{environmentLabel[certificate.environment]}</p>
-      <p className="text-zinc-500">{certificate.subjectName}</p>
-      <p className="text-zinc-500">
+      <p className="mt-1 text-[#64748b]">{environmentLabel[certificate.environment]}</p>
+      <p className="text-[#64748b]">{certificate.subjectName}</p>
+      <p className="text-[#64748b]">
         CNPJ {formatCnpj(certificate.taxId)} · série {certificate.serialNumber}
       </p>
-      <p className="text-zinc-500">
+      <p className="text-[#64748b]">
         {formatRawDate(certificate.validFrom)} a {formatRawDate(certificate.validUntil)}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -138,13 +137,13 @@ function CertificateCard({ certificate }: { certificate: TenantCertificateView }
         </Button>
       </div>
       {result ? (
-        <div className="mt-3 space-y-1 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+        <div className="mt-3 space-y-1 rounded-md border border-[#dfe5ee] bg-[#f8fafc] p-3">
           <p className={result.validLocal ? 'text-emerald-700' : 'text-rose-700'}>
             {result.validLocal
               ? 'Certificado pronto para uso.'
               : 'O certificado não passou na checagem local.'}
           </p>
-          <p className="text-zinc-500">
+          <p className="text-[#64748b]">
             {checks.map(([label, ok]) => `${label}: ${ok ? 'sim' : 'não'}`).join(' · ')}
           </p>
           <p className={result.validRemote ? 'text-emerald-700' : 'text-rose-700'}>
@@ -153,10 +152,10 @@ function CertificateCard({ certificate }: { certificate: TenantCertificateView }
               : (result.remote.error ?? 'Falha na conexão.')}
           </p>
           {result.validRemote && result.remote.statusMessage ? (
-            <p className="text-zinc-600">{result.remote.statusMessage}</p>
+            <p className="text-[#334155]">{result.remote.statusMessage}</p>
           ) : null}
           {result.endpoint ? (
-            <p className="text-zinc-500">
+            <p className="text-[#64748b]">
               {[endpointHost(result.endpoint), `${result.remote.latencyMs} ms`]
                 .filter(Boolean)
                 .join(' · ')}
@@ -260,83 +259,75 @@ export function CertificateSettings() {
   return (
     <div className="max-w-3xl space-y-6">
       <form
-        className="space-y-4 rounded-lg border bg-white p-4"
+        className="space-y-4 rounded-lg border bg-white p-6"
         onSubmit={(event) => {
           event.preventDefault();
           importCertificate.mutate();
         }}
       >
         <div>
-          <h3 className="text-lg font-bold text-zinc-900">Certificado digital</h3>
-          <p className="text-sm text-zinc-500">
+          <h3 className="text-lg font-bold text-[#172337]">Certificado digital</h3>
+          <p className="mt-1 text-sm text-[#64748b]">
             Importe o certificado A1 da empresa. A senha fica cifrada e o arquivo não é
             exibido depois.
           </p>
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="certificateEnvironment">Ambiente</Label>
-          <select
-            id="certificateEnvironment"
-            value={environment}
-            onChange={(event) =>
-              setEnvironment(event.target.value as CertificateEnvironment)
-            }
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-          >
-            <option value="production">Produção</option>
-            <option value="homologation">Homologação</option>
-          </select>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="certificateLabel">Apelido</Label>
-          <Input
-            id="certificateLabel"
-            value={label}
-            maxLength={60}
-            onChange={(event) => setLabel(event.target.value)}
-            placeholder="Opcional"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="certificateFile">Arquivo (.pfx ou .p12)</Label>
-          <Input
-            key={fileKey}
-            id="certificateFile"
-            type="file"
-            accept=".pfx,.p12,application/x-pkcs12"
-            onChange={(event) => {
-              setFile(event.target.files?.[0] ?? null);
-              setInspection(null);
-            }}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="certificatePassword">Senha</Label>
-          <Input
-            id="certificatePassword"
-            type="password"
-            autoComplete="off"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </div>
+        <FloatingSelect
+          id="certificateEnvironment"
+          label="Ambiente"
+          value={environment}
+          pinned
+          onChange={(event) =>
+            setEnvironment(event.target.value as CertificateEnvironment)
+          }
+        >
+          <option value="production">Produção</option>
+          <option value="homologation">Homologação</option>
+        </FloatingSelect>
+        <FloatingInput
+          id="certificateLabel"
+          label="Apelido"
+          value={label}
+          maxLength={60}
+          onChange={(event) => setLabel(event.target.value)}
+        />
+        <FloatingInput
+          id="certificateFile"
+          key={fileKey}
+          label="Arquivo (.pfx ou .p12)"
+          type="file"
+          pinned
+          accept=".pfx,.p12,application/x-pkcs12"
+          onChange={(event) => {
+            setFile(event.target.files?.[0] ?? null);
+            setInspection(null);
+          }}
+        />
+        <FloatingInput
+          id="certificatePassword"
+          label="Senha"
+          type="password"
+          autoComplete="off"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
         {inspection ? (
-          <div className="space-y-1 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm">
-            <p className="text-zinc-700">{inspection.subjectName}</p>
-            <p className="text-zinc-500">CNPJ {formatCnpj(inspection.taxId)}</p>
-            <p className="text-zinc-500">
+          <div className="space-y-1 rounded-md border border-[#dfe5ee] bg-[#f8fafc] p-3 text-sm">
+            <p className="text-[#172337]">{inspection.subjectName}</p>
+            <p className="text-[#64748b]">CNPJ {formatCnpj(inspection.taxId)}</p>
+            <p className="text-[#64748b]">
               Validade {formatRawDate(inspection.validFrom)} a{' '}
               {formatRawDate(inspection.validUntil)} ·{' '}
               {validityText(inspection.daysLeft, inspection.expired)}
             </p>
             {inspection.messages.map((message) => (
-              <p key={message} className="text-zinc-600">
+              <p key={message} className="text-[#334155]">
                 {message}
               </p>
             ))}
           </div>
         ) : null}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button
             type="button"
             variant="outline"
@@ -352,9 +343,9 @@ export function CertificateSettings() {
       </form>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-medium text-zinc-800">Certificados ativos</h3>
+        <h3 className="text-sm font-medium text-[#172337]">Certificados ativos</h3>
         {certificates.length === 0 ? (
-          <p className="text-sm text-zinc-500">Nenhum certificado importado.</p>
+          <p className="text-sm text-[#64748b]">Nenhum certificado importado.</p>
         ) : (
           <ul className="space-y-2">
             {certificates.map((certificate) => (

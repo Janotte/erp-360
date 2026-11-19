@@ -11,16 +11,8 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { emitterService, type Emitter, type TenantCrt } from '@/services/emitter';
+import { FloatingInput, FloatingSelect } from '@/components/ui/FloatingField';
+import { type Emitter, emitterService, type TenantCrt } from '@/services/emitter';
 import { locationsService } from '@/services/locations';
 import { personsService } from '@/services/persons';
 
@@ -134,7 +126,9 @@ export function EmitterForm() {
 
   useEffect(() => {
     if (!pendingUf || stateId) return;
-    const state = (statesQuery.data ?? []).find((item) => item.abbreviation === pendingUf);
+    const state = (statesQuery.data ?? []).find(
+      (item) => item.abbreviation === pendingUf,
+    );
     if (!state) return;
     if (lookupPatch.current) {
       lookupPatch.current = { ...lookupPatch.current, stateId: state.id };
@@ -261,16 +255,13 @@ export function EmitterForm() {
     cepMutation.mutate(postalCode);
   };
 
-  const selectClassName =
-    'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
-
   if (!data) {
     if (isPending && !isError) {
-      return <p className="text-sm text-zinc-500">Carregando emitente...</p>;
+      return <p className="text-sm text-[#64748b]">Carregando emitente...</p>;
     }
     return (
       <div className="space-y-3">
-        <p className="text-sm text-destructive">Não foi possível carregar o emitente.</p>
+        <p className="text-sm text-red-600">Não foi possível carregar o emitente.</p>
         <Button type="button" variant="outline" onClick={() => void refetch()}>
           Tentar de novo
         </Button>
@@ -280,7 +271,7 @@ export function EmitterForm() {
 
   return (
     <form
-      className="max-w-3xl space-y-4 rounded-lg border bg-white p-4"
+      className="max-w-3xl space-y-4 rounded-lg border bg-white p-6"
       onChange={() => {
         edited.current = true;
       }}
@@ -335,21 +326,22 @@ export function EmitterForm() {
       }}
     >
       <div>
-        <h3 className="text-lg font-bold text-zinc-900">Emitente</h3>
-        <p className="text-sm text-zinc-500">
+        <h3 className="text-lg font-bold text-[#172337]">Emitente</h3>
+        <p className="mt-1 text-sm text-[#64748b]">
           Dados da empresa usados na emissão de NF-e, NFC-e e NFS-e.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-1">
-          <Label htmlFor="emitterCnpj">CNPJ</Label>
-          <Input
+          <FloatingInput
             id="emitterCnpj"
+            label="CNPJ"
             value={cnpj}
             maxLength={18}
             inputMode="numeric"
             autoComplete="off"
+            error={cnpjError || undefined}
             onChange={(event) => {
               setCnpj(formatCnpj(event.target.value));
               setCnpjError('');
@@ -361,150 +353,129 @@ export function EmitterForm() {
             }}
             required
           />
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-[#64748b]">
             {lookupMutation.isPending
               ? 'Consultando CNPJ...'
               : 'Digite o CNPJ e pressione Enter para preencher os dados.'}
           </p>
-          {cnpjError ? <p className="text-sm text-destructive">{cnpjError}</p> : null}
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="emitterCrt">CRT</Label>
-          <select
-            id="emitterCrt"
-            className={selectClassName}
-            value={crt}
-            onChange={(event) => setCrt(event.target.value as TenantCrt)}
-          >
-            {crtOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <FloatingSelect
+          id="emitterCrt"
+          label="CRT"
+          value={crt}
+          pinned
+          onChange={(event) => setCrt(event.target.value as TenantCrt)}
+        >
+          {crtOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </FloatingSelect>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-1">
-          <Label htmlFor="emitterName">Razão social</Label>
-          <Input
-            id="emitterName"
-            value={name}
-            maxLength={60}
-            onChange={(event) => setName(event.target.value)}
-            onBlur={() => setName(toTitleCasePtBr(name))}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="emitterTradeName">Nome fantasia</Label>
-          <Input
-            id="emitterTradeName"
-            value={tradeName}
-            maxLength={60}
-            onChange={(event) => setTradeName(event.target.value)}
-            onBlur={() => setTradeName(toTitleCasePtBr(tradeName))}
-            required
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-1">
-          <Label htmlFor="emitterIe">Inscrição estadual</Label>
-          <Input
-            id="emitterIe"
-            value={stateRegistration}
-            maxLength={14}
-            onChange={(event) => setStateRegistration(event.target.value.toUpperCase())}
-            placeholder="ISENTO"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="emitterIm">Inscrição municipal</Label>
-          <Input
-            id="emitterIm"
-            value={municipalRegistration}
-            maxLength={15}
-            onChange={(event) => setMunicipalRegistration(event.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-1">
-          <Label htmlFor="emitterCnae">CNAE</Label>
-          <Input
-            id="emitterCnae"
-            value={cnae}
-            maxLength={9}
-            inputMode="numeric"
-            onChange={(event) => setCnae(formatCnae(event.target.value))}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="emitterEmail">E-mail</Label>
-          <Input
-            id="emitterEmail"
-            type="email"
-            value={email}
-            maxLength={80}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="emitterLogo">Logo</Label>
-        <Input
-          id="emitterLogo"
-          type="url"
-          value={logo}
-          maxLength={500}
-          onChange={(event) => setLogo(event.target.value)}
-          placeholder="https://"
+        <FloatingInput
+          id="emitterName"
+          label="Razão social"
+          value={name}
+          maxLength={60}
+          onChange={(event) => setName(event.target.value)}
+          onBlur={() => setName(toTitleCasePtBr(name))}
+          required
+        />
+        <FloatingInput
+          id="emitterTradeName"
+          label="Nome fantasia"
+          value={tradeName}
+          maxLength={60}
+          onChange={(event) => setTradeName(event.target.value)}
+          onBlur={() => setTradeName(toTitleCasePtBr(tradeName))}
+          required
         />
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2">
+        <FloatingInput
+          id="emitterIe"
+          label="Inscrição estadual"
+          value={stateRegistration}
+          maxLength={14}
+          pinned
+          placeholder="ISENTO"
+          onChange={(event) => setStateRegistration(event.target.value.toUpperCase())}
+        />
+        <FloatingInput
+          id="emitterIm"
+          label="Inscrição municipal"
+          value={municipalRegistration}
+          maxLength={15}
+          onChange={(event) => setMunicipalRegistration(event.target.value)}
+        />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <FloatingInput
+          id="emitterCnae"
+          label="CNAE"
+          value={cnae}
+          maxLength={9}
+          inputMode="numeric"
+          onChange={(event) => setCnae(formatCnae(event.target.value))}
+        />
+        <FloatingInput
+          id="emitterEmail"
+          label="E-mail"
+          type="email"
+          value={email}
+          maxLength={80}
+          onChange={(event) => setEmail(event.target.value)}
+        />
+      </div>
+
+      <FloatingInput
+        id="emitterLogo"
+        label="Logo"
+        type="url"
+        value={logo}
+        maxLength={500}
+        pinned
+        placeholder="https://"
+        onChange={(event) => setLogo(event.target.value)}
+      />
+
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-1">
-          <Label htmlFor="emitterPhone">Telefone</Label>
-          <Input
-            id="emitterPhone"
-            value={phone}
-            maxLength={16}
-            inputMode="numeric"
-            onChange={(event) => setPhone(displayPhone(event.target.value))}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="emitterMobilePhone">Celular</Label>
-          <Input
-            id="emitterMobilePhone"
-            value={mobilePhone}
-            maxLength={16}
-            inputMode="numeric"
-            onChange={(event) => setMobilePhone(displayPhone(event.target.value))}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="emitterWhatsapp">WhatsApp</Label>
-          <Input
-            id="emitterWhatsapp"
-            value={whatsapp}
-            maxLength={16}
-            inputMode="numeric"
-            onChange={(event) => setWhatsapp(displayPhone(event.target.value))}
-          />
-        </div>
+        <FloatingInput
+          id="emitterPhone"
+          label="Telefone"
+          value={phone}
+          maxLength={16}
+          inputMode="numeric"
+          onChange={(event) => setPhone(displayPhone(event.target.value))}
+        />
+        <FloatingInput
+          id="emitterMobilePhone"
+          label="Celular"
+          value={mobilePhone}
+          maxLength={16}
+          inputMode="numeric"
+          onChange={(event) => setMobilePhone(displayPhone(event.target.value))}
+        />
+        <FloatingInput
+          id="emitterWhatsapp"
+          label="WhatsApp"
+          value={whatsapp}
+          maxLength={16}
+          inputMode="numeric"
+          onChange={(event) => setWhatsapp(displayPhone(event.target.value))}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <div className="space-y-1 md:col-span-1">
-          <Label htmlFor="emitterPostalCode">CEP</Label>
-          <Input
+        <div className="space-y-1">
+          <FloatingInput
             id="emitterPostalCode"
+            label="CEP"
             value={postalCode}
             maxLength={9}
             inputMode="numeric"
@@ -515,99 +486,91 @@ export function EmitterForm() {
               lookupCep();
             }}
           />
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-[#64748b]">
             {cepMutation.isPending ? 'Consultando CEP...' : 'Enter consulta o CEP.'}
           </p>
         </div>
-        <div className="space-y-1 md:col-span-2">
-          <Label htmlFor="emitterStreet">Logradouro</Label>
-          <Input
+        <div className="md:col-span-2">
+          <FloatingInput
             id="emitterStreet"
+            label="Logradouro"
             value={street}
             maxLength={60}
             onChange={(event) => setStreet(event.target.value)}
             onBlur={() => setStreet(toTitleCasePtBr(street))}
           />
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="emitterNumber">Número</Label>
-          <Input
-            id="emitterNumber"
-            value={number}
-            maxLength={60}
-            onChange={(event) => setNumber(event.target.value)}
-          />
-        </div>
+        <FloatingInput
+          id="emitterNumber"
+          label="Número"
+          value={number}
+          maxLength={60}
+          onChange={(event) => setNumber(event.target.value)}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-1">
-          <Label htmlFor="emitterComplement">Complemento</Label>
-          <Input
-            id="emitterComplement"
-            value={complement}
-            maxLength={60}
-            onChange={(event) => setComplement(event.target.value)}
-            onBlur={() => setComplement(toTitleCasePtBr(complement))}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="emitterNeighborhood">Bairro</Label>
-          <Input
-            id="emitterNeighborhood"
-            value={neighborhood}
-            maxLength={60}
-            onChange={(event) => setNeighborhood(event.target.value)}
-            onBlur={() => setNeighborhood(toTitleCasePtBr(neighborhood))}
-          />
-        </div>
+        <FloatingInput
+          id="emitterComplement"
+          label="Complemento"
+          value={complement}
+          maxLength={60}
+          onChange={(event) => setComplement(event.target.value)}
+          onBlur={() => setComplement(toTitleCasePtBr(complement))}
+        />
+        <FloatingInput
+          id="emitterNeighborhood"
+          label="Bairro"
+          value={neighborhood}
+          maxLength={60}
+          onChange={(event) => setNeighborhood(event.target.value)}
+          onBlur={() => setNeighborhood(toTitleCasePtBr(neighborhood))}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-1">
-          <Label>Estado</Label>
-          <Select
-            value={stateId || undefined}
-            onValueChange={(value) => {
-              if (!value || value === stateId) return;
-              const patch = lookupPatch.current;
-              if (patch?.stateId === value) {
-                setStateId(value);
-                if (patch.cityId) {
-                  setCityId(patch.cityId);
-                  setCityName(patch.cityName ?? '');
-                  setCitySearchText(patch.cityName ?? '');
-                  setCitySearch((patch.cityName ?? '').trim());
-                }
-                return;
-              }
-              lookupPatch.current = null;
-              setPendingUf('');
+        <FloatingSelect
+          id="emitterState"
+          label="Estado"
+          value={stateId}
+          pinned={Boolean(stateId)}
+          onChange={(event) => {
+            const value = event.target.value;
+            if (!value || value === stateId) return;
+            const patch = lookupPatch.current;
+            if (patch?.stateId === value) {
               setStateId(value);
-              setCityId('');
-              setCityName('');
-              setCitySearchText('');
-              setCitySearch('');
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione" />
-            </SelectTrigger>
-            <SelectContent>
-              {(statesQuery.data ?? []).map((state) => (
-                <SelectItem key={state.id} value={state.id}>
-                  {state.abbreviation} — {state.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+              if (patch.cityId) {
+                setCityId(patch.cityId);
+                setCityName(patch.cityName ?? '');
+                setCitySearchText(patch.cityName ?? '');
+                setCitySearch((patch.cityName ?? '').trim());
+              }
+              return;
+            }
+            lookupPatch.current = null;
+            setPendingUf('');
+            setStateId(value);
+            setCityId('');
+            setCityName('');
+            setCitySearchText('');
+            setCitySearch('');
+          }}
+        >
+          <option value="" disabled>
+            Selecione
+          </option>
+          {(statesQuery.data ?? []).map((state) => (
+            <option key={state.id} value={state.id}>
+              {state.abbreviation} — {state.name}
+            </option>
+          ))}
+        </FloatingSelect>
         <div className="space-y-1">
-          <Label htmlFor="emitterCitySearch">Cidade</Label>
-          <Input
+          <FloatingInput
             id="emitterCitySearch"
+            label="Cidade"
             value={citySearchText}
-            placeholder="Digite ao menos 2 letras"
             disabled={!stateId}
             onChange={(event) => {
               const nextValue = event.target.value;
@@ -621,39 +584,40 @@ export function EmitterForm() {
               setCityName('');
             }}
           />
+          <p className="text-xs text-[#64748b]">Digite ao menos 2 letras.</p>
         </div>
       </div>
 
-      <div className="space-y-1">
-        <Select
-          value={cityId || undefined}
-          onValueChange={(value) => {
-            if (!value) return;
-            const city = cities.find((item) => item.id === value);
-            setCityId(value);
-            setCityName(city?.name ?? cityName);
-            if (city?.name) setCitySearchText(city.name);
-          }}
-          disabled={!stateId || (citySearch.length < 2 && !cityId)}
-        >
-          <SelectTrigger>
-            <SelectValue
-              placeholder={citySearch.length < 2 ? 'Busque a cidade' : 'Selecione a cidade'}
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {cities.map((city) => (
-              <SelectItem key={city.id} value={city.id}>
-                {city.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <FloatingSelect
+        id="emitterCity"
+        label="Cidade encontrada"
+        value={cityId}
+        pinned={Boolean(cityId)}
+        disabled={!stateId || (citySearch.length < 2 && !cityId)}
+        onChange={(event) => {
+          const value = event.target.value;
+          if (!value) return;
+          const city = cities.find((item) => item.id === value);
+          setCityId(value);
+          setCityName(city?.name ?? cityName);
+          if (city?.name) setCitySearchText(city.name);
+        }}
+      >
+        <option value="" disabled>
+          {citySearch.length < 2 ? 'Busque a cidade' : 'Selecione a cidade'}
+        </option>
+        {cities.map((city) => (
+          <option key={city.id} value={city.id}>
+            {city.name}
+          </option>
+        ))}
+      </FloatingSelect>
 
-      <Button type="submit" disabled={saveMutation.isPending}>
-        {saveMutation.isPending ? 'Salvando...' : 'Salvar emitente'}
-      </Button>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={saveMutation.isPending}>
+          {saveMutation.isPending ? 'Salvando...' : 'Salvar emitente'}
+        </Button>
+      </div>
     </form>
   );
 }

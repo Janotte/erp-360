@@ -8,8 +8,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FloatingInput } from '@/components/ui/FloatingField';
 import { treasuryService } from '@/services/treasury';
 
 export function FinancialSettingsForm() {
@@ -58,7 +57,7 @@ export function FinancialSettingsForm() {
 
   return (
     <form
-      className="max-w-lg space-y-4 rounded-lg border bg-white p-4"
+      className="max-w-lg space-y-4 rounded-lg border bg-white p-6"
       onSubmit={(event) => {
         event.preventDefault();
         if (parseCurrencyToCents(cashOpeningAmountStr) !== 0 && !cashOpeningOn) {
@@ -69,70 +68,65 @@ export function FinancialSettingsForm() {
       }}
     >
       <div>
-        <h3 className="text-lg font-bold text-zinc-900">Financeiro</h3>
-        <p className="text-sm text-zinc-500">
+        <h3 className="text-lg font-bold text-[#172337]">Financeiro</h3>
+        <p className="mt-1 text-sm text-[#64748b]">
           Multa e juros usados na baixa de contas a receber. 100 basis points = 1,00%.
         </p>
       </div>
-      <div className="space-y-1">
-        <Label htmlFor="lateFeeBps">Multa por atraso (bps)</Label>
-        <Input
-          id="lateFeeBps"
-          type="number"
-          min={0}
-          value={lateFeeBps}
-          onChange={(e) => setLateFeeBps(e.target.value)}
-          required
+      <FloatingInput
+        id="lateFeeBps"
+        label="Multa por atraso (bps)"
+        type="number"
+        min={0}
+        value={lateFeeBps}
+        onChange={(event) => setLateFeeBps(event.target.value)}
+        required
+      />
+      <FloatingInput
+        id="dailyInterestBps"
+        label="Juros ao dia (bps)"
+        type="number"
+        min={0}
+        value={dailyInterestBps}
+        onChange={(event) => setDailyInterestBps(event.target.value)}
+        required
+      />
+      <FloatingInput
+        id="graceDays"
+        label="Carência (dias)"
+        type="number"
+        min={0}
+        value={graceDays}
+        onChange={(event) => setGraceDays(event.target.value)}
+        required
+      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FloatingInput
+          id="cashOpeningOn"
+          label="Data do saldo inicial do caixa"
+          type="date"
+          value={cashOpeningOn}
+          onChange={(event) => setCashOpeningOn(event.target.value)}
+        />
+        <FloatingInput
+          id="cashOpeningAmount"
+          label="Saldo inicial do caixa (R$)"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          pinned
+          placeholder="0,00"
+          value={cashOpeningAmountStr}
+          onChange={(event) =>
+            setCashOpeningAmountStr(maskCurrencyInput(event.target.value))
+          }
         />
       </div>
-      <div className="space-y-1">
-        <Label htmlFor="dailyInterestBps">Juros ao dia (bps)</Label>
-        <Input
-          id="dailyInterestBps"
-          type="number"
-          min={0}
-          value={dailyInterestBps}
-          onChange={(e) => setDailyInterestBps(e.target.value)}
-          required
-        />
+      <div className="flex justify-end">
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? 'Salvando...' : 'Salvar'}
+        </Button>
       </div>
-      <div className="space-y-1">
-        <Label htmlFor="graceDays">Carência (dias)</Label>
-        <Input
-          id="graceDays"
-          type="number"
-          min={0}
-          value={graceDays}
-          onChange={(e) => setGraceDays(e.target.value)}
-          required
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label htmlFor="cashOpeningOn">Data do saldo inicial do caixa</Label>
-          <Input
-            id="cashOpeningOn"
-            type="date"
-            value={cashOpeningOn}
-            onChange={(e) => setCashOpeningOn(e.target.value)}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="cashOpeningAmount">Saldo inicial do caixa (R$)</Label>
-          <Input
-            id="cashOpeningAmount"
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="0,00"
-            value={cashOpeningAmountStr}
-            onChange={(e) => setCashOpeningAmountStr(maskCurrencyInput(e.target.value))}
-          />
-        </div>
-      </div>
-      <Button type="submit" disabled={mutation.isPending}>
-        {mutation.isPending ? 'Salvando...' : 'Salvar'}
-      </Button>
     </form>
   );
 }
