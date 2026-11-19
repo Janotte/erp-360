@@ -1,366 +1,414 @@
-import { civilDate, formatCurrency, formatRawDate } from '@erp-360/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import { Link } from 'react-router';
-import { toast } from 'sonner';
-
-import { titleRowTextClass } from '@/components/Financial/titleRowTone';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { type CompanyCard, companyCardService } from '@/services/companyCards';
-import { personsService } from '@/services/persons';
-import { treasuryService } from '@/services/treasury';
+  civilDate,
+  formatCurrency,
+  formatRawDate,
+  type ListPageSize,
+  listPageSizes,
+} from '@erp-360/shared';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 
-function chargeLabel(status: string, dueOn: string, today = civilDate()) {
-  if (status === 'pago') return 'Pago';
-  if (status === 'cancelado') return 'Cancelado';
-  if (dueOn < today) return 'Atrasado';
-  return 'Pendente';
-}
+import { titleRowTone } from '@/components/Financial/titleRowTone';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ListPagination } from '@/components/ui/ListPagination';
+import {
+  ListFilter,
+  ListMessage,
+  ListPageHeader,
+  ListPanel,
+  ListSearch,
+} from '@/components/ui/ListShell';
+import { StatusListHeader, StatusListRow } from '@/components/ui/StatusList';
+import { type StatusTone } from '@/components/ui/statusTone';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import {
+  type CardStatementEntry,
+  type CompanyCard,
+  companyCardService,
+} from '@/services/companyCards';
 
-const emptyForm = {
-  name: '',
-  issuerId: '',
-  issuerName: '',
-  closingDay: '1',
-  dueDay: '10',
-  bankAccountId: '',
-  isActive: true,
+const cardColumns = 'grid grid-cols-[minmax(0,1fr)_auto]';
+const entryColumns = 'grid grid-cols-[104px_minmax(220px,1.6fr)_104px_120px_130px]';
+
+const selectedTone: StatusTone = {
+  background: '#EFF6FF',
+  hover: '#DBEAFE',
+  border: '#2563EB',
+  text: '#1D4ED8',
 };
 
-export function CompanyCardsPage() {
-  const queryClient = useQueryClient();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(emptyForm);
-  const [issuerSearch, setIssuerSearch] = useState('');
+const inactiveTone: StatusTone = {
+  background: '#F8FAFC',
+  hover: '#F1F5F9',
+  border: '#64748B',
+  text: '#475569',
+};
 
-  const cards = useQuery({
+const plainTone: StatusTone = {
+  background: '#FFFFFF',
+  hover: '#F8FAFC',
+  border: '#94A3B8',
+  text: '#172337',
+};
+
+const statuses = ['pendente', 'atrasado', 'pago', 'cancelado'] as const;
+type ChargeStatus = (typeof statuses)[number];
+
+const statusLabels: Record<ChargeStatus, string> = {
+  pendente: 'Pendente',
+  atrasado: 'Atrasado',
+  pago: 'Pago',
+  cancelado: 'Cancelado',
+};
+
+function readPage(params: URLSearchParams) {
+  const page = Number(params.get('page') ?? '1');
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function readLimit(params: URLSearchParams): ListPageSize {
+  const value = Number(params.get('limit'));
+  if ((listPageSizes as readonly number[]).includes(value)) return value as ListPageSize;
+  return 10;
+}
+
+function readDate(params: URLSearchParams, key: string) {
+  const value = params.get(key) ?? '';
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+}
+
+function readCardId(params: URLSearchParams) {
+  const value = params.get('cartao') ?? '';
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+    ? value
+    : null;
+}
+
+function readStatus(params: URLSearchParams): ChargeStatus | 'all' {
+  const value = params.get('situacao');
+  return statuses.includes(value as ChargeStatus) ? (value as ChargeStatus) : 'all';
+}
+
+function chargeSituation(entry: CardStatementEntry, today = civilDate()): ChargeStatus {
+  if (entry.status === 'pago') return 'pago';
+  if (entry.status === 'cancelado') return 'cancelado';
+  if (entry.dueOn.slice(0, 10) < today) return 'atrasado';
+  return 'pendente';
+}
+
+function cardTone(card: CompanyCard, selected: boolean): StatusTone {
+  if (selected) return selectedTone;
+  if (!card.isActive) return inactiveTone;
+  return plainTone;
+}
+
+function DateFilter({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-[13px] text-[#64748b]">
+      {label}
+      <Input
+        type="date"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-[42px] w-[148px] border-[#cbd5e1]"
+        aria-label={label}
+      />
+    </label>
+  );
+}
+
+export function CompanyCardsPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  const page = readPage(params);
+  const limit = readLimit(params);
+  const search = params.get('busca') ?? '';
+  const from = readDate(params, 'from');
+  const to = readDate(params, 'to');
+  const status = readStatus(params);
+  const cardId = readCardId(params);
+  const listUrl = `/company-cards${location.search}`;
+  const { text: searchText, setText: setSearchText } = useDebouncedSearch(
+    (next) => {
+      setParams(
+        (current) => {
+          const updated = new URLSearchParams(current);
+          if ((updated.get('busca') ?? '') === next) return current;
+          if (next) updated.set('busca', next);
+          else updated.delete('busca');
+          updated.delete('page');
+          return updated;
+        },
+        { replace: true },
+      );
+    },
+    400,
+    search,
+  );
+
+  useEffect(() => {
+    setSearchText(search);
+  }, [search, setSearchText]);
+
+  const cardsQuery = useQuery({
     queryKey: ['company-cards'],
     queryFn: companyCardService.list,
   });
+
+  const cards = useMemo(() => cardsQuery.data ?? [], [cardsQuery.data]);
+  const selected = cards.find((card) => card.id === cardId);
+  const openTotal = cards.reduce((sum, card) => sum + (card.openBalance ?? 0), 0);
+
   const statement = useQuery({
-    queryKey: ['company-cards', selectedId, 'statement'],
-    queryFn: () => companyCardService.statement(selectedId!),
-    enabled: Boolean(selectedId),
-  });
-  const accounts = useQuery({
-    queryKey: ['treasury', 'bank-accounts'],
-    queryFn: treasuryService.bankAccounts,
-  });
-  const issuers = useQuery({
-    queryKey: ['persons', 'instituicao', issuerSearch],
-    queryFn: () =>
-      personsService.list({
-        page: 1,
-        limit: 8,
-        sortField: 'name',
-        sortOrder: 'asc',
-        type: 'instituicao',
-        search: issuerSearch,
-      }),
-    enabled: open,
+    queryKey: ['company-cards', selected?.id, 'statement'],
+    queryFn: () => companyCardService.statement(selected!.id),
+    enabled: Boolean(selected),
   });
 
-  const save = useMutation({
-    mutationFn: () => {
-      const closingDay = Number(form.closingDay);
-      const dueDay = Number(form.dueDay);
-      if (!form.name.trim()) throw new Error('Informe o nome do cartão.');
-      if (!form.issuerId) throw new Error('Informe o emissor.');
-      if (!Number.isInteger(closingDay) || closingDay < 1 || closingDay > 28) {
-        throw new Error('O fechamento vai do dia 1 ao 28.');
-      }
-      if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 28) {
-        throw new Error('O vencimento vai do dia 1 ao 28.');
-      }
-      const payload = {
-        name: form.name.trim(),
-        issuerId: form.issuerId,
-        closingDay,
-        dueDay,
-        bankAccountId: form.bankAccountId || null,
-        isActive: form.isActive,
-      };
-      return editingId
-        ? companyCardService.update(editingId, payload)
-        : companyCardService.create(payload);
-    },
-    onSuccess: async (saved) => {
-      await queryClient.invalidateQueries({ queryKey: ['company-cards'] });
-      setOpen(false);
-      setSelectedId(saved.id);
-      toast.success('Cartão salvo.');
-    },
-    onError: (error: Error) => toast.error(error.message),
-  });
-
-  const openNew = () => {
-    setEditingId(null);
-    setForm(emptyForm);
-    setIssuerSearch('');
-    setOpen(true);
-  };
-
-  const openEdit = (card: CompanyCard) => {
-    setEditingId(card.id);
-    setForm({
-      name: card.name,
-      issuerId: card.issuerId,
-      issuerName: card.issuerName,
-      closingDay: String(card.closingDay),
-      dueDay: String(card.dueDay),
-      bankAccountId: card.bankAccountId ?? '',
-      isActive: card.isActive,
+  const entries = useMemo(() => {
+    if (!statement.data || statement.data.card.id !== selected?.id) return [];
+    return statement.data.entries;
+  }, [selected?.id, statement.data]);
+  const filtered = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase('pt-BR');
+    return entries.filter((entry) => {
+      const date = entry.occurredOn.slice(0, 10);
+      if (from && date < from) return false;
+      if (to && date > to) return false;
+      if (status !== 'all' && chargeSituation(entry) !== status) return false;
+      if (term && !entry.description.toLocaleLowerCase('pt-BR').includes(term))
+        return false;
+      return true;
     });
-    setIssuerSearch('');
-    setOpen(true);
+  }, [entries, from, search, status, to]);
+  const total = filtered.length;
+  const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+  const rows = filtered.slice((page - 1) * limit, page * limit);
+  const hasFilter = Boolean(search || from || to || status !== 'all');
+
+  const replaceParams = (change: (next: URLSearchParams) => void) => {
+    const next = new URLSearchParams(params);
+    change(next);
+    next.delete('page');
+    setParams(next, { replace: true });
   };
 
-  const selectedStatement =
-    statement.data?.card.id === selectedId ? statement.data : undefined;
+  const setPage = (nextPage: number) => {
+    const next = new URLSearchParams(params);
+    if (nextPage <= 1) next.delete('page');
+    else next.set('page', String(nextPage));
+    setParams(next, { replace: true });
+  };
+
+  const setLimit = (nextLimit: ListPageSize) => {
+    const next = new URLSearchParams(params);
+    if (nextLimit === 10) next.delete('limit');
+    else next.set('limit', String(nextLimit));
+    next.delete('page');
+    setParams(next, { replace: true });
+  };
+
+  const selectCard = (id: string) => {
+    replaceParams((updated) => {
+      updated.set('cartao', id);
+      updated.delete('busca');
+      updated.delete('from');
+      updated.delete('to');
+      updated.delete('situacao');
+    });
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold text-zinc-900">Cartões da empresa</h3>
-        <Button type="button" onClick={openNew}>
-          Novo cartão
+      <ListPageHeader
+        title="Cartões da empresa"
+        description="Cada compra entra no extrato. A cor da linha indica a situação, e o saldo em aberto é o que ainda não foi pago ao emissor."
+      >
+        <div className="rounded-[10px] border border-[#dfe5ee] bg-white px-4 py-2 text-right">
+          <p className="text-xs text-[#64748b]">Em aberto</p>
+          <p className="text-lg font-semibold tabular-nums text-[#172337]">
+            {formatCurrency(openTotal)}
+          </p>
+        </div>
+        <Button asChild>
+          <Link to="/company-cards/new" state={{ from: listUrl }}>
+            Novo cartão
+          </Link>
         </Button>
-      </div>
-      <p className="text-sm text-zinc-500">
-        Cada compra lançada no cartão entra no extrato. O saldo em aberto é o que ainda
-        não foi pago ao emissor.
-      </p>
-      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <div className="rounded-md border bg-white">
-          {cards.isLoading ? (
-            <p className="p-4 text-sm text-zinc-500">Carregando cartões...</p>
-          ) : (cards.data ?? []).length ? (
-            (cards.data ?? []).map((card) => (
-              <button
+      </ListPageHeader>
+
+      <div className="grid items-start gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <ListPanel title="Cartões" description="Clique no cartão para abrir o extrato.">
+          {cardsQuery.isLoading ? (
+            <ListMessage>Carregando cartões...</ListMessage>
+          ) : cardsQuery.isError ? (
+            <ListMessage tone="error">Não foi possível carregar os cartões.</ListMessage>
+          ) : cards.length === 0 ? (
+            <ListMessage>Nenhum cartão cadastrado.</ListMessage>
+          ) : (
+            cards.map((card) => (
+              <StatusListRow
                 key={card.id}
-                type="button"
-                className={`flex w-full flex-col items-start border-b px-4 py-3 text-left last:border-b-0 ${
-                  selectedId === card.id ? 'bg-zinc-100' : 'hover:bg-zinc-50'
-                } ${card.isActive ? '' : 'text-zinc-400'}`}
-                onClick={() => setSelectedId(card.id)}
+                columns={cardColumns}
+                tone={cardTone(card, card.id === selected?.id)}
+                label={`${card.name}, ${card.issuerName}, ${card.isActive ? 'ativo' : 'inativo'}, em aberto ${formatCurrency(card.openBalance ?? 0)}`}
+                onOpen={() => selectCard(card.id)}
               >
-                <span className="font-medium">{card.name}</span>
-                <span className="text-sm text-zinc-500">{card.issuerName}</span>
-                <span className="text-sm tabular-nums text-zinc-500">
-                  Em aberto {formatCurrency(card.openBalance ?? 0)}
+                <span className="min-w-0">
+                  <span className="block truncate font-bold text-[var(--status-text)]">
+                    {card.name}
+                  </span>
+                  <span className="block truncate text-xs text-[var(--status-text)]">
+                    {card.issuerName}
+                  </span>
                 </span>
-              </button>
+                <span className="text-right text-sm tabular-nums text-[var(--status-text)]">
+                  {formatCurrency(card.openBalance ?? 0)}
+                </span>
+              </StatusListRow>
             ))
-          ) : (
-            <p className="p-4 text-sm text-zinc-500">Nenhum cartão cadastrado.</p>
           )}
-        </div>
+        </ListPanel>
 
-        <div className="rounded-md border bg-white">
-          {selectedStatement ? (
-            <>
-              <div className="flex items-center justify-between border-b px-4 py-3">
-                <div>
-                  <p className="font-medium">{selectedStatement.card.name}</p>
-                  <p className="text-sm text-zinc-500">
-                    {selectedStatement.card.issuerName} · Fecha dia{' '}
-                    {selectedStatement.card.closingDay} · Vence dia{' '}
-                    {selectedStatement.card.dueDay}
-                  </p>
-                  <p className="text-sm text-zinc-500">
-                    Em aberto {formatCurrency(selectedStatement.openBalance)}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openEdit(selectedStatement.card)}
-                >
-                  Editar
+        <ListPanel
+          title="Extrato"
+          description={
+            selected
+              ? `${selected.issuerName} · Fecha dia ${selected.closingDay} · Vence dia ${selected.dueDay}${selected.isActive ? '' : ' · Inativo'}. Em aberto ${formatCurrency(statement.data?.openBalance ?? selected.openBalance ?? 0)}.`
+              : 'Selecione um cartão para ver o extrato.'
+          }
+          toolbar={
+            selected ? (
+              <>
+                <Button variant="outline" asChild>
+                  <Link to={`/company-cards/${selected.id}`} state={{ from: listUrl }}>
+                    Editar
+                  </Link>
                 </Button>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Histórico</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                    <TableHead>Situação</TableHead>
-                    <TableHead className="text-right">Saldo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedStatement.entries.length ? (
-                    selectedStatement.entries.map((entry) => (
-                      <TableRow
-                        key={entry.id}
-                        className={titleRowTextClass(entry.status, entry.dueOn)}
-                      >
-                        <TableCell>{formatRawDate(entry.occurredOn)}</TableCell>
-                        <TableCell>
-                          {entry.documentId ? (
-                            <Link
-                              to={`/inbound/${entry.documentId}`}
-                              className="hover:underline"
-                            >
-                              {entry.description}
-                            </Link>
-                          ) : (
-                            entry.description
-                          )}
-                        </TableCell>
-                        <TableCell>{formatRawDate(entry.dueOn)}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatCurrency(entry.amount)}
-                        </TableCell>
-                        <TableCell>{chargeLabel(entry.status, entry.dueOn)}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatCurrency(entry.balance)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={6} className="py-4 text-center text-zinc-500">
-                        Nenhuma compra neste cartão.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </>
-          ) : (
-            <p className="p-6 text-sm text-zinc-500">
-              {statement.isLoading
-                ? 'Carregando extrato...'
-                : statement.isError
-                  ? 'Não foi possível carregar o extrato.'
-                  : 'Selecione um cartão para ver o extrato.'}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar cartão' : 'Novo cartão'}</DialogTitle>
-          </DialogHeader>
-          <form
-            className="space-y-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              save.mutate();
-            }}
-          >
-            <div className="space-y-1">
-              <Label>Nome</Label>
-              <Input
-                value={form.name}
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Emissor</Label>
-              <p className="text-sm text-zinc-700">
-                {form.issuerName || 'Não selecionado'}
-              </p>
-              <Input
-                value={issuerSearch}
-                placeholder="Buscar instituição financeira"
-                onChange={(event) => setIssuerSearch(event.target.value)}
-              />
-              <ul>
-                {(issuers.data?.data ?? []).map((person) => (
-                  <li key={person.id}>
-                    <button
-                      type="button"
-                      className="text-left text-sm text-zinc-700 hover:underline"
-                      onClick={() => {
-                        setForm({
-                          ...form,
-                          issuerId: person.id,
-                          issuerName: person.name,
-                        });
-                        setIssuerSearch('');
-                      }}
-                    >
-                      {person.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label>Dia de fechamento</Label>
-                <Input
-                  value={form.closingDay}
-                  inputMode="numeric"
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      closingDay: event.target.value.replace(/\D/g, ''),
+                <ListSearch
+                  value={searchText}
+                  onChange={setSearchText}
+                  placeholder="Buscar pelo histórico..."
+                  label="Pesquisar o extrato"
+                />
+                <ListFilter
+                  value={status}
+                  onValueChange={(next) =>
+                    replaceParams((updated) => {
+                      if (next === 'all') updated.delete('situacao');
+                      else updated.set('situacao', next);
+                    })
+                  }
+                  label="Filtrar por situação"
+                  allLabel="Todas as situações"
+                  options={statuses.map((value) => ({
+                    value,
+                    label: statusLabels[value],
+                  }))}
+                />
+                <DateFilter
+                  label="De"
+                  value={from}
+                  onChange={(value) =>
+                    replaceParams((updated) => {
+                      if (value) updated.set('from', value);
+                      else updated.delete('from');
                     })
                   }
                 />
-              </div>
-              <div className="space-y-1">
-                <Label>Dia de vencimento</Label>
-                <Input
-                  value={form.dueDay}
-                  inputMode="numeric"
-                  onChange={(event) =>
-                    setForm({ ...form, dueDay: event.target.value.replace(/\D/g, '') })
+                <DateFilter
+                  label="Até"
+                  value={to}
+                  onChange={(value) =>
+                    replaceParams((updated) => {
+                      if (value) updated.set('to', value);
+                      else updated.delete('to');
+                    })
                   }
                 />
+              </>
+            ) : null
+          }
+        >
+          {!selected ? (
+            <ListMessage>Selecione um cartão para ver o extrato.</ListMessage>
+          ) : statement.isLoading ? (
+            <ListMessage>Carregando o extrato...</ListMessage>
+          ) : statement.isError ? (
+            <ListMessage tone="error">Não foi possível carregar o extrato.</ListMessage>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <div className="min-w-[760px]">
+                  <StatusListHeader columns={entryColumns}>
+                    <span>Data</span>
+                    <span>Histórico</span>
+                    <span>Vencimento</span>
+                    <span className="text-right">Valor</span>
+                    <span className="text-right">Saldo</span>
+                  </StatusListHeader>
+                  {rows.length === 0 ? (
+                    <ListMessage>
+                      {hasFilter
+                        ? 'Nenhuma compra encontrada.'
+                        : 'Nenhuma compra neste cartão.'}
+                    </ListMessage>
+                  ) : (
+                    rows.map((entry) => (
+                      <StatusListRow
+                        key={entry.id}
+                        columns={entryColumns}
+                        tone={titleRowTone(entry.status, entry.dueOn)}
+                        label={`${formatRawDate(entry.occurredOn)}, ${entry.description}, ${statusLabels[chargeSituation(entry)].toLocaleLowerCase('pt-BR')}`}
+                        onOpen={
+                          entry.documentId
+                            ? () => navigate(`/inbound/${entry.documentId}`)
+                            : undefined
+                        }
+                      >
+                        <span className="text-[var(--status-text)]">
+                          {formatRawDate(entry.occurredOn)}
+                        </span>
+                        <span className="min-w-0 truncate font-bold text-[var(--status-text)]">
+                          {entry.description}
+                        </span>
+                        <span className="text-[var(--status-text)]">
+                          {formatRawDate(entry.dueOn)}
+                        </span>
+                        <span className="text-right tabular-nums text-[var(--status-text)]">
+                          {formatCurrency(entry.amount)}
+                        </span>
+                        <span className="text-right font-semibold tabular-nums text-[var(--status-text)]">
+                          {formatCurrency(entry.balance)}
+                        </span>
+                      </StatusListRow>
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Conta que paga a fatura</Label>
-              <select
-                className="flex h-9 w-full rounded-md border px-3 text-sm"
-                value={form.bankAccountId}
-                onChange={(event) =>
-                  setForm({ ...form, bankAccountId: event.target.value })
-                }
-              >
-                <option value="">Nenhuma</option>
-                {(accounts.data ?? []).map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <label className="flex items-center gap-2 text-sm text-zinc-700">
-              <input
-                type="checkbox"
-                checked={form.isActive}
-                onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
+              <ListPagination
+                page={page}
+                limit={limit}
+                total={total}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
               />
-              Ativo
-            </label>
-            <Button type="submit" disabled={save.isPending}>
-              Salvar
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+            </>
+          )}
+        </ListPanel>
+      </div>
     </div>
   );
 }

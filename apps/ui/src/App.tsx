@@ -28,6 +28,7 @@ import { BankAccountPage } from './components/Financial/BankAccounts/BankAccount
 import { ListBankAccounts } from './components/Financial/BankAccounts/ListBankAccounts';
 import { ListCashBook } from './components/Financial/CashBook/ListCashBook';
 import { CashFlowView } from './components/Financial/CashFlow/CashFlowView';
+import { CompanyCardPage } from './components/Financial/CompanyCards/CompanyCardPage';
 import { CompanyCardsPage } from './components/Financial/CompanyCards/CompanyCardsPage';
 import { IncomeStatementView } from './components/Financial/IncomeStatement/IncomeStatementView';
 import { PayableList } from './components/Financial/Payables/PayableList';
@@ -394,6 +395,22 @@ function App() {
               element={
                 <Pagina>
                   <CompanyCardsPage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/company-cards/new"
+              element={
+                <Pagina>
+                  <CompanyCardPage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/company-cards/:id"
+              element={
+                <Pagina>
+                  <CompanyCardPage />
                 </Pagina>
               }
             />
