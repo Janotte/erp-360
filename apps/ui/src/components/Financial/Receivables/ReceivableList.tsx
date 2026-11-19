@@ -1,124 +1,185 @@
-import { formatCurrency, formatRawDate } from '@erp-360/shared';
 import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
-import {
-  ArrowDown,
-  ArrowDownLeft,
-  ArrowUp,
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Printer,
-  RotateCcw,
-  Search,
-  Trash2,
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
+  civilDate,
+  formatCurrency,
+  formatRawDate,
+  type ListPageSize,
+  listPageSizes,
+} from '@erp-360/shared';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Printer } from 'lucide-react';
+import { useState } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { ListPagination } from '@/components/ui/ListPagination';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  ListFilter,
+  ListMessage,
+  ListPageHeader,
+  ListPanel,
+  ListSearch,
+} from '@/components/ui/ListShell';
+import { StatusListHeader, StatusListRow } from '@/components/ui/StatusList';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import {
   type FinancialAccount,
   financialService,
   type TitleSortField,
 } from '@/services/financials';
 
-import { PayModal } from '../Payables/PayModal';
 import { openTitleReport } from '../titleReport';
-import { titleRowTextClass } from '../titleRowTone';
-import { ReceivableForm } from './ReceivableForm';
-import { ReplicateReceivableDialog } from './ReplicateReceivableDialog';
+import { titleRowTone } from '../titleRowTone';
 
-type ConfirmAction = 'delete' | 'reverse' | null;
+const columns =
+  'grid grid-cols-[minmax(110px,0.7fr)_minmax(160px,1.1fr)_minmax(180px,1.4fr)_104px_104px_120px]';
+
+const sortFields: TitleSortField[] = [
+  'documentNumber',
+  'personName',
+  'description',
+  'issueOn',
+  'dueOn',
+  'installmentAmount',
+];
+
+const statuses = ['pendente', 'atrasado', 'recebido', 'cancelado'] as const;
+type ReceivableStatusFilter = (typeof statuses)[number];
+
+const statusLabels: Record<ReceivableStatusFilter, string> = {
+  pendente: 'Pendente',
+  atrasado: 'Atrasado',
+  recebido: 'Recebido',
+  cancelado: 'Cancelado',
+};
+
+function readPage(params: URLSearchParams) {
+  const page = Number(params.get('page') ?? '1');
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function readSort(params: URLSearchParams): TitleSortField {
+  const value = params.get('sortField');
+  return sortFields.includes(value as TitleSortField)
+    ? (value as TitleSortField)
+    : 'dueOn';
+}
+
+function readOrder(params: URLSearchParams): 'asc' | 'desc' {
+  return params.get('sortOrder') === 'desc' ? 'desc' : 'asc';
+}
+
+function readLimit(params: URLSearchParams): ListPageSize {
+  const value = Number(params.get('limit'));
+  if ((listPageSizes as readonly number[]).includes(value)) return value as ListPageSize;
+  return 10;
+}
+
+function readStatus(params: URLSearchParams): ReceivableStatusFilter | 'all' {
+  const value = params.get('status');
+  return statuses.includes(value as ReceivableStatusFilter)
+    ? (value as ReceivableStatusFilter)
+    : 'all';
+}
+
+function readDate(params: URLSearchParams, key: string) {
+  const value = params.get(key) ?? '';
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+}
+
+function situationLabel(account: FinancialAccount) {
+  if (account.status === 'recebido') return 'recebida';
+  if (account.status === 'cancelado') return 'cancelada';
+  const due = account.dueOn.slice(0, 10);
+  const today = civilDate();
+  if (due < today) return 'atrasada';
+  if (due === today) return 'vence hoje';
+  return 'pendente';
+}
+
+function DateFilter({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-[13px] text-[#64748b]">
+      {label}
+      <Input
+        type="date"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-[42px] w-[148px] border-[#cbd5e1]"
+        aria-label={label}
+      />
+    </label>
+  );
+}
 
 export function ReceivableList() {
-  const queryClient = useQueryClient();
-  const [openReceive, setOpenReceive] = useState(false);
-  const [openForm, setOpenForm] = useState(false);
-  const [openReplicate, setOpenReplicate] = useState(false);
-  const [formReadOnly, setFormReadOnly] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<FinancialAccount | null>(null);
-  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const [searchText, setSearchText] = useState('');
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('todos');
-  const [dueFrom, setDueFrom] = useState('');
-  const [dueTo, setDueTo] = useState('');
-  const [issueFrom, setIssueFrom] = useState('');
-  const [issueTo, setIssueTo] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState<TitleSortField>('dueOn');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  const page = readPage(params);
+  const limit = readLimit(params);
+  const sortField = readSort(params);
+  const sortOrder = readOrder(params);
+  const search = params.get('busca') ?? '';
+  const status = readStatus(params);
+  const dueFrom = readDate(params, 'dueFrom');
+  const dueTo = readDate(params, 'dueTo');
+  const issueFrom = readDate(params, 'issueFrom');
+  const issueTo = readDate(params, 'issueTo');
+  const from = `/receivables${location.search}`;
   const [reportPending, setReportPending] = useState(false);
+  const { text: searchText, setText: setSearchText } = useDebouncedSearch(
+    (next) => {
+      setParams(
+        (current) => {
+          const updated = new URLSearchParams(current);
+          if ((updated.get('busca') ?? '') === next) return current;
+          if (next) updated.set('busca', next);
+          else updated.delete('busca');
+          updated.delete('page');
+          return updated;
+        },
+        { replace: true },
+      );
+    },
+    400,
+    search,
+  );
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearch((current) => {
-        const next = searchText.trim();
-        if (current !== next) setPage(1);
-        return next;
-      });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchText]);
-
-  const { data: response, isLoading } = useQuery({
+  const list = useQuery({
     queryKey: [
       'financial',
       'receivable',
-      { page, status, search, dueFrom, dueTo, issueFrom, issueTo, sortField, sortOrder },
+      {
+        page,
+        limit,
+        status,
+        search,
+        dueFrom,
+        dueTo,
+        issueFrom,
+        issueTo,
+        sortField,
+        sortOrder,
+      },
     ],
     placeholderData: keepPreviousData,
     queryFn: () =>
       financialService.list('receivable', {
         page,
-        limit: 10,
+        limit,
         sortField,
         sortOrder,
-        status: status === 'todos' ? undefined : status,
+        status: status === 'all' ? undefined : status,
         search: search || undefined,
         dueFrom: dueFrom || undefined,
         dueTo: dueTo || undefined,
@@ -127,56 +188,67 @@ export function ReceivableList() {
       }),
   });
 
-  const changeSort = (field: TitleSortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-    setPage(1);
+  const replaceParams = (change: (next: URLSearchParams) => void) => {
+    const next = new URLSearchParams(params);
+    change(next);
+    next.delete('page');
+    setParams(next, { replace: true });
   };
 
-  const renderSortIcon = (field: TitleSortField) => {
-    if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4 shrink-0" />;
+  const changeSort = (field: TitleSortField) => {
+    const order = sortField === field && sortOrder === 'asc' ? 'desc' : 'asc';
+    replaceParams((next) => {
+      if (field === 'dueOn') next.delete('sortField');
+      else next.set('sortField', field);
+      if (order === 'asc') next.delete('sortOrder');
+      else next.set('sortOrder', order);
+    });
+  };
+
+  const changeStatus = (nextStatus: ReceivableStatusFilter | 'all') => {
+    replaceParams((next) => {
+      if (nextStatus === 'all') next.delete('status');
+      else next.set('status', nextStatus);
+    });
+  };
+
+  const changeDate = (key: string, value: string) => {
+    replaceParams((next) => {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    });
+  };
+
+  const setPage = (nextPage: number) => {
+    const next = new URLSearchParams(params);
+    if (nextPage <= 1) next.delete('page');
+    else next.set('page', String(nextPage));
+    setParams(next, { replace: true });
+  };
+
+  const setLimit = (nextLimit: ListPageSize) => {
+    const next = new URLSearchParams(params);
+    if (nextLimit === 10) next.delete('limit');
+    else next.set('limit', String(nextLimit));
+    next.delete('page');
+    setParams(next, { replace: true });
+  };
+
+  const sortIcon = (field: TitleSortField) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3.5 w-3.5" />;
     return sortOrder === 'asc' ? (
-      <ArrowUp className="ml-2 h-4 w-4 shrink-0 text-primary" />
+      <ArrowUp className="h-3.5 w-3.5" />
     ) : (
-      <ArrowDown className="ml-2 h-4 w-4 shrink-0 text-primary" />
+      <ArrowDown className="h-3.5 w-3.5" />
     );
   };
-
-  const meta = response?.meta;
-  const accounts = response?.data;
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => financialService.delete('receivable', id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['financial', 'receivable'] });
-      setConfirmAction(null);
-      setActionError(null);
-      toast.success('Conta a receber excluída com sucesso!');
-    },
-    onError: (error: Error) => setActionError(error.message),
-  });
-
-  const reverseMutation = useMutation({
-    mutationFn: (id: string) => financialService.reverse('receivable', id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['financial', 'receivable'] });
-      setConfirmAction(null);
-      setActionError(null);
-      toast.success('Recebimento estornado com sucesso!');
-    },
-    onError: (error: Error) => setActionError(error.message),
-  });
 
   const openReport = async () => {
     setReportPending(true);
     try {
       await openTitleReport({
         kind: 'receivable',
-        status,
+        status: status === 'all' ? 'todos' : status,
         search: search || undefined,
         dueFrom: dueFrom || undefined,
         dueTo: dueTo || undefined,
@@ -192,461 +264,188 @@ export function ReceivableList() {
     }
   };
 
-  const openCreate = () => {
-    setSelectedAccount(null);
-    setFormReadOnly(false);
-    setOpenForm(true);
-  };
-
-  const openEdit = (account: FinancialAccount) => {
-    setSelectedAccount(account);
-    setFormReadOnly(false);
-    setOpenForm(true);
-  };
-
-  const openView = (account: FinancialAccount) => {
-    setSelectedAccount(account);
-    setFormReadOnly(true);
-    setOpenForm(true);
-  };
-
-  const handleReceive = (account: FinancialAccount) => {
-    setSelectedAccount(account);
-    setOpenReceive(true);
-  };
-
-  const openConfirm = (account: FinancialAccount, action: ConfirmAction) => {
-    setSelectedAccount(account);
-    setActionError(null);
-    setConfirmAction(action);
-  };
-
-  if (isLoading && !response)
-    return <p className="text-sm text-zinc-500">Carregando contas a receber...</p>;
-
-  const confirmPending = deleteMutation.isPending || reverseMutation.isPending;
+  const rows = list.data?.data ?? [];
+  const meta = list.data?.meta;
+  const filtered = Boolean(
+    search || status !== 'all' || dueFrom || dueTo || issueFrom || issueTo,
+  );
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div>
-          <h3 className="text-lg font-bold text-zinc-900">Contas a Receber</h3>
-          <p className="text-sm text-zinc-500">Gerencie contas a receber.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={() => void openReport()}
-            disabled={reportPending}
-          >
-            <Printer className="h-4 w-4" />
-            {reportPending ? 'Gerando...' : 'Relatório'}
-          </Button>
-          <Button size="sm" className="gap-2" onClick={openCreate}>
-            <Plus className="h-4 w-4" /> Novo Receber
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3 bg-white p-4 rounded-lg border border-zinc-200">
-        <div className="flex flex-col sm:flex-row gap-3 items-center">
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
-            <Input
-              placeholder="Buscar por devedor, descrição ou documento..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select
-            value={status}
-            onValueChange={(v) => {
-              setStatus(v);
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="w-full sm:w-44">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os status</SelectItem>
-              <SelectItem value="pendente">Pendente</SelectItem>
-              <SelectItem value="atrasado">Atrasado</SelectItem>
-              <SelectItem value="recebido">Recebido</SelectItem>
-              <SelectItem value="cancelado">Cancelado</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3 items-center">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="text-sm text-zinc-500 shrink-0">Venc. de</span>
-            <Input
-              type="date"
-              value={dueFrom}
-              onChange={(e) => {
-                setDueFrom(e.target.value);
-                setPage(1);
-              }}
-              className="w-full sm:w-40"
-            />
-          </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="text-sm text-zinc-500 shrink-0">até</span>
-            <Input
-              type="date"
-              value={dueTo}
-              onChange={(e) => {
-                setDueTo(e.target.value);
-                setPage(1);
-              }}
-              className="w-full sm:w-40"
-            />
-          </div>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3 items-center">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="text-sm text-zinc-500 shrink-0">Emissão de</span>
-            <Input
-              type="date"
-              value={issueFrom}
-              onChange={(e) => {
-                setIssueFrom(e.target.value);
-                setPage(1);
-              }}
-              className="w-full sm:w-40"
-            />
-          </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="text-sm text-zinc-500 shrink-0">até</span>
-            <Input
-              type="date"
-              value={issueTo}
-              onChange={(e) => {
-                setIssueTo(e.target.value);
-                setPage(1);
-              }}
-              className="w-full sm:w-40"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-md border border-zinc-200 bg-white shadow-2xs">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead
-                onClick={() => changeSort('documentNumber')}
-                className="cursor-pointer select-none hover:bg-zinc-50"
-              >
-                <div className="flex items-center">
-                  Documento {renderSortIcon('documentNumber')}
-                </div>
-              </TableHead>
-              <TableHead
-                onClick={() => changeSort('personName')}
-                className="cursor-pointer select-none hover:bg-zinc-50"
-              >
-                <div className="flex items-center">
-                  Devedor {renderSortIcon('personName')}
-                </div>
-              </TableHead>
-              <TableHead
-                onClick={() => changeSort('description')}
-                className="cursor-pointer select-none hover:bg-zinc-50"
-              >
-                <div className="flex items-center">
-                  Descrição {renderSortIcon('description')}
-                </div>
-              </TableHead>
-              <TableHead
-                onClick={() => changeSort('issueOn')}
-                className="cursor-pointer select-none hover:bg-zinc-50"
-              >
-                <div className="flex items-center">
-                  Emissão {renderSortIcon('issueOn')}
-                </div>
-              </TableHead>
-              <TableHead
-                onClick={() => changeSort('dueOn')}
-                className="cursor-pointer select-none hover:bg-zinc-50"
-              >
-                <div className="flex items-center">
-                  Vencimento {renderSortIcon('dueOn')}
-                </div>
-              </TableHead>
-              <TableHead
-                onClick={() => changeSort('installmentAmount')}
-                className="cursor-pointer select-none hover:bg-zinc-50 text-right"
-              >
-                <div className="flex items-center justify-end">
-                  Valor {renderSortIcon('installmentAmount')}
-                </div>
-              </TableHead>
-              <TableHead className="w-12" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-4">
-                  Carregando dados...
-                </TableCell>
-              </TableRow>
-            ) : accounts?.length ? (
-              accounts.map((acc) => (
-                <TableRow
-                  key={acc.id}
-                  className={titleRowTextClass(acc.status, acc.dueOn)}
-                >
-                  <TableCell>{acc.documentNumber || '-'}</TableCell>
-                  <TableCell>{acc.personName || '-'}</TableCell>
-                  <TableCell className="font-medium">{acc.description}</TableCell>
-                  <TableCell>{formatRawDate(acc.issueOn)}</TableCell>
-                  <TableCell>{formatRawDate(acc.dueOn)}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatCurrency(acc.installmentAmount)}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Ações de ${acc.description}`}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {acc.status === 'pendente' && (
-                          <>
-                            <DropdownMenuItem onClick={() => openEdit(acc)}>
-                              <Pencil className="h-4 w-4" /> Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleReceive(acc)}>
-                              <ArrowDownLeft className="h-4 w-4" /> Receber
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-red-600 focus:text-red-600"
-                              onClick={() => openConfirm(acc, 'delete')}
-                            >
-                              <Trash2 className="h-4 w-4" /> Excluir
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        {(acc.status === 'recebido' || acc.status === 'cancelado') && (
-                          <>
-                            <DropdownMenuItem onClick={() => openView(acc)}>
-                              <Eye className="h-4 w-4" /> Visualizar
-                            </DropdownMenuItem>
-                            {acc.status === 'recebido' && (
-                              <DropdownMenuItem
-                                onClick={() => openConfirm(acc, 'reverse')}
-                              >
-                                <RotateCcw className="h-4 w-4" /> Estornar
-                              </DropdownMenuItem>
-                            )}
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-4 text-zinc-500">
-                  Nenhuma conta a receber encontrada.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {meta && meta.totalPages > 1 && (
-        <div className="flex items-center justify-between bg-white px-4 py-3 rounded-lg border border-zinc-200">
-          <div className="text-sm text-zinc-500">
-            Mostrando página <strong className="text-zinc-900">{meta.page}</strong> de{' '}
-            <strong className="text-zinc-900">{meta.totalPages}</strong> ({meta.total}{' '}
-            registros no total)
-          </div>
-          <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((old) => Math.max(old - 1, 1))}
-              disabled={page === 1}
-              className="gap-1"
-            >
-              <ChevronLeft className="h-4 w-4" /> Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((old) => (page < meta.totalPages ? old + 1 : old))}
-              disabled={page === meta.totalPages}
-              className="gap-1"
-            >
-              Próximo <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <Dialog
-        open={openForm}
-        onOpenChange={(open) => {
-          setOpenForm(open);
-          if (!open) {
-            setSelectedAccount(null);
-            setFormReadOnly(false);
-          }
-        }}
+      <ListPageHeader
+        title="Contas a receber"
+        description="Documento, cliente, vencimento e valor. A cor da linha indica a situação."
       >
-        <DialogContent
-          className="sm:max-w-lg"
-          onOpenAutoFocus={(event) => {
-            if (selectedAccount) event.preventDefault();
-          }}
+        <Button
+          variant="outline"
+          onClick={() => void openReport()}
+          disabled={reportPending}
         >
-          <DialogHeader>
-            <DialogTitle>
-              {formReadOnly
-                ? 'Visualizar Conta a Receber'
-                : selectedAccount
-                  ? 'Editar Conta a Receber'
-                  : 'Lançar Conta a Receber'}
-            </DialogTitle>
-          </DialogHeader>
-          <ReceivableForm
-            key={`${selectedAccount?.id ?? 'new'}-${formReadOnly ? 'view' : 'edit'}`}
-            accountToUpdate={selectedAccount}
-            readOnly={formReadOnly}
-            onReplicate={
-              selectedAccount
-                ? () => {
-                    setOpenForm(false);
-                    setOpenReplicate(true);
+          <Printer className="h-4 w-4" />
+          {reportPending ? 'Gerando...' : 'Relatório'}
+        </Button>
+        <Button asChild>
+          <Link to="/receivables/new" state={{ from }}>
+            <Plus className="h-4 w-4" />
+            Novo receber
+          </Link>
+        </Button>
+      </ListPageHeader>
+
+      <ListPanel
+        title="Lista de contas"
+        description="Clique na linha para abrir. O hover mantém a cor de cada situação."
+        toolbar={
+          <>
+            <ListSearch
+              value={searchText}
+              onChange={setSearchText}
+              placeholder="Buscar por cliente ou documento..."
+              label="Pesquisar contas a receber"
+            />
+            <ListFilter
+              value={status}
+              onValueChange={changeStatus}
+              label="Filtrar por situação"
+              allLabel="Todas as situações"
+              options={statuses.map((value) => ({
+                value,
+                label: statusLabels[value],
+              }))}
+            />
+            <DateFilter
+              label="Venc. de"
+              value={dueFrom}
+              onChange={(value) => changeDate('dueFrom', value)}
+            />
+            <DateFilter
+              label="Venc. até"
+              value={dueTo}
+              onChange={(value) => changeDate('dueTo', value)}
+            />
+            <DateFilter
+              label="Emissão de"
+              value={issueFrom}
+              onChange={(value) => changeDate('issueFrom', value)}
+            />
+            <DateFilter
+              label="Emissão até"
+              value={issueTo}
+              onChange={(value) => changeDate('issueTo', value)}
+            />
+          </>
+        }
+      >
+        <div className="overflow-x-auto">
+          <div className="min-w-[860px]">
+            <StatusListHeader columns={columns}>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-left"
+                onClick={() => changeSort('documentNumber')}
+              >
+                Documento
+                {sortIcon('documentNumber')}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-left"
+                onClick={() => changeSort('personName')}
+              >
+                Cliente
+                {sortIcon('personName')}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-left"
+                onClick={() => changeSort('description')}
+              >
+                Descrição
+                {sortIcon('description')}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-left"
+                onClick={() => changeSort('issueOn')}
+              >
+                Emissão
+                {sortIcon('issueOn')}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-left"
+                onClick={() => changeSort('dueOn')}
+              >
+                Vencimento
+                {sortIcon('dueOn')}
+              </button>
+              <button
+                type="button"
+                className="inline-flex w-full items-center justify-end gap-1 text-right"
+                onClick={() => changeSort('installmentAmount')}
+              >
+                Valor
+                {sortIcon('installmentAmount')}
+              </button>
+            </StatusListHeader>
+
+            {list.isLoading ? (
+              <ListMessage>Carregando as contas a receber...</ListMessage>
+            ) : list.isError ? (
+              <ListMessage tone="error">
+                Não foi possível carregar as contas a receber.
+              </ListMessage>
+            ) : rows.length === 0 ? (
+              <ListMessage>
+                {filtered
+                  ? 'Nenhuma conta a receber encontrada.'
+                  : 'Ainda não há conta a receber.'}
+              </ListMessage>
+            ) : (
+              rows.map((account) => (
+                <StatusListRow
+                  key={account.id}
+                  columns={columns}
+                  tone={titleRowTone(account.status, account.dueOn)}
+                  label={`${account.description}, ${account.personName ?? 'sem cliente'}, ${situationLabel(account)}`}
+                  onOpen={() =>
+                    navigate(`/receivables/${account.id}`, { state: { from } })
                   }
-                : undefined
-            }
-            onSuccess={() => {
-              setOpenForm(false);
-              setSelectedAccount(null);
-              setFormReadOnly(false);
-            }}
+                >
+                  <span className="min-w-0 truncate text-[var(--status-text)]">
+                    {account.documentNumber || '—'}
+                  </span>
+                  <span className="min-w-0 truncate text-[var(--status-text)]">
+                    {account.personName || '—'}
+                  </span>
+                  <span className="min-w-0 truncate font-bold text-[var(--status-text)]">
+                    {account.description}
+                  </span>
+                  <span className="text-[var(--status-text)]">
+                    {formatRawDate(account.issueOn)}
+                  </span>
+                  <span className="text-[var(--status-text)]">
+                    {formatRawDate(account.dueOn)}
+                  </span>
+                  <span className="text-right tabular-nums text-[var(--status-text)]">
+                    {formatCurrency(account.installmentAmount)}
+                  </span>
+                </StatusListRow>
+              ))
+            )}
+          </div>
+        </div>
+        {meta ? (
+          <ListPagination
+            page={page}
+            limit={limit}
+            total={meta.total}
+            totalPages={meta.totalPages}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
           />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={openReplicate}
-        onOpenChange={(open) => {
-          setOpenReplicate(open);
-          if (!open) setSelectedAccount(null);
-        }}
-      >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Replicar Conta a Receber</DialogTitle>
-          </DialogHeader>
-          {selectedAccount && (
-            <ReplicateReceivableDialog
-              source={selectedAccount}
-              onCancel={() => {
-                setOpenReplicate(false);
-                setSelectedAccount(null);
-              }}
-              onSuccess={() => {
-                setOpenReplicate(false);
-                setSelectedAccount(null);
-                setFormReadOnly(false);
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={openReceive}
-        onOpenChange={(open) => {
-          setOpenReceive(open);
-          if (!open) setSelectedAccount(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Receber Conta a Receber</DialogTitle>
-          </DialogHeader>
-          {selectedAccount && (
-            <PayModal
-              tipo="receivable"
-              account={selectedAccount}
-              onSuccess={() => {
-                setOpenReceive(false);
-                setSelectedAccount(null);
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog
-        open={confirmAction !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setConfirmAction(null);
-            setActionError(null);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {confirmAction === 'delete'
-                ? 'Excluir conta a receber'
-                : 'Estornar recebimento'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {actionError ??
-                (confirmAction === 'delete'
-                  ? `Deseja excluir ${selectedAccount?.description ?? 'esta conta'}? Essa ação não pode ser desfeita.`
-                  : `Deseja estornar o recebimento de ${selectedAccount?.description ?? 'esta conta'}? O título voltará para pendente.`)}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className={
-                confirmAction === 'delete'
-                  ? 'bg-red-600 hover:bg-red-700'
-                  : 'bg-amber-600 hover:bg-amber-700'
-              }
-              disabled={confirmPending || !!actionError}
-              onClick={(event) => {
-                event.preventDefault();
-                if (!selectedAccount) return;
-                if (confirmAction === 'delete') {
-                  deleteMutation.mutate(selectedAccount.id);
-                } else if (confirmAction === 'reverse') {
-                  reverseMutation.mutate(selectedAccount.id);
-                }
-              }}
-            >
-              {confirmPending
-                ? 'Processando...'
-                : confirmAction === 'delete'
-                  ? 'Excluir'
-                  : 'Estornar'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        ) : null}
+      </ListPanel>
     </div>
   );
 }

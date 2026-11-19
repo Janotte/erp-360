@@ -119,10 +119,15 @@ async function receivablePayment(
     .select({ meansOfPaymentId: paymentMethods.meansOfPaymentId })
     .from(paymentMethods)
     .where(
-      and(eq(paymentMethods.id, data.paymentMethodId), eq(paymentMethods.tenantId, tenantId)),
+      and(
+        eq(paymentMethods.id, data.paymentMethodId),
+        eq(paymentMethods.tenantId, tenantId),
+      ),
     );
   if (!method) {
-    const error = new Error('Forma de pagamento não encontrada.') as Error & { status: number };
+    const error = new Error('Forma de pagamento não encontrada.') as Error & {
+      status: number;
+    };
     error.status = 400;
     throw error;
   }
@@ -268,6 +273,41 @@ export const receivablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           totalPages: Math.ceil(Number(totalCount?.count || 0) / limit),
         },
       });
+    },
+  );
+
+  fastify.get(
+    '/:id',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: {
+          200: receivableTitleSchema,
+          404: errorMessageSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { tenantId } = request.user;
+      const { id } = request.params;
+      const debtor = and(
+        eq(persons.id, receivables.debtorId),
+        eq(persons.tenantId, receivables.tenantId),
+      );
+      const [row] = await db
+        .select({
+          ...getTableColumns(receivables),
+          personName: persons.name,
+        })
+        .from(receivables)
+        .innerJoin(persons, debtor)
+        .where(and(eq(receivables.id, id), eq(receivables.tenantId, tenantId)))
+        .limit(1);
+
+      if (!row) {
+        return reply.status(404).send({ message: 'Conta a receber não encontrada.' });
+      }
+      return row;
     },
   );
 

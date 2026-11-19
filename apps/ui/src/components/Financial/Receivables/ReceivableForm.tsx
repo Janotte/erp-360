@@ -12,10 +12,19 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { PersonSearchSelect } from '@/components/Persons/PersonSearchSelect';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FloatingInput } from '@/components/ui/FloatingField';
 import {
   type CreateReceivableInput,
   type FinancialAccount,
@@ -25,17 +34,26 @@ import { type PaymentMethod, paymentMethodsService } from '@/services/paymentMet
 import { type BankAccount, treasuryService } from '@/services/treasury';
 
 import {
-  instrumentProfile,
   type InstrumentField,
+  instrumentProfile,
   visibleInstrumentFields,
 } from './receivableInstrument';
 
 interface ReceivableFormProps {
   accountToUpdate?: FinancialAccount | null;
-  readOnly?: boolean;
-  onSuccess: () => void;
+  onSuccess?: () => void;
+  onCancel?: () => void;
+  onDeleted?: () => void;
+  onReceive?: () => void;
   onReplicate?: () => void;
 }
+
+const statusLabels: Record<FinancialAccount['status'], string> = {
+  pendente: 'Pendente',
+  pago: 'Pago',
+  recebido: 'Recebido',
+  cancelado: 'Cancelado',
+};
 
 interface MethodOption {
   id: string;
@@ -63,17 +81,21 @@ function institutionIdOf(method: MethodOption, accounts: BankAccount[]): string 
   if (method.acquirerId) return method.acquirerId;
   if (!method.bankAccountId) return '';
   return (
-    accounts.find((account) => account.id === method.bankAccountId)?.financialInstitutionId || ''
+    accounts.find((account) => account.id === method.bankAccountId)
+      ?.financialInstitutionId || ''
   );
 }
 
 export function ReceivableForm({
   accountToUpdate,
-  readOnly = false,
   onSuccess,
+  onCancel,
+  onDeleted,
+  onReceive,
   onReplicate,
 }: ReceivableFormProps) {
   const queryClient = useQueryClient();
+  const readOnly = Boolean(accountToUpdate && accountToUpdate.status !== 'pendente');
   const bankPrefillFor = useRef('');
   const [personId, setPersonId] = useState(accountToUpdate?.personId ?? '');
   const [documentNumber, setDocumentNumber] = useState('');
@@ -91,6 +113,9 @@ export function ReceivableForm({
   const [barcode, setBarcode] = useState('');
   const [bankSlipOurNumber, setBankSlipOurNumber] = useState('');
   const [transactionAuthorization, setTransactionAuthorization] = useState('');
+  const [openDelete, setOpenDelete] = useState(false);
+  const [openReverse, setOpenReverse] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const restoreInstrument = (account: FinancialAccount) => {
     setFinancialInstitutionId(account.financialInstitutionId || '');
@@ -250,16 +275,26 @@ export function ReceivableForm({
     const keepTyped = method.meansOfPaymentId === meansOfPaymentId;
     setMeansOfPaymentId(method.meansOfPaymentId);
     setFinancialInstitutionId((current) =>
-      fields.has('financialInstitution') ? (keepTyped && current ? current : institutionId) : '',
+      fields.has('financialInstitution')
+        ? keepTyped && current
+          ? current
+          : institutionId
+        : '',
     );
     setCardBrandId((current) =>
-      fields.has('cardBrand') ? (keepTyped && current ? current : method.cardBrandId || '') : '',
+      fields.has('cardBrand')
+        ? keepTyped && current
+          ? current
+          : method.cardBrandId || ''
+        : '',
     );
-    if (!keepTyped || !fields.has('transactionAuthorization')) setTransactionAuthorization('');
+    if (!keepTyped || !fields.has('transactionAuthorization'))
+      setTransactionAuthorization('');
     if (!keepTyped || !fields.has('bearerName')) setBearerName('');
     if (!keepTyped || !fields.has('bankSlipOurNumber')) setBankSlipOurNumber('');
     if (!keepTyped || !fields.has('barcode')) setBarcode('');
-    bankPrefillFor.current = method.acquirerId || !method.bankAccountId || institutionId ? id : '';
+    bankPrefillFor.current =
+      method.acquirerId || !method.bankAccountId || institutionId ? id : '';
   };
 
   const applyMeans = (id: string) => {
@@ -283,9 +318,31 @@ export function ReceivableForm({
           ? 'Conta a receber atualizada com sucesso!'
           : 'Conta a receber lançada com sucesso!',
       );
-      onSuccess();
+      onSuccess?.();
     },
     onError: (err: Error) => toast.error(`Erro: ${err.message}`),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => financialService.delete('receivable', accountToUpdate?.id ?? ''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['financial', 'receivable'] });
+      toast.success('Conta a receber excluída com sucesso!');
+      onDeleted?.();
+    },
+    onError: (error: Error) => setActionError(error.message),
+  });
+
+  const reverseMutation = useMutation({
+    mutationFn: () => financialService.reverse('receivable', accountToUpdate?.id ?? ''),
+    onSuccess: (saved) => {
+      queryClient.setQueryData(['financial', 'receivable', saved.id], saved);
+      queryClient.invalidateQueries({ queryKey: ['financial', 'receivable'] });
+      setOpenReverse(false);
+      setActionError(null);
+      toast.success('Recebimento estornado com sucesso!');
+    },
+    onError: (error: Error) => setActionError(error.message),
   });
 
   const optionalId = (value: string) => (value ? value : undefined);
@@ -296,7 +353,22 @@ export function ReceivableForm({
     e.preventDefault();
     if (readOnly) return;
     const installmentAmount = parseCurrencyToCents(amountStr);
-    if (!personId || !description || !dueOn || installmentAmount <= 0) return;
+    if (!personId) {
+      toast.error('Informe o cliente.');
+      return;
+    }
+    if (!description.trim()) {
+      toast.error('Informe a descrição.');
+      return;
+    }
+    if (!dueOn) {
+      toast.error('Informe o vencimento.');
+      return;
+    }
+    if (installmentAmount <= 0) {
+      toast.error('Informe o valor.');
+      return;
+    }
     if (meansOfPaymentId && !meanCode) {
       toast.error('Aguarde o carregamento do meio de pagamento.');
       return;
@@ -326,144 +398,130 @@ export function ReceivableForm({
       bearerName: shownValue('bearerName', bearerName),
       barcode: shownValue('barcode', barcode),
       bankSlipOurNumber: shownValue('bankSlipOurNumber', bankSlipOurNumber),
-      transactionAuthorization: shownValue('transactionAuthorization', transactionAuthorization),
+      transactionAuthorization: shownValue(
+        'transactionAuthorization',
+        transactionAuthorization,
+      ),
     });
   };
 
   const showSettlement =
-    readOnly &&
     accountToUpdate &&
     (accountToUpdate.status === 'recebido' || accountToUpdate.settledOn);
+  const busy =
+    mutation.isPending || deleteMutation.isPending || reverseMutation.isPending;
 
   const documentLabel =
-    meanCode === '02' ? 'Nº do cheque' : meanCode === '14' ? 'Nº da duplicata' : 'Nº do Documento';
+    meanCode === '02'
+      ? 'Nº do cheque'
+      : meanCode === '14'
+        ? 'Nº da duplicata'
+        : 'Nº do documento';
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pt-2"
-    >
-      {showSettlement && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm space-y-1">
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {showSettlement && accountToUpdate ? (
+        <div className="space-y-1 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
           <p className="font-medium text-emerald-800">Liquidação</p>
           <p className="text-emerald-700">
-            Data: <strong>{formatRawDate(accountToUpdate.settledOn) || '-'}</strong>
+            Data: <strong>{formatRawDate(accountToUpdate.settledOn) || '—'}</strong>
           </p>
           <p className="text-emerald-700">
             Valor recebido:{' '}
             <strong>{formatCurrency(accountToUpdate.settledAmount)}</strong>
           </p>
           <p className="text-emerald-700">
-            Status: <strong>{accountToUpdate.status}</strong>
+            Situação: <strong>{statusLabels[accountToUpdate.status]}</strong>
           </p>
         </div>
-      )}
+      ) : null}
 
-      <div className="space-y-1">
-        <Label>Cliente</Label>
-        <PersonSearchSelect
-          value={personId}
-          onChange={setPersonId}
-          type="cliente"
-          placeholder="Buscar cliente por nome ou documento..."
+      <PersonSearchSelect
+        label="Cliente"
+        value={personId}
+        onChange={setPersonId}
+        type="cliente"
+        placeholder="Buscar cliente por nome ou documento..."
+        required={!readOnly}
+        disabled={readOnly}
+      />
+
+      <div className="grid grid-cols-2 gap-4">
+        <FloatingInput
+          id="documentNumber"
+          label={documentLabel}
+          value={documentNumber}
+          maxLength={44}
+          disabled={readOnly}
+          onChange={(event) => setDocumentNumber(event.target.value)}
+        />
+        <FloatingInput
+          id="invoiceNumber"
+          label="Nº da fatura"
+          value={invoiceNumber}
+          maxLength={44}
+          disabled={readOnly}
+          onChange={(event) => setInvoiceNumber(event.target.value)}
+        />
+      </div>
+
+      <FloatingInput
+        id="description"
+        label="Descrição da venda ou serviço"
+        value={description}
+        maxLength={255}
+        required={!readOnly}
+        disabled={readOnly}
+        onChange={(event) => setDescription(event.target.value)}
+      />
+
+      <div className="grid grid-cols-2 gap-4">
+        <FloatingInput
+          id="issueOn"
+          label="Emissão"
+          type="date"
+          value={issueOn}
           required={!readOnly}
           disabled={readOnly}
+          onChange={(event) => setIssueOn(event.target.value)}
         />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="documentNumber">{documentLabel}</Label>
-          <Input
-            id="documentNumber"
-            value={documentNumber}
-            maxLength={44}
-            onChange={(e) => setDocumentNumber(e.target.value)}
-            disabled={readOnly}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="invoiceNumber">Nº da Fatura</Label>
-          <Input
-            id="invoiceNumber"
-            value={invoiceNumber}
-            maxLength={44}
-            onChange={(e) => setInvoiceNumber(e.target.value)}
-            disabled={readOnly}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="description">Descrição da venda ou serviço</Label>
-        <Input
-          id="description"
-          value={description}
-          maxLength={255}
-          onChange={(e) => setDescription(e.target.value)}
+        <FloatingInput
+          id="dueOn"
+          label="Vencimento"
+          type="date"
+          value={dueOn}
           required={!readOnly}
           disabled={readOnly}
+          onChange={(event) => setDueOn(event.target.value)}
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="issueOn">Emissão</Label>
-          <Input
-            id="issueOn"
-            type="date"
-            value={issueOn}
-            onChange={(e) => setIssueOn(e.target.value)}
-            required={!readOnly}
-            disabled={readOnly}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="dueOn">Vencimento</Label>
-          <Input
-            id="dueOn"
-            type="date"
-            value={dueOn}
-            onChange={(e) => setDueOn(e.target.value)}
-            required={!readOnly}
-            disabled={readOnly}
-          />
-        </div>
-      </div>
+      <FloatingInput
+        id="amount"
+        label="Valor"
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        value={amountStr}
+        required={!readOnly}
+        disabled={readOnly}
+        onChange={(event) => setAmountStr(maskCurrencyInput(event.target.value))}
+      />
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="amount">Valor (R$)</Label>
-          <Input
-            id="amount"
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="0,00"
-            value={amountStr}
-            onChange={(e) => setAmountStr(maskCurrencyInput(e.target.value))}
-            required={!readOnly}
-            disabled={readOnly}
-          />
-        </div>
-      </div>
+      <CatalogSearchSelect
+        label="Plano de contas"
+        value={planAccountId}
+        onChange={setPlanAccountId}
+        options={planAccounts}
+        placeholder="Buscar plano de contas..."
+        emptyMessage="Nenhum plano de contas cadastrado."
+        allowClear={!readOnly}
+        disabled={readOnly}
+      />
 
-      <div className="space-y-1">
-        <Label>Plano de contas</Label>
+      <div className="space-y-2">
         <CatalogSearchSelect
-          value={planAccountId}
-          onChange={setPlanAccountId}
-          options={planAccounts}
-          placeholder="Buscar plano de contas..."
-          emptyMessage="Nenhum plano de contas cadastrado."
-          allowClear={!readOnly}
-          disabled={readOnly}
-        />
-      </div>
-
-      <div className="space-y-1">
-        <Label>Forma de pagamento</Label>
-        <CatalogSearchSelect
+          label="Forma de pagamento"
           value={paymentMethodId}
           onChange={applyMethod}
           options={methodChoices}
@@ -478,17 +536,17 @@ export function ReceivableForm({
           required={!readOnly && profile.requiresPaymentMethod}
         />
         {meanCode === '99' && !paymentMethodId ? (
-          <p className="text-xs text-zinc-500">
+          <p className="text-sm text-zinc-500">
             Outros exige uma forma. O nome dela identifica o pagamento.
           </p>
         ) : meansOfPaymentId && !paymentMethodId ? (
-          <p className="text-xs text-zinc-500">A lista mostra as formas deste meio.</p>
+          <p className="text-sm text-zinc-500">A lista mostra as formas deste meio.</p>
         ) : null}
       </div>
 
-      <div className="space-y-1">
-        <Label>Meio de pagamento</Label>
+      <div className="space-y-2">
         <CatalogSearchSelect
+          label="Meio de pagamento"
           value={meansOfPaymentId}
           onChange={applyMeans}
           options={meansOfPayment}
@@ -498,52 +556,46 @@ export function ReceivableForm({
           disabled={readOnly || Boolean(paymentMethodId)}
         />
         {paymentMethodId ? (
-          <p className="text-xs text-zinc-500">O meio vem da forma escolhida.</p>
+          <p className="text-sm text-zinc-500">O meio vem da forma escolhida.</p>
         ) : null}
       </div>
 
       {show('financialInstitution') ? (
-        <div className="space-y-1">
-          <Label>Instituição financeira</Label>
-          <PersonSearchSelect
-            value={financialInstitutionId}
-            onChange={setFinancialInstitutionId}
-            type="instituicao"
-            placeholder="Buscar instituição (opcional)..."
-            allowClear={!readOnly}
-            disabled={readOnly}
-          />
-        </div>
+        <PersonSearchSelect
+          label="Instituição financeira"
+          value={financialInstitutionId}
+          onChange={setFinancialInstitutionId}
+          type="instituicao"
+          placeholder="Buscar instituição..."
+          allowClear={!readOnly}
+          disabled={readOnly}
+        />
       ) : null}
 
       {show('cardBrand') || show('transactionAuthorization') ? (
         <div className="grid grid-cols-2 gap-4">
           {show('cardBrand') ? (
-            <div className="space-y-1">
-              <Label>Bandeira do cartão</Label>
-              <CatalogSearchSelect
-                value={cardBrandId}
-                onChange={setCardBrandId}
-                options={cardBrands}
-                placeholder="Buscar bandeira..."
-                emptyMessage="Nenhuma bandeira cadastrada."
-                allowClear={!readOnly}
-                disabled={readOnly}
-                required={!readOnly && brandRequired}
-              />
-            </div>
+            <CatalogSearchSelect
+              label="Bandeira do cartão"
+              value={cardBrandId}
+              onChange={setCardBrandId}
+              options={cardBrands}
+              placeholder="Buscar bandeira..."
+              emptyMessage="Nenhuma bandeira cadastrada."
+              allowClear={!readOnly}
+              disabled={readOnly}
+              required={!readOnly && brandRequired}
+            />
           ) : null}
           {show('transactionAuthorization') ? (
-            <div className="space-y-1">
-              <Label htmlFor="transactionAuthorization">Autorização da transação</Label>
-              <Input
-                id="transactionAuthorization"
-                value={transactionAuthorization}
-                maxLength={128}
-                onChange={(e) => setTransactionAuthorization(e.target.value)}
-                disabled={readOnly}
-              />
-            </div>
+            <FloatingInput
+              id="transactionAuthorization"
+              label="Autorização da transação"
+              value={transactionAuthorization}
+              maxLength={128}
+              disabled={readOnly}
+              onChange={(event) => setTransactionAuthorization(event.target.value)}
+            />
           ) : null}
         </div>
       ) : null}
@@ -551,81 +603,147 @@ export function ReceivableForm({
       {show('bearerName') || show('bankSlipOurNumber') ? (
         <div className="grid grid-cols-2 gap-4">
           {show('bearerName') ? (
-            <div className="space-y-1">
-              <Label htmlFor="bearerName">Portador do boleto</Label>
-              <Input
-                id="bearerName"
-                value={bearerName}
-                maxLength={60}
-                onChange={(e) => setBearerName(e.target.value)}
-                disabled={readOnly}
-              />
-            </div>
+            <FloatingInput
+              id="bearerName"
+              label="Portador do boleto"
+              value={bearerName}
+              maxLength={60}
+              disabled={readOnly}
+              onChange={(event) => setBearerName(event.target.value)}
+            />
           ) : null}
           {show('bankSlipOurNumber') ? (
-            <div className="space-y-1">
-              <Label htmlFor="bankSlipOurNumber">Nosso número</Label>
-              <Input
-                id="bankSlipOurNumber"
-                value={bankSlipOurNumber}
-                maxLength={20}
-                onChange={(e) => setBankSlipOurNumber(e.target.value)}
-                disabled={readOnly}
-              />
-            </div>
+            <FloatingInput
+              id="bankSlipOurNumber"
+              label="Nosso número"
+              value={bankSlipOurNumber}
+              maxLength={20}
+              disabled={readOnly}
+              onChange={(event) => setBankSlipOurNumber(event.target.value)}
+            />
           ) : null}
         </div>
       ) : null}
 
       {show('barcode') ? (
-        <div className="space-y-1">
-          <Label htmlFor="barcode">Código de barras</Label>
-          <Input
-            id="barcode"
-            value={barcode}
-            maxLength={50}
-            onChange={(e) => setBarcode(e.target.value)}
-            disabled={readOnly}
-          />
-        </div>
+        <FloatingInput
+          id="barcode"
+          label="Código de barras"
+          value={barcode}
+          maxLength={50}
+          disabled={readOnly}
+          onChange={(event) => setBarcode(event.target.value)}
+        />
       ) : null}
 
-      {readOnly ? (
-        <div className="mt-2 flex gap-2">
-          {onReplicate && accountToUpdate && (
-            <Button type="button" className="flex-1" onClick={onReplicate}>
-              Replicar
-            </Button>
-          )}
-          <Button type="button" variant="outline" className="flex-1" onClick={onSuccess}>
-            Fechar
+      {mutation.isError ? (
+        <p className="rounded-md bg-destructive/10 p-3 text-sm font-medium text-destructive">
+          {mutation.error.message}
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap justify-end gap-2 pt-2">
+        {onCancel ? (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancelar
           </Button>
-        </div>
-      ) : (
-        <div className="mt-2 flex gap-2">
-          {onReplicate && accountToUpdate && (
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1"
-              onClick={onReplicate}
-            >
-              Replicar
-            </Button>
-          )}
+        ) : null}
+        {accountToUpdate && onDeleted && accountToUpdate.status === 'pendente' ? (
           <Button
-            type="submit"
-            className="flex-1 bg-zinc-900 text-white hover:bg-zinc-800"
-            disabled={mutation.isPending}
+            type="button"
+            variant="destructive"
+            disabled={busy}
+            onClick={() => {
+              setActionError(null);
+              setOpenDelete(true);
+            }}
           >
+            Excluir
+          </Button>
+        ) : null}
+        {onReplicate && accountToUpdate ? (
+          <Button type="button" variant="outline" disabled={busy} onClick={onReplicate}>
+            Replicar
+          </Button>
+        ) : null}
+        {accountToUpdate?.status === 'recebido' ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() => {
+              setActionError(null);
+              setOpenReverse(true);
+            }}
+          >
+            Estornar
+          </Button>
+        ) : null}
+        {onReceive ? (
+          <Button type="button" disabled={busy} onClick={onReceive}>
+            Receber
+          </Button>
+        ) : null}
+        {readOnly ? null : (
+          <Button type="submit" disabled={busy}>
             {mutation.isPending
               ? 'Salvando...'
               : accountToUpdate
                 ? 'Atualizar'
-                : 'Confirmar Lançamento'}
+                : 'Lançar'}
           </Button>
-        </div>
-      )}
+        )}
+      </div>
+
+      <AlertDialog open={openDelete} onOpenChange={setOpenDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir conta a receber</AlertDialogTitle>
+            <AlertDialogDescription>
+              {actionError ??
+                `Deseja excluir ${description || 'esta conta'}? Essa ação não pode ser desfeita.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteMutation.isPending || !!actionError}
+              onClick={(event) => {
+                event.preventDefault();
+                deleteMutation.mutate();
+              }}
+            >
+              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={openReverse} onOpenChange={setOpenReverse}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Estornar recebimento</AlertDialogTitle>
+            <AlertDialogDescription>
+              {actionError ??
+                `Deseja estornar o recebimento de ${description || 'esta conta'}? O título voltará para pendente.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700"
+              disabled={reverseMutation.isPending || !!actionError}
+              onClick={(event) => {
+                event.preventDefault();
+                reverseMutation.mutate();
+              }}
+            >
+              {reverseMutation.isPending ? 'Estornando...' : 'Estornar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </form>
   );
 }

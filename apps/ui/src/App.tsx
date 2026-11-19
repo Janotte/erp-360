@@ -35,6 +35,8 @@ import { ReplicatePayablePage } from './components/Financial/Payables/ReplicateP
 import { ListPaymentMethods } from './components/Financial/PaymentMethods/ListPaymentMethods';
 import { ListPlanAccounts } from './components/Financial/PlanAccounts/ListPlanAccounts';
 import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
+import { ReceivablePage } from './components/Financial/Receivables/ReceivablePage';
+import { ReplicateReceivablePage } from './components/Financial/Receivables/ReplicateReceivablePage';
 import { FormInbound } from './components/Inbound/FormInbound';
 import { FormInboundLinks } from './components/Inbound/FormInboundLinks';
 import { ListInbounds } from './components/Inbound/ListInbounds';
@@ -311,6 +313,30 @@ function App() {
               element={
                 <Pagina>
                   <ReceivableList />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/receivables/new"
+              element={
+                <Pagina>
+                  <ReceivablePage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/receivables/:id/replicate"
+              element={
+                <Pagina>
+                  <ReplicateReceivablePage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/receivables/:id"
+              element={
+                <Pagina>
+                  <ReceivablePage />
                 </Pagina>
               }
             />
