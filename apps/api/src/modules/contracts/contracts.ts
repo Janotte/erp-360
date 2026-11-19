@@ -13,12 +13,13 @@ import { users } from '@erp-360/mod-core';
 import { paymentMethods, planAccounts } from '@erp-360/mod-financial';
 import { persons } from '@erp-360/mod-persons';
 import { serviceOrders } from '@erp-360/mod-service-orders';
-import { contractBillingSchedule, escapeIlike } from '@erp-360/shared';
+import { contractBillingSchedule, escapeIlike, listPageMeta } from '@erp-360/shared';
 import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
+import { listPageQuery } from '../../lib/list-page.ts';
 import { formatServiceOrderNumber } from '../service-orders/rules.ts';
 import { contractBillingRoutes } from './billings.ts';
 import { todayForTenant } from './clock.ts';
@@ -59,6 +60,7 @@ const listQuery = z.object({
   q: z.string().optional(),
   status: z.enum(contractStatuses).optional(),
   personId: z.string().uuid().optional(),
+  ...listPageQuery,
 });
 
 type ContractBody = z.infer<typeof contractBody>;
@@ -545,8 +547,20 @@ async function listContracts(tenantId: string, query: z.infer<typeof listQuery>)
     }
   }
 
+  const where = and(...filters);
+  const [totalCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(contracts)
+    .innerJoin(
+      persons,
+      and(eq(persons.id, contracts.personId), eq(persons.tenantId, contracts.tenantId)),
+    )
+    .where(where);
+  const total = Number(totalCount?.count || 0);
+  const limit = query.limit;
+
   const today = await todayForTenant(tenantId);
-  const rows = await db
+  const base = db
     .select({
       id: contracts.id,
       number: contracts.number,
@@ -565,8 +579,9 @@ async function listContracts(tenantId: string, query: z.infer<typeof listQuery>)
       persons,
       and(eq(persons.id, contracts.personId), eq(persons.tenantId, contracts.tenantId)),
     )
-    .where(and(...filters))
+    .where(where)
     .orderBy(desc(contracts.number));
+  const rows = limit ? await base.limit(limit).offset((query.page - 1) * limit) : await base;
 
   return {
     data: rows.map((row) => ({
@@ -574,6 +589,7 @@ async function listContracts(tenantId: string, query: z.infer<typeof listQuery>)
       numberLabel: formatContractNumber(row.number),
       termExpired: termExpired(row.status, row.endedOn, today),
     })),
+    meta: listPageMeta(total, query.page, limit),
   };
 }
 

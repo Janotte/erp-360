@@ -1,5 +1,6 @@
+import { type ListPageSize } from '@erp-360/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router';
 
@@ -7,6 +8,7 @@ import { ServiceOrderBillingDialog } from '@/components/ServiceOrders/ServiceOrd
 import { ServiceOrderRowMenu } from '@/components/ServiceOrders/ServiceOrderRowMenu';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ListPagination } from '@/components/ui/ListPagination';
 import {
   Select,
   SelectContent,
@@ -33,24 +35,6 @@ const statusLabels: Record<ServiceOrderStatus, string> = {
 };
 
 const statuses = Object.keys(statusLabels) as ServiceOrderStatus[];
-
-const pageSizes = [5, 10, 20, 50] as const;
-type PageSize = (typeof pageSizes)[number];
-
-function pageWindow(current: number, total: number): (number | 'gap')[] {
-  if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1);
-  const pages = [1, total, current - 1, current, current + 1].filter(
-    (page) => page >= 1 && page <= total,
-  );
-  const unique = [...new Set(pages)].sort((left, right) => left - right);
-  const window: (number | 'gap')[] = [];
-  for (const page of unique) {
-    const previous = window.at(-1);
-    if (typeof previous === 'number' && page - previous > 1) window.push('gap');
-    window.push(page);
-  }
-  return window;
-}
 
 const statusTone: Record<
   ServiceOrderStatus,
@@ -107,7 +91,7 @@ const statusTone: Record<
 };
 
 const columns =
-  'grid grid-cols-[96px_minmax(150px,1fr)_minmax(160px,1.3fr)_132px_132px_176px] items-center gap-3 px-3.5';
+  'grid grid-cols-[96px_minmax(150px,1fr)_minmax(160px,1.3fr)_132px_176px] items-center gap-3 px-3.5';
 
 function toneStyle(status: ServiceOrderStatus): CSSProperties {
   const tone = statusTone[status];
@@ -154,7 +138,7 @@ export function ListServiceOrders() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ServiceOrderStatus | 'all'>('all');
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState<PageSize>(10);
+  const [limit, setLimit] = useState<ListPageSize>(10);
   const [menu, setMenu] = useState<{
     row: ServiceOrderListItem;
     x: number;
@@ -198,20 +182,11 @@ export function ListServiceOrders() {
 
   const rows = list.data?.data ?? [];
   const meta = list.data?.meta;
-  const totalPages = meta?.totalPages ?? 0;
-
-  useEffect(() => {
-    if (totalPages > 0 && page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
   const summaryLabel =
     rows[0]?.summaryLabel ||
     settings.data?.fields.find((field) => field.slot === settings.data.summarySlot)
       ?.label ||
     'Resumo';
-  const rangeStart = meta && meta.total > 0 ? (meta.page - 1) * meta.limit + 1 : 0;
-  const rangeEnd = meta ? Math.min(meta.page * meta.limit, meta.total) : 0;
-  const countLabel = meta ? `Exibindo ${rangeStart}–${rangeEnd} de ${meta.total}` : '';
-  const pages = pageWindow(page, totalPages);
 
   function openOrder(id: string) {
     navigate(`/service-orders/${id}`);
@@ -223,7 +198,7 @@ export function ListServiceOrders() {
         <div>
           <h2 className="text-2xl font-bold text-[#172337]">Ordens de serviço</h2>
           <p className="mt-1 text-sm text-[#64748b]">
-            Número, cliente, previsão e situação.
+            Número, cliente, abertura e situação.
           </p>
         </div>
         <Button asChild>
@@ -278,7 +253,7 @@ export function ListServiceOrders() {
         </div>
 
         <div className="overflow-x-auto">
-          <div className="min-w-[880px]">
+          <div className="min-w-[740px]">
             <div
               className={cn(
                 columns,
@@ -289,7 +264,6 @@ export function ListServiceOrders() {
               <span>Cliente</span>
               <span>{summaryLabel}</span>
               <span>Abertura</span>
-              <span>Previsão</span>
               <span>Situação</span>
             </div>
 
@@ -337,7 +311,6 @@ export function ListServiceOrders() {
                     {row.summaryValue?.trim() || '—'}
                   </span>
                   <span className="whitespace-nowrap">{formatWhen(row.openedAt)}</span>
-                  <span className="whitespace-nowrap">{formatWhen(row.promisedAt)}</span>
                   <span>
                     <StatusBadge status={row.status} />
                   </span>
@@ -363,72 +336,17 @@ export function ListServiceOrders() {
         </div>
         */}
         {meta ? (
-          <div className="mt-4 flex flex-col gap-3 border-t border-[#dfe5ee] pt-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-4">
-              <p className="text-[13px] text-[#64748b]" aria-live="polite">
-                {countLabel}
-              </p>
-              <label className="flex items-center gap-2 text-[13px] text-[#64748b]">
-                Por página
-                <select
-                  className="h-8 rounded-md border border-[#cbd5e1] bg-white px-2 text-sm text-[#172337]"
-                  value={limit}
-                  aria-label="Quantidade por página"
-                  onChange={(event) => {
-                    setLimit(Number(event.target.value) as PageSize);
-                    setPage(1);
-                  }}
-                >
-                  {pageSizes.map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <div className="flex flex-wrap items-center gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-              >
-                <ChevronLeft className="h-4 w-4" /> Anterior
-              </Button>
-              {pages.map((item, index) =>
-                item === 'gap' ? (
-                  <span key={`gap-${index}`} className="px-1 text-sm text-[#64748b]">
-                    …
-                  </span>
-                ) : (
-                  <Button
-                    key={item}
-                    type="button"
-                    variant={item === page ? 'default' : 'outline'}
-                    size="sm"
-                    className="min-w-8 px-2"
-                    aria-current={item === page ? 'page' : undefined}
-                    onClick={() => setPage(item)}
-                  >
-                    {item}
-                  </Button>
-                ),
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1"
-                disabled={totalPages === 0 || page >= totalPages}
-                onClick={() => setPage(page + 1)}
-              >
-                Próxima <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          <ListPagination
+            page={page}
+            limit={limit}
+            total={meta.total}
+            totalPages={meta.totalPages}
+            onPageChange={setPage}
+            onLimitChange={(next) => {
+              setLimit(next);
+              setPage(1);
+            }}
+          />
         ) : null}
       </section>
 

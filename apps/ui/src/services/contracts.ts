@@ -1,4 +1,4 @@
-import { formatCurrency } from '@erp-360/shared';
+import { formatCurrency, type ListPageMeta } from '@erp-360/shared';
 
 import { apiFetch } from './apiClient';
 
@@ -140,16 +140,34 @@ export const contractsService = {
     q?: string;
     status?: ContractStatus;
     personId?: string;
-  }): Promise<{ data: ContractListItem[] }> => {
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: ContractListItem[]; meta: ListPageMeta }> => {
     const params = new URLSearchParams();
     if (filters?.q) params.set('q', filters.q);
     if (filters?.status) params.set('status', filters.status);
     if (filters?.personId) params.set('personId', filters.personId);
+    if (filters?.page) params.set('page', String(filters.page));
+    if (filters?.limit) params.set('limit', String(filters.limit));
     const query = params.toString();
     const res = await apiFetch(`/contracts${query ? `?${query}` : ''}`);
     const body = await readBody(res);
     if (!res.ok) throw new Error(messageOf(body, 'Falha ao listar os contratos.'));
-    return body as unknown as { data: ContractListItem[] };
+    const payload = body as unknown as {
+      data: ContractListItem[];
+      meta?: Partial<ListPageMeta>;
+    };
+    const total = Number(payload.meta?.total ?? payload.data.length);
+    const limit = Number(payload.meta?.limit ?? total);
+    return {
+      data: payload.data,
+      meta: {
+        total,
+        page: Number(payload.meta?.page ?? 1),
+        limit,
+        totalPages: Number(payload.meta?.totalPages ?? (limit > 0 ? Math.ceil(total / limit) : 1)),
+      },
+    };
   },
 
   get: async (id: string): Promise<ContractDetail> => {

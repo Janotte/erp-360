@@ -22,12 +22,13 @@ import {
   serviceOrders,
   serviceOrderStatuses,
 } from '@erp-360/mod-service-orders';
-import { escapeIlike, formatPostalCode } from '@erp-360/shared';
+import { escapeIlike, formatPostalCode, listPageMeta } from '@erp-360/shared';
 import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
+import { listPageQuery } from '../../lib/list-page.ts';
 import { listServiceOrderBillings, serviceOrderBillingRoutes } from './billings.ts';
 import { todayForTenant } from '../contracts/clock.ts';
 import { buildServiceOrderPrint } from './print-model.ts';
@@ -161,22 +162,10 @@ const orderBody = z
     }
   });
 
-const pageSizes = [5, 10, 20, 50] as const;
-
 const listQuery = z.object({
   q: z.string().optional(),
   status: z.enum(serviceOrderStatuses).optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.preprocess(
-    (value) => (value === undefined || value === '' ? undefined : value),
-    z.coerce
-      .number()
-      .int()
-      .refine((value) => (pageSizes as readonly number[]).includes(value), {
-        message: 'A quantidade por página é 5, 10, 20 ou 50.',
-      })
-      .optional(),
-  ),
+  ...listPageQuery,
 });
 
 type OrderBody = z.infer<typeof orderBody>;
@@ -1229,7 +1218,7 @@ async function listServiceOrders(
     .where(where);
   const total = Number(totalCount?.count || 0);
   const limit = query.limit;
-  const page = limit ? query.page : 1;
+  const page = query.page;
 
   const base = db
     .select({
@@ -1281,12 +1270,7 @@ async function listServiceOrders(
       promisedAt: row.promisedAt,
       status: row.status,
     })),
-    meta: {
-      total,
-      page,
-      limit: limit ?? total,
-      totalPages: limit ? Math.ceil(total / limit) : 1,
-    },
+    meta: listPageMeta(total, page, limit),
   };
 }
 
