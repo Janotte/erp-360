@@ -5,8 +5,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FloatingInput, FloatingSelect } from '@/components/ui/FloatingField';
 import { financialService } from '@/services/financials';
 import { treasuryService } from '@/services/treasury';
 
@@ -15,7 +14,10 @@ interface InvestmentEntryModalProps {
   onSuccess: () => void;
 }
 
-export function InvestmentEntryModal({ bankAccountId, onSuccess }: InvestmentEntryModalProps) {
+export function InvestmentEntryModal({
+  bankAccountId,
+  onSuccess,
+}: InvestmentEntryModalProps) {
   const queryClient = useQueryClient();
   const [occurredOn, setOccurredOn] = useState(civilDate());
   const [description, setDescription] = useState('');
@@ -25,7 +27,8 @@ export function InvestmentEntryModal({ bankAccountId, onSuccess }: InvestmentEnt
 
   const { data: planAccounts = [], isLoading } = useQuery({
     queryKey: ['financial', 'plan-accounts', 'investment-entry'],
-    queryFn: () => financialService.listPlanAccounts({ acceptsEntries: true, isTreasury: false }),
+    queryFn: () =>
+      financialService.listPlanAccounts({ acceptsEntries: true, isTreasury: false }),
   });
 
   const mutation = useMutation({
@@ -66,68 +69,60 @@ export function InvestmentEntryModal({ bankAccountId, onSuccess }: InvestmentEnt
         mutation.mutate();
       }}
     >
-      <p className="text-sm text-zinc-500">
+      <p className="text-sm text-[#64748b]">
         Entra só nesta conta de investimento. Não movimenta a conta corrente.
       </p>
-      <div className="space-y-1">
-        <Label htmlFor="entryOn">Data</Label>
-        <Input
-          id="entryOn"
-          type="date"
-          value={occurredOn}
-          onChange={(event) => setOccurredOn(event.target.value)}
-          required
-        />
+      <FloatingInput
+        id="entryOn"
+        label="Data"
+        type="date"
+        value={occurredOn}
+        onChange={(event) => setOccurredOn(event.target.value)}
+        required
+      />
+      <FloatingInput
+        id="entryDescription"
+        label="Histórico"
+        value={description}
+        onChange={(event) => setDescription(event.target.value)}
+        maxLength={255}
+        required
+      />
+      <FloatingSelect
+        id="entryDirection"
+        label="Movimento"
+        value={direction}
+        pinned
+        onChange={(event) => setDirection(event.target.value as 'in' | 'out')}
+      >
+        <option value="in">Entrada</option>
+        <option value="out">Saída</option>
+      </FloatingSelect>
+      <FloatingInput
+        id="entryAmount"
+        label="Valor (R$)"
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder="0,00"
+        value={amountStr}
+        onChange={(event) => setAmountStr(maskCurrencyInput(event.target.value))}
+        required
+      />
+      <CatalogSearchSelect
+        label="Conta do plano"
+        value={planAccountId}
+        onChange={setPlanAccountId}
+        options={planAccounts}
+        placeholder="Receita, despesa ou ativo"
+        isLoading={isLoading}
+        required
+      />
+      <div className="flex justify-end">
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? 'Registrando...' : 'Confirmar'}
+        </Button>
       </div>
-      <div className="space-y-1">
-        <Label htmlFor="entryDescription">Histórico</Label>
-        <Input
-          id="entryDescription"
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          maxLength={255}
-          required
-        />
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="entryDirection">Movimento</Label>
-        <select
-          id="entryDirection"
-          value={direction}
-          onChange={(event) => setDirection(event.target.value as 'in' | 'out')}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-        >
-          <option value="in">Entrada</option>
-          <option value="out">Saída</option>
-        </select>
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="entryAmount">Valor (R$)</Label>
-        <Input
-          id="entryAmount"
-          type="text"
-          inputMode="numeric"
-          autoComplete="off"
-          placeholder="0,00"
-          value={amountStr}
-          onChange={(event) => setAmountStr(maskCurrencyInput(event.target.value))}
-          required
-        />
-      </div>
-      <div className="space-y-1">
-        <Label>Conta do plano</Label>
-        <CatalogSearchSelect
-          value={planAccountId}
-          onChange={setPlanAccountId}
-          options={planAccounts}
-          placeholder="Receita, despesa ou ativo"
-          isLoading={isLoading}
-          required
-        />
-      </div>
-      <Button type="submit" className="w-full" disabled={mutation.isPending}>
-        {mutation.isPending ? 'Registrando...' : 'Confirmar'}
-      </Button>
     </form>
   );
 }

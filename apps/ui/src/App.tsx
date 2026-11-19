@@ -24,6 +24,7 @@ import { MeasurePage } from './components/Catalog/Measures/MeasurePage';
 import { FormContract } from './components/Contracts/FormContract';
 import { ListContracts } from './components/Contracts/ListContracts';
 import { Dashboard } from './components/Dashboard';
+import { BankAccountPage } from './components/Financial/BankAccounts/BankAccountPage';
 import { ListBankAccounts } from './components/Financial/BankAccounts/ListBankAccounts';
 import { ListCashBook } from './components/Financial/CashBook/ListCashBook';
 import { CashFlowView } from './components/Financial/CashFlow/CashFlowView';
@@ -369,6 +370,22 @@ function App() {
               element={
                 <Pagina>
                   <ListBankAccounts />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/bank-accounts/new"
+              element={
+                <Pagina>
+                  <BankAccountPage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/bank-accounts/:id"
+              element={
+                <Pagina>
+                  <BankAccountPage />
                 </Pagina>
               }
             />

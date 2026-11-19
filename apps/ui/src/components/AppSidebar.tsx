@@ -98,7 +98,8 @@ function rotaDoFilho(url: string, path: string) {
     url === '/items' ||
     url === '/measures' ||
     url === '/payables' ||
-    url === '/receivables'
+    url === '/receivables' ||
+    url === '/bank-accounts'
   ) {
     return path === url || path.startsWith(`${url}/`);
   }

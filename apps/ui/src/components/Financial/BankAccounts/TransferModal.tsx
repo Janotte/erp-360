@@ -4,8 +4,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FloatingInput, FloatingSelect } from '@/components/ui/FloatingField';
 import { type BankAccount, treasuryService } from '@/services/treasury';
 
 export type TransferMode = 'transfer' | 'apply' | 'redeem';
@@ -22,7 +21,10 @@ const titles: Record<TransferMode, string> = {
   redeem: 'Resgatar',
 };
 
-function parseSide(value: string): { treasury: 'cash' | 'bank'; bankAccountId: string | null } {
+function parseSide(value: string): {
+  treasury: 'cash' | 'bank';
+  bankAccountId: string | null;
+} {
   if (value === 'cash') return { treasury: 'cash', bankAccountId: null };
   return { treasury: 'bank', bankAccountId: value };
 }
@@ -38,10 +40,7 @@ export function TransferModal({ mode, accounts, onSuccess }: TransferModalProps)
     if (mode === 'redeem') {
       return investments.map((item) => ({ id: item.id, label: item.name }));
     }
-    return [
-      ...cash,
-      ...operating.map((item) => ({ id: item.id, label: item.name })),
-    ];
+    return [...cash, ...operating.map((item) => ({ id: item.id, label: item.name }))];
   }, [mode, investments, operating]);
 
   const destOptions = useMemo(() => {
@@ -109,65 +108,60 @@ export function TransferModal({ mode, accounts, onSuccess }: TransferModalProps)
         mutation.mutate();
       }}
     >
-      <p className="text-sm text-zinc-500">{titles[mode]} entre tesourarias.</p>
-      <div className="space-y-1">
-        <Label htmlFor="transferOn">Data</Label>
-        <Input
-          id="transferOn"
-          type="date"
-          value={occurredOn}
-          onChange={(e) => setOccurredOn(e.target.value)}
-          required
-        />
+      <p className="text-sm text-[#64748b]">{titles[mode]} entre tesourarias.</p>
+      <FloatingInput
+        id="transferOn"
+        label="Data"
+        type="date"
+        value={occurredOn}
+        onChange={(event) => setOccurredOn(event.target.value)}
+        required
+      />
+      <FloatingSelect
+        id="transferFrom"
+        label="Origem"
+        value={fromSide}
+        pinned
+        onChange={(event) => setFromSide(event.target.value)}
+        required
+      >
+        {sourceOptions.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </FloatingSelect>
+      <FloatingSelect
+        id="transferTo"
+        label="Destino"
+        value={toSide}
+        pinned
+        onChange={(event) => setToSide(event.target.value)}
+        required
+      >
+        {destOptions.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </FloatingSelect>
+      <FloatingInput
+        id="transferAmount"
+        label="Valor (R$)"
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder="0,00"
+        pinned
+        value={amountStr}
+        onChange={(event) => setAmountStr(maskCurrencyInput(event.target.value))}
+        required
+      />
+      <div className="flex justify-end">
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? 'Registrando...' : 'Confirmar'}
+        </Button>
       </div>
-      <div className="space-y-1">
-        <Label htmlFor="transferFrom">Origem</Label>
-        <select
-          id="transferFrom"
-          value={fromSide}
-          onChange={(e) => setFromSide(e.target.value)}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-          required
-        >
-          {sourceOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="transferTo">Destino</Label>
-        <select
-          id="transferTo"
-          value={toSide}
-          onChange={(e) => setToSide(e.target.value)}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-          required
-        >
-          {destOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="transferAmount">Valor (R$)</Label>
-        <Input
-          id="transferAmount"
-          type="text"
-          inputMode="numeric"
-          autoComplete="off"
-          placeholder="0,00"
-          value={amountStr}
-          onChange={(e) => setAmountStr(maskCurrencyInput(e.target.value))}
-          required
-        />
-      </div>
-      <Button type="submit" className="w-full" disabled={mutation.isPending}>
-        {mutation.isPending ? 'Registrando...' : 'Confirmar'}
-      </Button>
     </form>
   );
 }
