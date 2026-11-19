@@ -39,6 +39,7 @@ import { ListInbounds } from './components/Inbound/ListInbounds';
 import { InboundSetupPage } from './components/Inbound/Setup/InboundSetupPage';
 import { Navbar } from './components/Navbar';
 import { ListPersons } from './components/Persons/ListPersons';
+import { PersonPage } from './components/Persons/PersonPage';
 import { FormServiceOrder } from './components/ServiceOrders/FormServiceOrder';
 import { ListServiceOrders } from './components/ServiceOrders/ListServiceOrders';
 import { SettingsPage } from './components/Settings/SettingsPage';
@@ -180,6 +181,22 @@ function App() {
               element={
                 <Pagina>
                   <ListPersons />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/persons/new"
+              element={
+                <Pagina>
+                  <PersonPage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/persons/:id"
+              element={
+                <Pagina>
+                  <PersonPage />
                 </Pagina>
               }
             />

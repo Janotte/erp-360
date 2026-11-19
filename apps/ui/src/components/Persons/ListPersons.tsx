@@ -1,426 +1,370 @@
 import {
   formatTaxId,
+  type ListPageSize,
+  listPageSizes,
   parsePersonKind,
-  parseTaxpayerType,
+  type PersonKind,
   personKindLabels,
   personKinds,
-  taxpayerTypeLabels,
 } from '@erp-360/shared';
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus } from 'lucide-react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ListPagination } from '@/components/ui/ListPagination';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  ListFilter,
+  ListMessage,
+  ListPageHeader,
+  ListPanel,
+  ListSearch,
+} from '@/components/ui/ListShell';
+import { StatusBadge, StatusListHeader, StatusListRow } from '@/components/ui/StatusList';
+import { type StatusTone } from '@/components/ui/statusTone';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { type Person, personsService } from '@/services/persons';
 
-import { type Person, personsService } from '../../services/persons';
-import { Input } from '../ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
-import { FormPerson } from './FormPerson';
+const columns =
+  'grid grid-cols-[minmax(180px,1.5fr)_minmax(140px,0.8fr)_108px_minmax(180px,1.1fr)_104px_132px]';
 
-function formatTaxpayerType(value: Person['taxpayerType']) {
-  const parsed = parseTaxpayerType(value);
-  return parsed ? taxpayerTypeLabels[parsed] : '-';
+const activeTone: StatusTone = {
+  background: '#EFF6FF',
+  hover: '#DBEAFE',
+  border: '#2563EB',
+  text: '#1D4ED8',
+};
+
+const inactiveTone: StatusTone = {
+  background: '#F8FAFC',
+  hover: '#F1F5F9',
+  border: '#64748B',
+  text: '#334155',
+};
+
+const profileTones = {
+  client: {
+    background: '#EFF6FF',
+    hover: '#DBEAFE',
+    border: '#2563EB',
+    text: '#1D4ED8',
+  },
+  supplier: {
+    background: '#FFFBEB',
+    hover: '#FEF3C7',
+    border: '#D97706',
+    text: '#92400E',
+  },
+  employee: {
+    background: '#F5F3FF',
+    hover: '#EDE9FE',
+    border: '#7C3AED',
+    text: '#6D28D9',
+  },
+  institution: {
+    background: '#F0FDFA',
+    hover: '#CCFBF1',
+    border: '#0D9488',
+    text: '#0F766E',
+  },
+} satisfies Record<string, StatusTone>;
+
+const profiles = ['cliente', 'fornecedor', 'colaborador', 'instituicao'] as const;
+type PersonProfile = (typeof profiles)[number];
+
+const profileLabels: Record<PersonProfile, string> = {
+  cliente: 'Clientes',
+  fornecedor: 'Fornecedores',
+  colaborador: 'Colaboradores',
+  instituicao: 'Instituições',
+};
+
+type SortField = 'name' | 'createdAt';
+
+function readPage(params: URLSearchParams) {
+  const page = Number(params.get('page') ?? '1');
+  return Number.isInteger(page) && page > 0 ? page : 1;
 }
+
+function readSort(params: URLSearchParams): SortField {
+  return params.get('sortField') === 'createdAt' ? 'createdAt' : 'name';
+}
+
+function readOrder(params: URLSearchParams): 'asc' | 'desc' {
+  return params.get('sortOrder') === 'desc' ? 'desc' : 'asc';
+}
+
+function readLimit(params: URLSearchParams): ListPageSize {
+  const value = Number(params.get('limit'));
+  if ((listPageSizes as readonly number[]).includes(value)) return value as ListPageSize;
+  return 10;
+}
+
+function readKind(params: URLSearchParams): PersonKind | 'all' {
+  const value = params.get('tipo');
+  return personKinds.includes(value as PersonKind) ? (value as PersonKind) : 'all';
+}
+
+function readProfile(params: URLSearchParams): PersonProfile | 'all' {
+  const value = params.get('perfil');
+  return profiles.includes(value as PersonProfile) ? (value as PersonProfile) : 'all';
+}
+
+function formatDate(value?: string) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('pt-BR');
+}
+
+function profileBadges(person: Person) {
+  const items: { label: string; tone: StatusTone }[] = [];
+  if (person.isClient) items.push({ label: 'Cliente', tone: profileTones.client });
+  if (person.isSupplier) items.push({ label: 'Fornecedor', tone: profileTones.supplier });
+  if (person.isEmployee)
+    items.push({ label: 'Colaborador', tone: profileTones.employee });
+  if (person.isFinancialInstitution) {
+    items.push({ label: 'Instituição', tone: profileTones.institution });
+  }
+  return items;
+}
+
 export function ListPersons() {
-  const queryClient = useQueryClient();
-  const [openDialog, setOpenDialog] = useState(false);
-  const [personPersisted, setPersonPersisted] = useState(false);
-  const [openAlert, setOpenAlert] = useState(false);
-  const [personSelected, setPersonSelected] = useState<Person | null>(null);
-  const [erroExclusao, setErroExclusao] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  const page = readPage(params);
+  const limit = readLimit(params);
+  const sortField = readSort(params);
+  const sortOrder = readOrder(params);
+  const search = params.get('busca') ?? '';
+  const kind = readKind(params);
+  const profile = readProfile(params);
+  const from = `/persons${location.search}`;
+  const { text: searchText, setText: setSearchText } = useDebouncedSearch(
+    (next) => {
+      setParams(
+        (current) => {
+          const updated = new URLSearchParams(current);
+          if ((updated.get('busca') ?? '') === next) return current;
+          if (next) updated.set('busca', next);
+          else updated.delete('busca');
+          updated.delete('page');
+          return updated;
+        },
+        { replace: true },
+      );
+    },
+    400,
+    search,
+  );
 
-  // 1. Estados locais que controlam os filtros e a paginação
-  const [searchText, setSearchText] = useState('');
-  const [search, setSearch] = useState('');
-  const [type, setType] = useState<string>('todos');
-  const [kind, setKind] = useState<string>('todos');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState<'name' | 'createdAt'>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearch((current) => {
-        const next = searchText.trim();
-        if (current !== next) setPage(1);
-        return next;
-      });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchText]);
-
-  // 2. O TanStack Query escuta as mudanças de estados e faz o "refetch" automático
-  const { data: response, isLoading } = useQuery({
-    queryKey: ['listaPessoas', { page, type, kind, search, sortField, sortOrder }],
+  const list = useQuery({
+    queryKey: [
+      'listaPessoas',
+      { page, limit, search, kind, profile, sortField, sortOrder },
+    ],
     placeholderData: keepPreviousData,
     queryFn: () =>
       personsService.list({
         page,
-        limit: 10, // Define 10 registros por página
+        limit,
         sortField,
         sortOrder,
-        type: type === 'todos' ? undefined : type,
-        kind: kind === 'todos' ? undefined : (kind as Person['type']),
+        kind: kind === 'all' ? undefined : kind,
+        type: profile === 'all' ? undefined : profile,
         search: search || undefined,
       }),
   });
 
-  // Função utilitária para gerenciar o clique na ordenação da coluna
-  const changeSort = (field: 'name' | 'createdAt') => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-    setPage(1); // Reseta para a primeira página ao ordenar
+  const changeSort = (field: SortField) => {
+    const next = new URLSearchParams(params);
+    const order = sortField === field && sortOrder === 'asc' ? 'desc' : 'asc';
+    if (field === 'name') next.delete('sortField');
+    else next.set('sortField', field);
+    if (order === 'asc') next.delete('sortOrder');
+    else next.set('sortOrder', order);
+    next.delete('page');
+    setParams(next, { replace: true });
   };
 
-  const renderIconeOrdenacao = (field: 'name' | 'createdAt') => {
-    if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4 shrink-0" />;
+  const changeKind = (nextKind: PersonKind | 'all') => {
+    const next = new URLSearchParams(params);
+    if (nextKind === 'all') next.delete('tipo');
+    else next.set('tipo', nextKind);
+    next.delete('page');
+    setParams(next, { replace: true });
+  };
+
+  const changeProfile = (nextProfile: PersonProfile | 'all') => {
+    const next = new URLSearchParams(params);
+    if (nextProfile === 'all') next.delete('perfil');
+    else next.set('perfil', nextProfile);
+    next.delete('page');
+    setParams(next, { replace: true });
+  };
+
+  const setPage = (nextPage: number) => {
+    const next = new URLSearchParams(params);
+    if (nextPage <= 1) next.delete('page');
+    else next.set('page', String(nextPage));
+    setParams(next, { replace: true });
+  };
+
+  const setLimit = (nextLimit: ListPageSize) => {
+    const next = new URLSearchParams(params);
+    if (nextLimit === 10) next.delete('limit');
+    else next.set('limit', String(nextLimit));
+    next.delete('page');
+    setParams(next, { replace: true });
+  };
+
+  const sortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3.5 w-3.5" />;
     return sortOrder === 'asc' ? (
-      <ArrowUp className="ml-2 h-4 w-4 shrink-0 text-primary" />
+      <ArrowUp className="h-3.5 w-3.5" />
     ) : (
-      <ArrowDown className="ml-2 h-4 w-4 shrink-0 text-primary" />
+      <ArrowDown className="h-3.5 w-3.5" />
     );
   };
 
-  const meta = response?.meta;
-  const persons = response?.data;
-
-  const deleteMutation = useMutation({
-    mutationFn: personsService.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['listaPessoas'] });
-      setOpenAlert(false);
-      setErroExclusao(null);
-      toast.success('Pessoa removida com sucesso!');
-    },
-    onError: (error: Error) => {
-      // 🌟 Exibe a mensagem caso a API bloqueie por possuir vínculos ativos
-      setErroExclusao(error.message);
-    },
-  });
-
-  const openEdit = (person: Person) => {
-    setPersonSelected(person);
-    setOpenDialog(true);
-  };
-
-  const openDelete = (person: Person) => {
-    setPersonSelected(person);
-    setErroExclusao(null);
-    setOpenAlert(true);
-  };
-
-  if (isLoading && !response) return <p>Carregando registros...</p>;
+  const rows = list.data?.data ?? [];
+  const meta = list.data?.meta;
+  const filtered = Boolean(search || kind !== 'all' || profile !== 'all');
 
   return (
     <div className="space-y-4">
-      {/* 📊 BARRA DE FILTROS E BUSCA */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-4 rounded-lg border border-zinc-200">
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
-          <Input
-            placeholder="Buscar por nome, CPF/CNPJ..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+      <ListPageHeader title="Pessoas" description="Nome, documento, perfil e situação.">
+        <Button asChild>
+          <Link to="/persons/new" state={{ from }}>
+            <Plus className="h-4 w-4" />
+            Nova pessoa
+          </Link>
+        </Button>
+      </ListPageHeader>
 
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <Select
-            value={kind}
-            onValueChange={(v) => {
-              setKind(v);
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="w-full sm:w-45">
-              <SelectValue placeholder="Filtrar por Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os tipos</SelectItem>
-              {personKinds.map((value) => (
-                <SelectItem key={value} value={value}>
-                  {personKindLabels[value]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={type}
-            onValueChange={(v) => {
-              setType(v);
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="w-full sm:w-45">
-              <SelectValue placeholder="Filtrar por Perfil" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os perfis</SelectItem>
-              <SelectItem value="cliente">Clientes</SelectItem>
-              <SelectItem value="fornecedor">Fornecedores</SelectItem>
-              <SelectItem value="colaborador">Colaboradores</SelectItem>
-              <SelectItem value="instituicao">Instituições</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            onClick={() => {
-              setPersonSelected(null);
-              setPersonPersisted(false);
-              setOpenDialog(true);
-            }}
-          >
-            <Plus className="h-4 w-4" /> Nova Pessoa
-          </Button>
-        </div>
-      </div>
-
-      {/* 📋 TABELA COM ORDENAÇÃO NOS CABEÇALHOS */}
-      <div className="rounded-md border border-zinc-200 bg-white shadow-2xs">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead
-                onClick={() => changeSort('name')}
-                className="cursor-pointer select-none hover:bg-zinc-50"
-              >
-                <div className="flex items-center">
-                  Nome {renderIconeOrdenacao('name')}
-                </div>
-              </TableHead>
-              <TableHead>CPF / CNPJ</TableHead>
-              <TableHead>Indicador IE</TableHead>
-              <TableHead>E-mail NF-e</TableHead>
-              <TableHead
-                onClick={() => changeSort('createdAt')}
-                className="cursor-pointer select-none hover:bg-zinc-50"
-              >
-                <div className="flex items-center">
-                  Data Cadastro {renderIconeOrdenacao('createdAt')}
-                </div>
-              </TableHead>
-              <TableHead>Perfis</TableHead>
-              <TableHead className="w-12" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-4">
-                  Carregando dados...
-                </TableCell>
-              </TableRow>
-            ) : persons?.length ? (
-              persons.map((person) => (
-                <TableRow key={person.id}>
-                  <TableCell className="font-medium">{person.name}</TableCell>
-                  <TableCell>
-                    {person.taxId
-                      ? formatTaxId(parsePersonKind(person.type), person.taxId)
-                      : '-'}
-                  </TableCell>
-                  <TableCell>{formatTaxpayerType(person.taxpayerType)}</TableCell>
-                  <TableCell>{person.nfeEmail || '-'}</TableCell>
-                  <TableCell>
-                    {person.createdAt
-                      ? new Date(person.createdAt).toLocaleDateString('pt-BR')
-                      : '-'}
-                  </TableCell>
-                  <TableCell className="flex gap-1.5">
-                    {person.isClient && (
-                      <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-600">
-                        Cliente
-                      </span>
-                    )}
-                    {person.isSupplier && (
-                      <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-50 text-amber-600">
-                        Fornecedor
-                      </span>
-                    )}
-                    {person.isEmployee && (
-                      <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-50 text-purple-600">
-                        Colaborador
-                      </span>
-                    )}
-                    {person.isFinancialInstitution && (
-                      <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700">
-                        Instituição
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Ações de ${person.name}`}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEdit(person)}>
-                          <Pencil className="h-4 w-4" /> Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600 focus:text-red-600"
-                          onClick={() => openDelete(person)}
-                        >
-                          <Trash2 className="h-4 w-4" /> Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-4 text-zinc-500">
-                  Nenhuma pessoa encontrada.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* 🎛️ CONTROLES DE PAGINAÇÃO RESPONSIVA */}
-      {meta && meta.totalPages > 1 && (
-        <div className="flex items-center justify-between bg-white px-4 py-3 rounded-lg border border-zinc-200">
-          <div className="text-sm text-zinc-500">
-            Mostrando página <strong className="text-zinc-900">{meta.page}</strong> de{' '}
-            <strong className="text-zinc-900">{meta.totalPages}</strong> ({meta.total}{' '}
-            registros no total)
-          </div>
-          <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((old) => Math.max(old - 1, 1))}
-              disabled={page === 1}
-              className="gap-1"
-            >
-              <ChevronLeft className="h-4 w-4" /> Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((old) => (page < meta.totalPages ? old + 1 : old))}
-              disabled={page === meta.totalPages}
-              className="gap-1"
-            >
-              Próximo <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <Dialog
-        open={openDialog}
-        onOpenChange={(open) => {
-          setOpenDialog(open);
-          if (!open) {
-            setPersonSelected(null);
-            setPersonPersisted(false);
-          }
-        }}
+      <ListPanel
+        title="Lista de pessoas"
+        description="Clique na linha para abrir. O hover mantém a cor de cada situação."
+        toolbar={
+          <>
+            <ListSearch
+              value={searchText}
+              onChange={setSearchText}
+              placeholder="Buscar por nome ou documento..."
+              label="Pesquisar pessoas"
+            />
+            <ListFilter
+              value={kind}
+              onValueChange={changeKind}
+              label="Filtrar por tipo"
+              allLabel="Todos os tipos"
+              options={personKinds.map((value) => ({
+                value,
+                label: personKindLabels[value],
+              }))}
+            />
+            <ListFilter
+              value={profile}
+              onValueChange={changeProfile}
+              label="Filtrar por perfil"
+              allLabel="Todos os perfis"
+              options={profiles.map((value) => ({
+                value,
+                label: profileLabels[value],
+              }))}
+            />
+          </>
+        }
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>
-              {personSelected || personPersisted
-                ? 'Editar Pessoa'
-                : 'Cadastrar Nova Pessoa'}
-            </DialogTitle>
-          </DialogHeader>
-          <FormPerson
-            key={personSelected?.id ?? 'new'}
-            personToUpdate={personSelected}
-            onPersisted={(saved) => {
-              setPersonSelected(saved);
-              setPersonPersisted(true);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
+        <div className="overflow-x-auto">
+          <div className="min-w-[980px]">
+            <StatusListHeader columns={columns}>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-left"
+                onClick={() => changeSort('name')}
+              >
+                Nome
+                {sortIcon('name')}
+              </button>
+              <span>Documento</span>
+              <span>Tipo</span>
+              <span>Perfis</span>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-left"
+                onClick={() => changeSort('createdAt')}
+              >
+                Cadastro
+                {sortIcon('createdAt')}
+              </button>
+              <span>Situação</span>
+            </StatusListHeader>
 
-      <AlertDialog open={openAlert} onOpenChange={setOpenAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir pessoa</AlertDialogTitle>
-            <AlertDialogDescription>
-              {erroExclusao ??
-                `Deseja excluir ${personSelected?.name ?? 'esta pessoa'}? Essa ação não pode ser desfeita.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              disabled={deleteMutation.isPending || !!erroExclusao}
-              onClick={(event) => {
-                event.preventDefault();
-                if (personSelected) deleteMutation.mutate(personSelected.id);
-              }}
-            >
-              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            {list.isLoading ? (
+              <ListMessage>Carregando as pessoas...</ListMessage>
+            ) : list.isError ? (
+              <ListMessage tone="error">
+                Não foi possível carregar as pessoas.
+              </ListMessage>
+            ) : rows.length === 0 ? (
+              <ListMessage>
+                {filtered ? 'Nenhuma pessoa encontrada.' : 'Ainda não há pessoa.'}
+              </ListMessage>
+            ) : (
+              rows.map((person) => {
+                const status = person.isActive ? 'Ativa' : 'Inativa';
+                const kindLabel = personKindLabels[parsePersonKind(person.type)];
+                const document = person.taxId
+                  ? formatTaxId(parsePersonKind(person.type), person.taxId)
+                  : '—';
+                const badges = profileBadges(person);
+                return (
+                  <StatusListRow
+                    key={person.id}
+                    columns={columns}
+                    tone={person.isActive ? activeTone : inactiveTone}
+                    label={`${person.name}, ${document}, ${kindLabel}, ${status}`}
+                    onOpen={() => navigate(`/persons/${person.id}`, { state: { from } })}
+                  >
+                    <span className="min-w-0 truncate font-bold">{person.name}</span>
+                    <span className="min-w-0 truncate">{document}</span>
+                    <span className="min-w-0 truncate">{kindLabel}</span>
+                    <span className="flex min-w-0 flex-wrap gap-1">
+                      {badges.length ? (
+                        badges.map((badge) => (
+                          <StatusBadge
+                            key={badge.label}
+                            label={badge.label}
+                            tone={badge.tone}
+                          />
+                        ))
+                      ) : (
+                        <span>—</span>
+                      )}
+                    </span>
+                    <span>{formatDate(person.createdAt)}</span>
+                    <span>
+                      <StatusBadge label={status} />
+                    </span>
+                  </StatusListRow>
+                );
+              })
+            )}
+          </div>
+        </div>
+        {meta ? (
+          <ListPagination
+            page={page}
+            limit={limit}
+            total={meta.total}
+            totalPages={meta.totalPages}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+          />
+        ) : null}
+      </ListPanel>
     </div>
   );
 }

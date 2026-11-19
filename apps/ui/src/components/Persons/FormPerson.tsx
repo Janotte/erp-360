@@ -15,10 +15,23 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+  FloatingInput,
+  FloatingSelect,
+  FloatingTextarea,
+} from '@/components/ui/FloatingField';
 import { onEnterSequence, onEnterSequenceCapture } from '@/lib/enterSequence';
 
 import {
@@ -76,6 +89,8 @@ function taxIdMaxLength(kind: PersonKind) {
 interface FormPersonProps {
   personToUpdate?: Person | null;
   onPersisted?: (person: Person) => void;
+  onCancel?: () => void;
+  onDeleted?: () => void;
   initialName?: string;
   /** Após o primeiro salvamento, rola até endereço e contato em vez de encerrar o cadastro. */
   stayAfterCreate?: boolean;
@@ -90,6 +105,8 @@ interface FormPersonProps {
 export function FormPerson({
   personToUpdate,
   onPersisted,
+  onCancel,
+  onDeleted,
   initialName = '',
   stayAfterCreate = false,
   createAs,
@@ -118,6 +135,8 @@ export function FormPerson({
     Boolean(createAs?.isFinancialInstitution),
   );
   const [pendingAddress, setPendingAddress] = useState<CnpjLookupAddress | null>(null);
+  const [openDelete, setOpenDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const pendingAddressRef = useRef<CnpjLookupAddress | null>(null);
   pendingAddressRef.current = pendingAddress;
 
@@ -234,6 +253,19 @@ export function FormPerson({
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => personsService.delete(personId ?? ''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['listaPessoas'] });
+      if (personId) queryClient.removeQueries({ queryKey: ['person', personId] });
+      toast.success('Pessoa removida com sucesso!');
+      onDeleted?.();
+    },
+    onError: (error: Error) => {
+      setDeleteError(error.message);
+    },
+  });
+
   const labels = fieldLabels[personKind];
   const showTaxpayerType = personKind === 'company';
 
@@ -261,7 +293,9 @@ export function FormPerson({
       if (data.existingPersonId && data.existingPersonId !== personId) {
         toast.error('Este CNPJ já está cadastrado neste ambiente.');
       } else if (data.address && !data.address.cityId) {
-        toast.error('Dados preenchidos, mas a cidade não foi encontrada. Complete o endereço após salvar.');
+        toast.error(
+          'Dados preenchidos, mas a cidade não foi encontrada. Complete o endereço após salvar.',
+        );
       } else {
         toast.success('Dados do CNPJ preenchidos. Confira e salve.');
       }
@@ -280,6 +314,10 @@ export function FormPerson({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name.trim()) {
+      toast.error('Informe o nome.');
+      return;
+    }
     if (personKind === 'individual' && taxId && !isValidCpf(taxId)) {
       setTaxIdError('CPF inválido');
       return;
@@ -310,77 +348,81 @@ export function FormPerson({
     });
   };
 
-  const selectClassName =
-    'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
+  const busy = mutation.isPending || deleteMutation.isPending;
+  const submitLabel = mutation.isPending
+    ? 'Salvando...'
+    : stayAfterCreate
+      ? personId
+        ? 'Salvar alterações'
+        : 'Salvar pessoa'
+      : personId
+        ? 'Atualizar'
+        : 'Cadastrar';
 
   return (
-    <div className="space-y-6 pt-4">
+    <div className="space-y-6">
       <form
         onSubmit={handleSubmit}
         onKeyDown={onEnterSequence}
         onKeyDownCapture={onEnterSequenceCapture}
         className="space-y-4"
       >
-        <div className="space-y-1">
-          <Label htmlFor="personKind">Tipo de pessoa</Label>
-          <select
-            id="personKind"
-            data-enter-sequence=""
-            value={personKind}
-            onChange={(event) => handleKindChange(parsePersonKind(event.target.value))}
-            className={selectClassName}
-            required
-          >
-            {personKinds.map((kind) => (
-              <option key={kind} value={kind}>
-                {personKindLabels[kind]}
-              </option>
-            ))}
-          </select>
-        </div>
+        <FloatingSelect
+          id="personKind"
+          label="Tipo de pessoa"
+          data-enter-sequence=""
+          value={personKind}
+          required
+          pinned
+          onChange={(event) => handleKindChange(parsePersonKind(event.target.value))}
+        >
+          {personKinds.map((kind) => (
+            <option key={kind} value={kind}>
+              {personKindLabels[kind]}
+            </option>
+          ))}
+        </FloatingSelect>
 
         {personKind === 'company' ? (
-          <div className="space-y-1">
-            <Label htmlFor="taxId">{labels.taxId}</Label>
-            <Input
+          <div className="space-y-2">
+            <FloatingInput
               id="taxId"
+              label={labels.taxId}
               data-enter-sequence=""
               value={taxId}
               maxLength={taxIdMaxLength(personKind)}
               inputMode="numeric"
               autoComplete="off"
-              onChange={(e) => handleTaxIdChange(e.target.value)}
+              error={taxIdError}
+              onChange={(event) => handleTaxIdChange(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key !== 'Enter' || event.shiftKey) return;
                 event.preventDefault();
                 lookupCnpj();
               }}
             />
-            <p className="text-xs text-zinc-500">
+            <p className="text-sm text-zinc-500">
               {lookupMutation.isPending
                 ? 'Consultando CNPJ...'
                 : 'Digite o CNPJ e pressione Enter para preencher os dados.'}
             </p>
-            {taxIdError ? (
-              <p className="text-sm text-destructive">{taxIdError}</p>
-            ) : null}
           </div>
         ) : null}
 
-        <div className="space-y-1">
-          <Label htmlFor="nome">{labels.name}</Label>
-          <Input
+        <div className="space-y-2">
+          <FloatingInput
             id="nome"
+            label={labels.name}
             data-enter-sequence=""
             value={name}
             maxLength={120}
-            onChange={(e) => setName(e.target.value)}
+            required
+            onChange={(event) => setName(event.target.value)}
             onBlur={() => {
               if (!preserveNameCasing) setName(toTitleCasePtBr(name));
             }}
-            required
           />
-          <div className="flex items-center space-x-2 pt-1">
+          <div className="flex items-center space-x-2">
             <Checkbox
               id="preserveNameCasing"
               checked={preserveNameCasing}
@@ -390,7 +432,7 @@ export function FormPerson({
                 if (!next) setName(toTitleCasePtBr(name));
               }}
             />
-            <label htmlFor="preserveNameCasing" className="text-sm text-zinc-600">
+            <label htmlFor="preserveNameCasing" className="text-sm font-medium">
               Manter grafia
             </label>
           </div>
@@ -398,119 +440,101 @@ export function FormPerson({
 
         <div className="grid grid-cols-2 gap-4">
           {personKind !== 'company' ? (
-            <div className="space-y-1">
-              <Label htmlFor="taxId">{labels.taxId}</Label>
-              <Input
-                id="taxId"
-                data-enter-sequence=""
-                value={taxId}
-                maxLength={taxIdMaxLength(personKind)}
-                inputMode={personKind === 'foreigner' ? 'text' : 'numeric'}
-                autoComplete="off"
-                onChange={(e) => handleTaxIdChange(e.target.value)}
-              />
-              {taxIdError ? (
-                <p className="text-sm text-destructive">{taxIdError}</p>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="space-y-1">
-            <Label htmlFor="birthDate">{labels.birthDate}</Label>
-            <Input
-              id="birthDate"
+            <FloatingInput
+              id="taxId"
+              label={labels.taxId}
               data-enter-sequence=""
-              type="date"
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
+              value={taxId}
+              maxLength={taxIdMaxLength(personKind)}
+              inputMode={personKind === 'foreigner' ? 'text' : 'numeric'}
+              autoComplete="off"
+              error={taxIdError}
+              onChange={(event) => handleTaxIdChange(event.target.value)}
             />
-          </div>
+          ) : null}
+          <FloatingInput
+            id="birthDate"
+            label={labels.birthDate}
+            data-enter-sequence=""
+            type="date"
+            value={birthDate}
+            onChange={(event) => setBirthDate(event.target.value)}
+          />
         </div>
 
         {showTaxpayerType ? (
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label htmlFor="taxpayerType">Indicador de contribuinte</Label>
-              <select
-                id="taxpayerType"
-                data-enter-sequence=""
-                value={taxpayerType}
-                onChange={(event) => setTaxpayerType(event.target.value)}
-                className={selectClassName}
-              >
-                <option value="">Selecione</option>
-                {taxpayerTypes.map((value) => (
-                  <option key={value} value={String(value)}>
-                    {taxpayerTypeLabels[value]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="stateRegistration">{labels.stateRegistration}</Label>
-              <Input
-                id="stateRegistration"
-                data-enter-sequence=""
-                value={stateRegistration}
-                maxLength={20}
-                onChange={(e) => setStateRegistration(e.target.value)}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            <Label htmlFor="stateRegistration">{labels.stateRegistration}</Label>
-            <Input
+            <FloatingSelect
+              id="taxpayerType"
+              label="Indicador de contribuinte"
+              data-enter-sequence=""
+              value={taxpayerType}
+              onChange={(event) => setTaxpayerType(event.target.value)}
+            >
+              <option value="">Selecione</option>
+              {taxpayerTypes.map((value) => (
+                <option key={value} value={String(value)}>
+                  {taxpayerTypeLabels[value]}
+                </option>
+              ))}
+            </FloatingSelect>
+            <FloatingInput
               id="stateRegistration"
+              label={labels.stateRegistration}
               data-enter-sequence=""
               value={stateRegistration}
               maxLength={20}
-              onChange={(e) => setStateRegistration(e.target.value)}
+              onChange={(event) => setStateRegistration(event.target.value)}
             />
           </div>
+        ) : (
+          <FloatingInput
+            id="stateRegistration"
+            label={labels.stateRegistration}
+            data-enter-sequence=""
+            value={stateRegistration}
+            maxLength={20}
+            onChange={(event) => setStateRegistration(event.target.value)}
+          />
         )}
 
-        <div className="space-y-1">
-          <Label htmlFor="nfeEmail">E-mail da NF-e</Label>
-          <Input
-            id="nfeEmail"
-            data-enter-sequence=""
-            type="email"
-            value={nfeEmail}
-            maxLength={60}
-            onChange={(e) => setNfeEmail(e.target.value.toLowerCase())}
-          />
-        </div>
+        <FloatingInput
+          id="nfeEmail"
+          label="E-mail da NF-e"
+          data-enter-sequence=""
+          type="email"
+          value={nfeEmail}
+          maxLength={60}
+          onChange={(event) => setNfeEmail(event.target.value.toLowerCase())}
+        />
 
-        <div className="space-y-1">
-          <Label htmlFor="documentEmails">E-mails de documentos</Label>
-          <Input
+        <div className="space-y-2">
+          <FloatingInput
             id="documentEmails"
+            label="E-mails de documentos"
             data-enter-sequence=""
             value={documentEmails}
-            placeholder="Separe por vírgula"
-            onChange={(e) => setDocumentEmails(e.target.value)}
+            onChange={(event) => setDocumentEmails(event.target.value)}
           />
+          <p className="text-sm text-zinc-500">Separe vários e-mails por vírgula.</p>
         </div>
 
-        <div className="space-y-1">
-          <Label htmlFor="notes">Observações</Label>
-          <textarea
-            id="notes"
-            data-enter-sequence=""
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="flex min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          />
-        </div>
+        <FloatingTextarea
+          id="notes"
+          label="Observações"
+          data-enter-sequence=""
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+        />
 
-        <div className="flex flex-col gap-2 pt-2">
-          <Label>Perfil da Pessoa</Label>
-          <div className="flex flex-wrap gap-6 mt-1">
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-zinc-900">Perfil</p>
+          <div className="flex flex-wrap gap-6">
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="cliente"
                 checked={isClient}
-                onCheckedChange={(v) => setIsClient(!!v)}
+                onCheckedChange={(value) => setIsClient(!!value)}
               />
               <label htmlFor="cliente" className="text-sm font-medium">
                 Cliente
@@ -520,7 +544,7 @@ export function FormPerson({
               <Checkbox
                 id="fornecedor"
                 checked={isSupplier}
-                onCheckedChange={(v) => setIsSupplier(!!v)}
+                onCheckedChange={(value) => setIsSupplier(!!value)}
               />
               <label htmlFor="fornecedor" className="text-sm font-medium">
                 Fornecedor
@@ -530,7 +554,7 @@ export function FormPerson({
               <Checkbox
                 id="colaborador"
                 checked={isEmployee}
-                onCheckedChange={(v) => setIsEmployee(!!v)}
+                onCheckedChange={(value) => setIsEmployee(!!value)}
               />
               <label htmlFor="colaborador" className="text-sm font-medium">
                 Colaborador
@@ -540,7 +564,7 @@ export function FormPerson({
               <Checkbox
                 id="instituicao"
                 checked={isFinancialInstitution}
-                onCheckedChange={(v) => setIsFinancialInstitution(!!v)}
+                onCheckedChange={(value) => setIsFinancialInstitution(!!value)}
               />
               <label htmlFor="instituicao" className="text-sm font-medium">
                 Instituição financeira
@@ -554,7 +578,7 @@ export function FormPerson({
             <Checkbox
               id="rural"
               checked={isRuralProducer}
-              onCheckedChange={(v) => setIsRuralProducer(!!v)}
+              onCheckedChange={(value) => setIsRuralProducer(!!value)}
             />
             <label htmlFor="rural" className="text-sm font-medium">
               Produtor rural
@@ -564,17 +588,17 @@ export function FormPerson({
             <Checkbox
               id="ativo"
               checked={isActive}
-              onCheckedChange={(v) => setIsActive(!!v)}
+              onCheckedChange={(value) => setIsActive(!!value)}
             />
             <label htmlFor="ativo" className="text-sm font-medium">
-              Ativo
+              Ativa
             </label>
           </div>
           <div className="flex items-center space-x-2">
             <Checkbox
               id="visivel"
               checked={isVisible}
-              onCheckedChange={(v) => setIsVisible(!!v)}
+              onCheckedChange={(value) => setIsVisible(!!value)}
             />
             <label htmlFor="visivel" className="text-sm font-medium">
               Visível
@@ -582,15 +606,15 @@ export function FormPerson({
           </div>
         </div>
 
-        {mutation.isError && (
+        {mutation.isError ? (
           <p className="text-sm font-medium text-destructive bg-destructive/10 p-3 rounded-md">
             {mutation.error.message}
           </p>
-        )}
+        ) : null}
 
         {pendingAddress && !personId ? (
           <p className="text-sm text-zinc-600">
-            Endereço Principal a gravar:{' '}
+            Endereço principal a gravar:{' '}
             {[
               pendingAddress.street,
               pendingAddress.number,
@@ -604,23 +628,57 @@ export function FormPerson({
           </p>
         ) : null}
 
-        <Button
-          type="submit"
-          data-enter-sequence=""
-          className="w-full mt-4"
-          disabled={mutation.isPending}
-        >
-          {mutation.isPending
-            ? 'Salvando...'
-            : stayAfterCreate
-              ? personId
-                ? 'Salvar alterações'
-                : 'Salvar pessoa'
-              : 'Salvar'}
-        </Button>
+        <div className="flex flex-wrap justify-end gap-2 pt-2">
+          {onCancel ? (
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancelar
+            </Button>
+          ) : null}
+          {personId && onDeleted ? (
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={busy}
+              onClick={() => {
+                setDeleteError(null);
+                setOpenDelete(true);
+              }}
+            >
+              Excluir
+            </Button>
+          ) : null}
+          <Button type="submit" data-enter-sequence="" disabled={busy}>
+            {submitLabel}
+          </Button>
+        </div>
+
+        <AlertDialog open={openDelete} onOpenChange={setOpenDelete}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir pessoa</AlertDialogTitle>
+              <AlertDialogDescription>
+                {deleteError ??
+                  `Deseja excluir ${name || 'esta pessoa'}? Essa ação não pode ser desfeita.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700"
+                disabled={deleteMutation.isPending || !!deleteError}
+                onClick={(event) => {
+                  event.preventDefault();
+                  if (personId) deleteMutation.mutate();
+                }}
+              >
+                {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </form>
 
-      <div ref={detailsRef} className="space-y-6">
+      <div id="person-details" ref={detailsRef} className="space-y-6">
         <Separator />
         <PersonAddresses personId={personId} />
         <Separator />

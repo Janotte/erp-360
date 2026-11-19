@@ -189,7 +189,9 @@ export function AppSidebar() {
                       asChild
                       tooltip={item.title}
                       isActive={
-                        item.url === '/service-orders' || item.url === '/contracts'
+                        item.url === '/service-orders' ||
+                        item.url === '/contracts' ||
+                        item.url === '/persons'
                           ? pathAtivo === item.url || pathAtivo.startsWith(`${item.url}/`)
                           : pathAtivo === item.url
                       }
