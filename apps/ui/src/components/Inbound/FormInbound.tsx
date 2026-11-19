@@ -16,9 +16,9 @@ import {
   filterFromSearch,
   freightLabels,
   groupKey,
-  inboundPageSize,
   labeledToken,
 } from '@/components/Inbound/inboundQuery';
+import { inboundStatusTone } from '@/components/Inbound/inboundTone';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,8 +30,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { FloatingInput, FloatingSelect } from '@/components/ui/FloatingField';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { companyCardService } from '@/services/companyCards';
 import {
   discoveryConfirm,
@@ -100,15 +100,11 @@ function lineCents(qty: number, price: number) {
 
 const editableStatus = new Set(['pre_note', 'divergent', 'pending']);
 
-const statusClass: Record<string, string> = {
-  pending: 'bg-amber-100 text-amber-800',
-  pre_note: 'bg-sky-100 text-sky-800',
-  divergent: 'bg-rose-100 text-rose-800',
-  posted: 'bg-emerald-100 text-emerald-800',
-  reversed: 'bg-zinc-200 text-zinc-700',
-  ignored: 'bg-zinc-200 text-zinc-600',
-  discovered: 'bg-violet-100 text-violet-800',
-};
+function listReturn(state: unknown) {
+  const from = (state as { from?: string } | null)?.from;
+  if (from === '/inbound' || from?.startsWith('/inbound?')) return from;
+  return '/inbound';
+}
 
 function Section({
   title,
@@ -140,8 +136,8 @@ function Section({
         onClick={onToggle}
       >
         <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />
-        <span className="font-medium text-zinc-900">{title}</span>
-        <span className="ml-auto truncate pl-3 text-sm text-zinc-500">{summary}</span>
+        <span className="font-medium text-[#172337]">{title}</span>
+        <span className="ml-auto truncate pl-3 text-sm text-[#64748b]">{summary}</span>
       </button>
       {open ? <div className="space-y-4 border-t px-4 py-4">{children}</div> : null}
     </section>
@@ -151,8 +147,8 @@ function Section({
 function ReadField({ label, value }: { label: string; value: string }) {
   return (
     <div className="space-y-1">
-      <p className="text-sm text-zinc-500">{label}</p>
-      <p className="text-sm text-zinc-800">{value || '—'}</p>
+      <p className="text-sm text-[#64748b]">{label}</p>
+      <p className="text-sm text-[#172337]">{value || '—'}</p>
     </div>
   );
 }
@@ -162,11 +158,7 @@ export function FormInbound() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const from =
-    (location.state as { from?: string } | null)?.from &&
-    (location.state as { from?: string }).from?.startsWith('/inbound')
-      ? (location.state as { from: string }).from
-      : '/inbound';
+  const from = listReturn(location.state);
 
   const [draft, setDraft] = useState<InboundDraft | null>(null);
   const [baseline, setBaseline] = useState('');
@@ -372,7 +364,7 @@ export function FormInbound() {
 
   async function openNext() {
     const query = from.includes('?') ? from.slice(from.indexOf('?')) : '';
-    const filter = { ...filterFromSearch(query), limit: inboundPageSize };
+    const filter = filterFromSearch(query);
     let page = 1;
     while (page < 1000) {
       const result = await inboundService.list({ ...filter, page });
@@ -442,7 +434,7 @@ export function FormInbound() {
     return 'Item selecionado';
   };
 
-  if (detail.isPending) return <p className="text-sm text-zinc-500">Carregando...</p>;
+  if (detail.isPending) return <p className="text-sm text-[#64748b]">Carregando...</p>;
   if (detail.isError) {
     return <p className="text-sm text-rose-700">{detail.error.message}</p>;
   }
@@ -503,31 +495,32 @@ export function FormInbound() {
       <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-white py-3">
         <div className="flex flex-wrap items-center gap-3">
           <Button type="button" variant="outline" onClick={goBack}>
-            Voltar
+            Voltar à lista
           </Button>
-          <h2 className="text-xl font-bold text-zinc-900">
+          <h2 className="text-xl font-bold text-[#172337]">
             Nota {document.number}/{document.series}
           </h2>
           <span
-            className={`rounded px-2 py-0.5 text-xs font-medium ${statusClass[document.status]}`}
+            className="text-sm font-semibold"
+            style={{ color: inboundStatusTone[document.status].text }}
           >
             {inboundStatusLabel[document.status]}
           </span>
-          <span className="text-sm text-zinc-600">
+          <span className="text-sm text-[#64748b]">
             {document.supplierName || 'Sem emitente'}
           </span>
-          <span className="text-sm font-medium text-zinc-900">
+          <span className="text-sm font-medium text-[#172337]">
             {formatCurrency(document.totalAmount)}
           </span>
         </div>
       </div>
 
       {document.status === 'discovered' ? (
-        <section className="space-y-4 rounded-lg border bg-white p-4">
+        <section className="space-y-4 rounded-lg border bg-white p-6">
           <dl className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1 sm:col-span-2">
-              <dt className="text-sm text-zinc-500">Chave</dt>
-              <dd className="break-all font-mono text-sm text-zinc-800">
+              <dt className="text-sm text-[#64748b]">Chave</dt>
+              <dd className="break-all font-mono text-sm text-[#172337]">
                 {document.accessKey || '—'}
               </dd>
             </div>
@@ -548,13 +541,15 @@ export function FormInbound() {
           {document.authorizationStatus === 'denied' ? (
             <p className="text-sm text-rose-700">Denegada na SEFAZ</p>
           ) : null}
-          <Button
-            type="button"
-            onClick={() => void confirmDiscovery()}
-            disabled={discover.isPending}
-          >
-            Consultar
-          </Button>
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              onClick={() => void confirmDiscovery()}
+              disabled={discover.isPending}
+            >
+              Consultar
+            </Button>
+          </div>
         </section>
       ) : draft ? (
         <form
@@ -578,35 +573,27 @@ export function FormInbound() {
               {document.accessKey ? (
                 <ReadField label="Número" value={document.number} />
               ) : (
-                <div className="space-y-1">
-                  <Label>Número</Label>
-                  <Input
-                    value={draft.number}
-                    disabled={locked}
-                    onChange={(event) =>
-                      setDraft({ ...draft, number: event.target.value })
-                    }
-                  />
-                </div>
+                <FloatingInput
+                  label="Número"
+                  value={draft.number}
+                  disabled={locked}
+                  onChange={(event) => setDraft({ ...draft, number: event.target.value })}
+                />
               )}
               {document.accessKey ? (
                 <ReadField label="Série" value={document.series} />
               ) : (
-                <div className="space-y-1">
-                  <Label>Série</Label>
-                  <Input
-                    value={draft.series}
-                    disabled={locked}
-                    onChange={(event) =>
-                      setDraft({ ...draft, series: event.target.value })
-                    }
-                  />
-                </div>
+                <FloatingInput
+                  label="Série"
+                  value={draft.series}
+                  disabled={locked}
+                  onChange={(event) => setDraft({ ...draft, series: event.target.value })}
+                />
               )}
               <div className="space-y-1 sm:col-span-4">
-                <p className="text-sm text-zinc-500">Chave de acesso</p>
+                <p className="text-sm text-[#64748b]">Chave de acesso</p>
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="break-all font-mono text-sm text-zinc-800">
+                  <p className="break-all font-mono text-sm text-[#172337]">
                     {document.accessKey ? groupKey(document.accessKey) : '—'}
                   </p>
                   {document.accessKey ? (
@@ -626,45 +613,42 @@ export function FormInbound() {
                   ) : null}
                 </div>
               </div>
-              <div className="space-y-1 sm:col-span-2">
-                <Label>Natureza da operação</Label>
-                <select
-                  className="flex h-9 w-full rounded-md border px-3 text-sm"
-                  value={draft.natureId ?? ''}
-                  disabled={locked}
-                  onChange={(event) =>
-                    setDraft({ ...draft, natureId: event.target.value || null })
-                  }
-                >
-                  <option value="">Selecione</option>
-                  {(natures.data ?? []).map((nature) => (
-                    <option key={nature.id} value={nature.id}>
-                      {nature.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <FloatingSelect
+                className="sm:col-span-2"
+                label="Natureza da operação"
+                value={draft.natureId ?? ''}
+                pinned
+                disabled={locked}
+                onChange={(event) =>
+                  setDraft({ ...draft, natureId: event.target.value || null })
+                }
+              >
+                <option value="">Selecione</option>
+                {(natures.data ?? []).map((nature) => (
+                  <option key={nature.id} value={nature.id}>
+                    {nature.name}
+                  </option>
+                ))}
+              </FloatingSelect>
               {document.accessKey ? (
                 <ReadField
                   label="Data de emissão"
                   value={formatRawDate(document.issueOn)}
                 />
               ) : (
-                <div className="space-y-1">
-                  <Label>Data de emissão</Label>
-                  <Input
-                    type="date"
-                    value={draft.issueOn}
-                    disabled={locked}
-                    onChange={(event) =>
-                      setDraft({ ...draft, issueOn: event.target.value })
-                    }
-                  />
-                </div>
+                <FloatingInput
+                  label="Data de emissão"
+                  type="date"
+                  value={draft.issueOn}
+                  disabled={locked}
+                  onChange={(event) =>
+                    setDraft({ ...draft, issueOn: event.target.value })
+                  }
+                />
               )}
-              <div className="space-y-1">
-                <Label>Data de entrada</Label>
-                <Input
+              <div>
+                <FloatingInput
+                  label="Data de entrada"
                   type="date"
                   value={draft.inboundOn ?? ''}
                   disabled={locked}
@@ -673,7 +657,7 @@ export function FormInbound() {
                   }
                 />
                 {entryBeforeIssue ? (
-                  <p className="text-xs text-rose-700">
+                  <p className="mt-1 text-xs text-rose-700">
                     A data de entrada não pode ser anterior à emissão.
                   </p>
                 ) : null}
@@ -713,7 +697,7 @@ export function FormInbound() {
               <ReadField label="UF" value={emitter?.state || ''} />
             </div>
             <div className="space-y-2">
-              <p className="text-sm text-zinc-700">
+              <p className="text-sm text-[#334155]">
                 {supplierState}
                 {document.supplierTaxId ? ` · ${document.supplierTaxId}` : ''}
               </p>
@@ -732,9 +716,9 @@ export function FormInbound() {
               ) : null}
               {!locked && !document.supplierId ? (
                 <>
-                  <Input
+                  <FloatingInput
+                    label="Buscar pessoa"
                     value={supplierSearch}
-                    placeholder="Buscar pessoa"
                     onChange={(event) => setSupplierSearch(event.target.value)}
                   />
                   <ul>
@@ -742,7 +726,7 @@ export function FormInbound() {
                       <li key={personRow.id}>
                         <button
                           type="button"
-                          className="text-left text-sm text-zinc-700 hover:underline"
+                          className="text-left text-sm text-[#334155] hover:underline"
                           onClick={() => {
                             setDraft({ ...draft, supplierId: personRow.id });
                             setSupplierSearch('');
@@ -777,18 +761,16 @@ export function FormInbound() {
               </Button>
             </div>
             <div className="flex flex-wrap items-end gap-2">
-              <div className="space-y-1">
-                <Label>CFOP de entrada</Label>
-                <Input
-                  value={bulkCfop}
-                  maxLength={4}
-                  disabled={locked}
-                  className="w-28"
-                  onChange={(event) =>
-                    setBulkCfop(event.target.value.replace(/\D/g, '').slice(0, 4))
-                  }
-                />
-              </div>
+              <FloatingInput
+                label="CFOP de entrada"
+                value={bulkCfop}
+                maxLength={4}
+                disabled={locked}
+                className="w-40"
+                onChange={(event) =>
+                  setBulkCfop(event.target.value.replace(/\D/g, '').slice(0, 4))
+                }
+              />
               <Button
                 type="button"
                 variant="outline"
@@ -806,7 +788,7 @@ export function FormInbound() {
             <div className="overflow-x-auto">
               <table className="min-w-[1100px] w-full text-sm">
                 <thead>
-                  <tr className="border-b text-left text-zinc-500">
+                  <tr className="border-b text-left text-[#64748b]">
                     <th className="py-2 pr-2 font-medium">Nº</th>
                     <th className="py-2 pr-2 font-medium">Código</th>
                     <th className="py-2 pr-2 font-medium">Descrição</th>
@@ -1002,7 +984,7 @@ export function FormInbound() {
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-zinc-500">Sem XML completo</p>
+              <p className="text-sm text-[#64748b]">Sem XML completo</p>
             )}
           </Section>
 
@@ -1047,7 +1029,7 @@ export function FormInbound() {
                 <ReadField label="Peso líquido" value={transport.netWeight} />
               </div>
             ) : (
-              <p className="text-sm text-zinc-500">Sem XML completo</p>
+              <p className="text-sm text-[#64748b]">Sem XML completo</p>
             )}
           </Section>
 
@@ -1072,8 +1054,10 @@ export function FormInbound() {
           >
             {asksPayment(document) ? (
               <div className="space-y-3">
-                <select
-                  className="flex h-9 w-full max-w-sm rounded-md border px-3 text-sm"
+                <FloatingSelect
+                  className="max-w-sm"
+                  label="Como a compra foi paga"
+                  pinned
                   value={
                     draft.finance?.financialStatus === 'waived'
                       ? 'waived'
@@ -1144,10 +1128,12 @@ export function FormInbound() {
                   <option value="supplier">Prazo com o fornecedor</option>
                   <option value="card">Cartão de crédito</option>
                   <option value="waived">Sem obrigação financeira</option>
-                </select>
+                </FloatingSelect>
                 {draft.finance?.paymentKind === 'card' ? (
-                  <select
-                    className="flex h-9 w-full max-w-sm rounded-md border px-3 text-sm"
+                  <FloatingSelect
+                    className="max-w-sm"
+                    label="Cartão"
+                    pinned
                     value={draft.finance.companyCardId ?? ''}
                     disabled={locked}
                     onChange={(event) => {
@@ -1189,11 +1175,11 @@ export function FormInbound() {
                           {card.name}
                         </option>
                       ))}
-                  </select>
+                  </FloatingSelect>
                 ) : null}
                 {(cards.isSuccess ? cards.data : []).filter((card) => card.isActive)
                   .length === 0 && draft.finance?.paymentKind === 'card' ? (
-                  <p className="text-sm text-zinc-500">
+                  <p className="text-sm text-[#64748b]">
                     <Link to="/company-cards" className="underline">
                       Cadastre um cartão da empresa
                     </Link>{' '}
@@ -1201,10 +1187,10 @@ export function FormInbound() {
                   </p>
                 ) : null}
                 {draft.finance?.financialStatus === 'waived' ? (
-                  <Input
+                  <FloatingInput
+                    label="Motivo da dispensa"
                     value={draft.finance.waiverReason ?? ''}
                     disabled={locked}
-                    placeholder="Motivo da dispensa"
                     onChange={(event) =>
                       setDraft({
                         ...draft,
@@ -1215,20 +1201,18 @@ export function FormInbound() {
                 ) : null}
                 {draft.finance?.financialStatus === 'classified' ? (
                   <div className="flex flex-wrap items-end gap-2">
-                    <div className="space-y-1">
-                      <Label>Parcelas</Label>
-                      <Input
-                        className="w-24"
-                        value={installmentCount}
-                        disabled={locked}
-                        inputMode="numeric"
-                        onChange={(event) =>
-                          setInstallmentCount(
-                            event.target.value.replace(/\D/g, '').slice(0, 2),
-                          )
-                        }
-                      />
-                    </div>
+                    <FloatingInput
+                      className="w-32"
+                      label="Parcelas"
+                      value={installmentCount}
+                      disabled={locked}
+                      inputMode="numeric"
+                      onChange={(event) =>
+                        setInstallmentCount(
+                          event.target.value.replace(/\D/g, '').slice(0, 2),
+                        )
+                      }
+                    />
                     <Button
                       type="button"
                       variant="outline"
@@ -1276,28 +1260,30 @@ export function FormInbound() {
               </div>
             ) : null}
             <div className="space-y-2">
-              <p className="text-sm text-zinc-600">
+              <p className="text-sm text-[#64748b]">
                 Soma {formatCurrency(paySum)} · total{' '}
                 {formatCurrency(document.totalAmount)}
               </p>
               {draft.installments.map((installment, index) => (
                 <div
                   key={`${installment.number}-${index}`}
-                  className="grid items-center gap-2 sm:grid-cols-3"
+                  className="grid items-end gap-2 sm:grid-cols-[8rem_minmax(0,16rem)_8rem]"
                 >
-                  <p className="text-sm text-zinc-700">Parcela {installment.number}</p>
-                  <Input
+                  <p className="pb-3 text-sm text-[#172337]">
+                    Parcela {installment.number}
+                  </p>
+                  <FloatingInput
+                    label="Vencimento"
                     type="date"
                     value={installment.dueOn}
                     disabled={locked}
-                    aria-label={`Vencimento da parcela ${installment.number}`}
                     onChange={(event) => {
                       const installments = [...draft.installments];
                       installments[index] = { ...installment, dueOn: event.target.value };
                       setDraft({ ...draft, installments });
                     }}
                   />
-                  <p className="text-sm tabular-nums text-zinc-700">
+                  <p className="pb-3 text-sm tabular-nums text-[#172337]">
                     {formatCurrency(installment.amount)}
                   </p>
                 </div>
@@ -1325,13 +1311,13 @@ export function FormInbound() {
               </div>
             ) : null}
             {info ? (
-              <p className="whitespace-pre-wrap text-sm text-zinc-700">{info}</p>
+              <p className="whitespace-pre-wrap text-sm text-[#334155]">{info}</p>
             ) : (
-              <p className="text-sm text-zinc-500">Sem XML completo</p>
+              <p className="text-sm text-[#64748b]">Sem XML completo</p>
             )}
           </Section>
 
-          <div className="sticky bottom-0 z-20 flex flex-wrap items-center gap-2 border-t bg-white py-3">
+          <div className="sticky bottom-0 z-20 flex flex-wrap items-center justify-end gap-2 border-t bg-white py-3">
             <Button
               type="submit"
               variant="outline"

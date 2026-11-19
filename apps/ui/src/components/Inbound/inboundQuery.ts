@@ -1,3 +1,5 @@
+import { type ListPageSize, listPageSizes } from '@erp-360/shared';
+
 import type {
   InboundListFilter,
   InboundListItem,
@@ -35,10 +37,15 @@ export function filterFromSearch(search: string): InboundListFilter {
     sort: sorts.has(sort as InboundListSort) ? (sort as InboundListSort) : undefined,
     dir: dir === 'asc' || dir === 'desc' ? dir : undefined,
     page: pageFrom(params.get('page')),
+    limit: readLimit(params.get('limit')),
   };
 }
 
-export const inboundPageSize = 10;
+function readLimit(value: string | null): ListPageSize {
+  const limit = Number(value);
+  if ((listPageSizes as readonly number[]).includes(limit)) return limit as ListPageSize;
+  return 10;
+}
 
 function pageFrom(value: string | null) {
   const page = Number(value);

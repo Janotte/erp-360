@@ -27,7 +27,7 @@ describe('lista e data de entrada', () => {
     assert.equal(parsed.success, false);
   });
 
-  it('ordena pela entrada, separa a fila e expõe o primeiro bloqueio', async () => {
+  it('ordena pela emissão, separa a fila e expõe o primeiro bloqueio', async () => {
     const company = await createCompany('Lista de entradas');
     const tenantId = company.tenantId;
     await db.insert(inboundDocuments).values([
@@ -81,7 +81,7 @@ describe('lista e data de entrada', () => {
     assert.equal(listed.meta.limit, 10);
     assert.deepEqual(
       listed.data.map((row) => row.number),
-      ['20', '10', '30', '40'],
+      ['30', '10', '20', '40'],
     );
     assert.equal(
       listed.data.find((row) => row.number === '10')?.postBlocker,
@@ -93,7 +93,7 @@ describe('lista e data de entrada', () => {
     const page = await listInboundDocuments(tenantId, { page: 2, limit: 2 });
     assert.deepEqual(
       page.data.map((row) => row.number),
-      ['30', '40'],
+      ['20', '40'],
     );
     assert.equal(page.meta.total, 4);
     assert.equal(page.meta.totalPages, 2);
@@ -103,7 +103,7 @@ describe('lista e data de entrada', () => {
     const queue = await listInboundDocuments(tenantId, { queue: 'to_post', limit: 1 });
     assert.deepEqual(
       queue.data.map((row) => row.number),
-      ['20'],
+      ['10'],
     );
     assert.equal(queue.meta.total, 2);
     assert.equal(queue.meta.totalPages, 2);

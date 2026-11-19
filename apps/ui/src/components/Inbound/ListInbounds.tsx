@@ -1,48 +1,44 @@
-import { civilDate, formatCurrency, formatRawDate } from '@erp-360/shared';
+import {
+  civilDate,
+  formatCurrency,
+  formatRawDate,
+  type ListPageSize,
+} from '@erp-360/shared';
 import {
   keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import {
-  ChevronLeft,
-  ChevronRight,
-  FileText,
-  MoreHorizontal,
-  Search,
-} from 'lucide-react';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, FileText, MoreHorizontal } from 'lucide-react';
+import { type MouseEvent, useEffect, useLayoutEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 
 import { InboundNoteMenu } from '@/components/Inbound/InboundNoteMenu';
 import {
   filterFromSearch,
-  inboundPageSize,
   monthRange,
   shortKey,
   statusDetail,
   todayInSaoPaulo,
 } from '@/components/Inbound/inboundQuery';
+import { inboundStatusTone } from '@/components/Inbound/inboundTone';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { FloatingInput } from '@/components/ui/FloatingField';
 import { Label } from '@/components/ui/label';
+import { ListPagination } from '@/components/ui/ListPagination';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  ListFilter,
+  ListMessage,
+  ListPageHeader,
+  ListPanel,
+  ListSearch,
+} from '@/components/ui/ListShell';
+import { StatusListHeader } from '@/components/ui/StatusList';
+import { statusToneStyle } from '@/components/ui/statusTone';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { cn } from '@/lib/utils';
 import { dfeService, type DfeSyncResult } from '@/services/dfe';
 import {
   discoveryConfirm,
@@ -57,23 +53,8 @@ import {
 
 const scrollPrefix = 'inbound-list-scroll';
 
-const statusClass: Record<InboundStatus, string> = {
-  pending: 'bg-amber-100 text-amber-800',
-  pre_note: 'bg-sky-100 text-sky-800',
-  divergent: 'bg-rose-100 text-rose-800',
-  posted: 'bg-emerald-100 text-emerald-800',
-  reversed: 'bg-zinc-200 text-zinc-700',
-  ignored: 'bg-zinc-200 text-zinc-600',
-  discovered: 'bg-violet-100 text-violet-800',
-};
-
-const manifestClass: Record<RecipientManifestation, string> = {
-  none: 'bg-zinc-100 text-zinc-600',
-  aware: 'bg-sky-100 text-sky-800',
-  confirmed: 'bg-emerald-100 text-emerald-800',
-  unaware: 'bg-rose-100 text-rose-800',
-  not_performed: 'bg-amber-100 text-amber-800',
-};
+const columns =
+  'grid grid-cols-[150px_100px_minmax(180px,1.5fr)_120px_110px_110px_minmax(140px,1fr)_150px_110px_168px]';
 
 const sortable = [
   ['status', 'Situação'],
@@ -83,7 +64,7 @@ const sortable = [
   ['inboundOn', 'Entrada'],
   ['issueOn', 'Emissão'],
   ['nature', 'Natureza'],
-  ['manifestation', 'Manifesto do destinatário'],
+  ['manifestation', 'Manifesto'],
 ] as const;
 
 function formatWhen(iso: string | null) {
@@ -102,14 +83,15 @@ function syncMessage(result: DfeSyncResult) {
     : `${result.received} documentos recebidos.`;
 }
 
-function Badge({ className, children }: { className: string; children: string }) {
-  return (
-    <span
-      className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${className}`}
-    >
-      {children}
-    </span>
-  );
+function knownStatus(value: string | null): InboundStatus | 'all' {
+  if (value && value in inboundStatusLabel) return value as InboundStatus;
+  return 'all';
+}
+
+function knownManifestation(value: string | null): RecipientManifestation | 'all' {
+  if (value && value in recipientManifestationLabel)
+    return value as RecipientManifestation;
+  return 'all';
 }
 
 export function ListInbounds() {
@@ -117,16 +99,33 @@ export function ListInbounds() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
-  const [searchText, setSearchText] = useState(params.get('q') ?? '');
   const [noteMenu, setNoteMenu] = useState<{
     row: InboundListItem;
     x: number;
     y: number;
   } | null>(null);
   const [danfeRow, setDanfeRow] = useState<InboundListItem | null>(null);
-  const filter = { ...filterFromSearch(location.search), limit: inboundPageSize };
+  const filter = filterFromSearch(location.search);
   const today = todayInSaoPaulo();
   const month = monthRange(today);
+  const search = params.get('q') ?? '';
+  const { text: searchText, setText: setSearchText } = useDebouncedSearch(
+    (next) => {
+      setParams(
+        (current) => {
+          const updated = new URLSearchParams(current);
+          if ((updated.get('q') ?? '') === next) return current;
+          if (next) updated.set('q', next);
+          else updated.delete('q');
+          updated.delete('page');
+          return updated;
+        },
+        { replace: true },
+      );
+    },
+    400,
+    search,
+  );
 
   useLayoutEffect(() => {
     const saved = sessionStorage.getItem(`${scrollPrefix}${location.search}`);
@@ -140,20 +139,6 @@ export function ListInbounds() {
       sessionStorage.setItem(key, String(window.scrollY));
     };
   }, [location.search]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const next = searchText.trim();
-      const current = params.get('q') ?? '';
-      if (next === current) return;
-      const updated = new URLSearchParams(params);
-      if (next) updated.set('q', next);
-      else updated.delete('q');
-      updated.delete('page');
-      setParams(updated, { replace: true });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchText, params, setParams]);
 
   const list = useQuery({
     queryKey: ['inbound', 'list', filter],
@@ -173,6 +158,13 @@ export function ListInbounds() {
     if (page <= 1) next.delete('page');
     else next.set('page', String(page));
     setParams(next, { replace: true });
+  }
+
+  function setLimit(nextLimit: ListPageSize) {
+    write((next) => {
+      if (nextLimit === 10) next.delete('limit');
+      else next.set('limit', String(nextLimit));
+    });
   }
 
   function clearQueue(next: URLSearchParams) {
@@ -286,212 +278,213 @@ export function ListInbounds() {
 
   function toggleSort(column: InboundListSort) {
     write((next) => {
-      const current = next.get('sort');
-      const dir = next.get('dir') === 'asc' ? 'desc' : 'asc';
+      const current = next.get('sort') || 'issueOn';
+      const currentDir = next.get('dir') === 'asc' ? 'asc' : 'desc';
+      const nextDir = current === column && currentDir === 'desc' ? 'asc' : 'desc';
+      if (column === 'issueOn' && nextDir === 'desc') {
+        next.delete('sort');
+        next.delete('dir');
+        return;
+      }
       next.set('sort', column);
-      next.set('dir', current === column ? dir : 'desc');
+      next.set('dir', nextDir);
     });
   }
 
-  const activeSort = params.get('sort');
+  const activeSort = params.get('sort') || 'issueOn';
   const activeDir = params.get('dir') === 'asc' ? 'asc' : 'desc';
+  const rows = list.data?.data ?? [];
+  const meta = list.data?.meta;
+
+  const sortIcon = (field: InboundListSort) => {
+    if (activeSort !== field) return <ArrowUpDown className="h-3.5 w-3.5" />;
+    return activeDir === 'asc' ? (
+      <ArrowUp className="h-3.5 w-3.5" />
+    ) : (
+      <ArrowDown className="h-3.5 w-3.5" />
+    );
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-bold text-zinc-900">Entradas</h2>
-          <p className="text-sm text-zinc-500">
-            Clique na linha para abrir a nota. O botão direito e o menu da coluna fixa
-            abrem o DANFE, a manifestação e os eventos.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            onClick={() => syncSefaz.mutate()}
-            disabled={syncSefaz.isPending}
-          >
-            Buscar na SEFAZ
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => createManual.mutate()}
-            disabled={createManual.isPending}
-          >
-            Nova manual
-          </Button>
-          <Label className="inline-flex h-9 cursor-pointer items-center rounded-md border px-4 text-sm">
-            Importar XML
-            <input
-              type="file"
-              accept=".xml,text/xml"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = '';
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = () => {
-                  if (typeof reader.result === 'string') {
-                    importXml.mutate({ fileName: file.name, xml: reader.result });
-                  }
-                };
-                reader.readAsText(file);
-              }}
-            />
-          </Label>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <ListPageHeader
+        title="Entradas"
+        description="Clique na linha para abrir a nota. O botão direito e o menu abrem o DANFE, a manifestação e os eventos."
+      >
+        <Button
+          type="button"
+          onClick={() => syncSefaz.mutate()}
+          disabled={syncSefaz.isPending}
+        >
+          Buscar na SEFAZ
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => createManual.mutate()}
+          disabled={createManual.isPending}
+        >
+          Nova manual
+        </Button>
+        <Label className="inline-flex h-9 cursor-pointer items-center rounded-md border px-4 text-sm">
+          Importar XML
+          <input
+            type="file"
+            accept=".xml,text/xml"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                if (typeof reader.result === 'string') {
+                  importXml.mutate({ fileName: file.name, xml: reader.result });
+                }
+              };
+              reader.readAsText(file);
+            }}
+          />
+        </Label>
+      </ListPageHeader>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4">
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={queueActive ? 'default' : 'outline'}
-            onClick={() =>
-              write((next) => {
-                if (queueActive) next.delete('queue');
-                else clearQueue(next);
-                if (!queueActive) next.set('queue', 'to_post');
-              })
-            }
-          >
-            A lançar
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={divergentActive ? 'default' : 'outline'}
-            onClick={() =>
-              write((next) => {
-                clearQueue(next);
-                if (!divergentActive) next.set('status', 'divergent');
-              })
-            }
-          >
-            Divergentes
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={manifestActive ? 'default' : 'outline'}
-            onClick={() =>
-              write((next) => {
-                clearQueue(next);
-                if (!manifestActive) next.set('manifestation', 'none');
-              })
-            }
-          >
-            Sem manifesto
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={postedMonthActive ? 'default' : 'outline'}
-            onClick={() =>
-              write((next) => {
-                clearQueue(next);
-                if (!postedMonthActive) {
-                  next.set('status', 'posted');
+      <ListPanel
+        title="Notas"
+        description="A cor da linha indica a situação. Estornada e ignorada ficam cinza, e o manifesto continua na coluna."
+      >
+        <div className="mb-4 space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={queueActive ? 'default' : 'outline'}
+              onClick={() =>
+                write((next) => {
+                  if (queueActive) next.delete('queue');
+                  else clearQueue(next);
+                  if (!queueActive) next.set('queue', 'to_post');
+                })
+              }
+            >
+              A lançar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={divergentActive ? 'default' : 'outline'}
+              onClick={() =>
+                write((next) => {
+                  clearQueue(next);
+                  if (!divergentActive) next.set('status', 'divergent');
+                })
+              }
+            >
+              Divergentes
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={manifestActive ? 'default' : 'outline'}
+              onClick={() =>
+                write((next) => {
+                  clearQueue(next);
+                  if (!manifestActive) next.set('manifestation', 'none');
+                })
+              }
+            >
+              Sem manifesto
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={postedMonthActive ? 'default' : 'outline'}
+              onClick={() =>
+                write((next) => {
+                  clearQueue(next);
+                  if (!postedMonthActive) {
+                    next.set('status', 'posted');
+                    next.set('inboundFrom', month.from);
+                    next.set('inboundTo', month.to);
+                  }
+                })
+              }
+            >
+              Lançadas no mês
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                write((next) => {
+                  next.set('inboundFrom', today);
+                  next.set('inboundTo', today);
+                })
+              }
+            >
+              Hoje
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                write((next) => {
                   next.set('inboundFrom', month.from);
                   next.set('inboundTo', month.to);
-                }
-              })
-            }
-          >
-            Lançadas no mês
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              write((next) => {
-                next.set('inboundFrom', today);
-                next.set('inboundTo', today);
-              })
-            }
-          >
-            Hoje
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              write((next) => {
-                next.set('inboundFrom', month.from);
-                next.set('inboundTo', month.to);
-              })
-            }
-          >
-            Este mês
-          </Button>
-        </div>
-        <div className="flex flex-col items-center gap-3 sm:flex-row">
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
-            <Input
-              placeholder="Número, chave ou emitente"
+                })
+              }
+            >
+              Este mês
+            </Button>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <ListSearch
               value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              className="pl-9"
+              onChange={setSearchText}
+              placeholder="Número, chave ou emitente"
+              label="Pesquisar notas"
+            />
+            <ListFilter
+              value={knownStatus(params.get('status'))}
+              label="Situação"
+              allLabel="Todas as situações"
+              options={(Object.keys(inboundStatusLabel) as InboundStatus[]).map(
+                (item) => ({
+                  value: item,
+                  label: inboundStatusLabel[item],
+                }),
+              )}
+              onValueChange={(value) =>
+                write((next) => {
+                  next.delete('queue');
+                  if (value === 'all') next.delete('status');
+                  else next.set('status', value);
+                })
+              }
+            />
+            <ListFilter
+              value={knownManifestation(params.get('manifestation'))}
+              label="Manifesto"
+              allLabel="Todos os manifestos"
+              options={(
+                Object.keys(recipientManifestationLabel) as RecipientManifestation[]
+              ).map((item) => ({
+                value: item,
+                label: recipientManifestationLabel[item],
+              }))}
+              onValueChange={(value) =>
+                write((next) => {
+                  next.delete('queue');
+                  if (value === 'all') next.delete('manifestation');
+                  else next.set('manifestation', value);
+                })
+              }
             />
           </div>
-          <Select
-            value={params.get('status') ?? 'todos'}
-            onValueChange={(value) =>
-              write((next) => {
-                next.delete('queue');
-                if (value === 'todos') next.delete('status');
-                else next.set('status', value);
-              })
-            }
-          >
-            <SelectTrigger className="w-full sm:w-52">
-              <SelectValue placeholder="Situação" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todas as situações</SelectItem>
-              {(Object.keys(inboundStatusLabel) as InboundStatus[]).map((item) => (
-                <SelectItem key={item} value={item}>
-                  {inboundStatusLabel[item]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={params.get('manifestation') ?? 'todos'}
-            onValueChange={(value) =>
-              write((next) => {
-                next.delete('queue');
-                if (value === 'todos') next.delete('manifestation');
-                else next.set('manifestation', value);
-              })
-            }
-          >
-            <SelectTrigger className="w-full sm:w-52">
-              <SelectValue placeholder="Manifesto" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os manifestos</SelectItem>
-              {(Object.keys(recipientManifestationLabel) as RecipientManifestation[]).map(
-                (item) => (
-                  <SelectItem key={item} value={item}>
-                    {recipientManifestationLabel[item]}
-                  </SelectItem>
-                ),
-              )}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col items-center gap-3 sm:flex-row">
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <span className="shrink-0 text-sm text-zinc-500">Emissão de</span>
-            <Input
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <FloatingInput
+              label="Emissão de"
               type="date"
               value={params.get('issueFrom') ?? ''}
               onChange={(event) =>
@@ -500,12 +493,9 @@ export function ListInbounds() {
                   else next.delete('issueFrom');
                 })
               }
-              className="w-full sm:w-40"
             />
-          </div>
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <span className="shrink-0 text-sm text-zinc-500">até</span>
-            <Input
+            <FloatingInput
+              label="Emissão até"
               type="date"
               value={params.get('issueTo') ?? ''}
               onChange={(event) =>
@@ -514,14 +504,9 @@ export function ListInbounds() {
                   else next.delete('issueTo');
                 })
               }
-              className="w-full sm:w-40"
             />
-          </div>
-        </div>
-        <div className="flex flex-col items-center gap-3 sm:flex-row">
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <span className="shrink-0 text-sm text-zinc-500">Entrada de</span>
-            <Input
+            <FloatingInput
+              label="Entrada de"
               type="date"
               value={params.get('inboundFrom') ?? ''}
               onChange={(event) =>
@@ -530,12 +515,9 @@ export function ListInbounds() {
                   else next.delete('inboundFrom');
                 })
               }
-              className="w-full sm:w-40"
             />
-          </div>
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <span className="shrink-0 text-sm text-zinc-500">até</span>
-            <Input
+            <FloatingInput
+              label="Entrada até"
               type="date"
               value={params.get('inboundTo') ?? ''}
               onChange={(event) =>
@@ -544,165 +526,73 @@ export function ListInbounds() {
                   else next.delete('inboundTo');
                 })
               }
-              className="w-full sm:w-40"
             />
           </div>
         </div>
-      </div>
 
-      <Table className="min-w-[1180px]">
-        <TableHeader>
-          <TableRow>
-            {sortable.map(([key, label]) => (
-              <TableHead key={key}>
+        <div className="overflow-x-auto">
+          <div className="min-w-[1360px]">
+            <StatusListHeader columns={columns}>
+              {sortable.map(([key, label]) => (
                 <button
+                  key={key}
                   type="button"
-                  className="inline-flex items-center gap-1"
+                  className="inline-flex items-center gap-1 text-left"
                   onClick={() => toggleSort(key)}
                 >
                   {label}
-                  {activeSort === key ? (activeDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                  {sortIcon(key)}
                 </button>
-              </TableHead>
-            ))}
-            <TableHead>Chave</TableHead>
-            <TableHead className="sticky right-0 z-20 w-24 border-l bg-white" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {(list.data?.data ?? []).map((row) => {
-            const detail = statusDetail(row);
-            const supplier = row.linkedSupplierName || row.supplierName || '—';
-            return (
-              <TableRow
-                key={row.id}
-                className="cursor-pointer"
-                onClick={() => openNote(row)}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  setNoteMenu({ row, x: event.clientX, y: event.clientY });
-                }}
-              >
-                <TableCell>
-                  <Badge className={statusClass[row.status]}>
-                    {inboundStatusLabel[row.status]}
-                  </Badge>
-                  {detail ? (
-                    <p className="mt-1 max-w-48 text-xs text-rose-700">{detail}</p>
-                  ) : null}
-                </TableCell>
-                <TableCell>
-                  {row.number}/{row.series}
-                </TableCell>
-                <TableCell>{supplier}</TableCell>
-                <TableCell>{formatCurrency(row.totalAmount)}</TableCell>
-                <TableCell>
-                  {row.inboundOn ? formatRawDate(row.inboundOn) : '—'}
-                </TableCell>
-                <TableCell>{formatRawDate(row.issueOn)}</TableCell>
-                <TableCell>{row.natureName || '—'}</TableCell>
-                <TableCell>
-                  <Badge className={manifestClass[row.recipientManifestation]}>
-                    {recipientManifestationLabel[row.recipientManifestation]}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <button
-                    type="button"
-                    className="font-mono text-xs text-zinc-700 underline-offset-2 hover:underline"
-                    title={row.accessKey ?? undefined}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      if (!row.accessKey) return;
-                      void navigator.clipboard
-                        .writeText(row.accessKey)
-                        .then(() => toast.success('Chave copiada.'))
-                        .catch(() => toast.error('Não foi possível copiar a chave.'));
-                    }}
-                  >
-                    {shortKey(row.accessKey)}
-                  </button>
-                </TableCell>
-                <TableCell
-                  className="sticky right-0 z-10 border-l bg-white"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <div className="flex justify-end gap-1">
-                    {row.status === 'discovered' ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void confirmDiscovery(row.id)}
-                      >
-                        Consultar
-                      </Button>
-                    ) : (
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        title="DANFE"
-                        aria-label="DANFE"
-                        disabled={!row.accessKey}
-                        onClick={() => setDanfeRow(row)}
-                      >
-                        <FileText />
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      title="Ações da nota"
-                      aria-label="Ações da nota"
-                      onClick={(event) => {
-                        const rect = event.currentTarget.getBoundingClientRect();
-                        setNoteMenu({ row, x: rect.left, y: rect.bottom });
-                      }}
-                    >
-                      <MoreHorizontal />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+              ))}
+              <span>Chave</span>
+              <span />
+            </StatusListHeader>
 
-      {list.data && list.data.meta.totalPages > 1 ? (
-        <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3">
-          <div className="text-sm text-zinc-500">
-            Mostrando página{' '}
-            <strong className="text-zinc-900">{list.data.meta.page}</strong> de{' '}
-            <strong className="text-zinc-900">{list.data.meta.totalPages}</strong> (
-            {list.data.meta.total} registros no total)
-          </div>
-          <div className="flex space-x-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1"
-              disabled={list.data.meta.page === 1}
-              onClick={() => setPage(list.data.meta.page - 1)}
-            >
-              <ChevronLeft className="h-4 w-4" /> Anterior
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1"
-              disabled={list.data.meta.page === list.data.meta.totalPages}
-              onClick={() => setPage(list.data.meta.page + 1)}
-            >
-              Próximo <ChevronRight className="h-4 w-4" />
-            </Button>
+            {list.isLoading ? (
+              <ListMessage>Carregando as notas...</ListMessage>
+            ) : list.isError ? (
+              <ListMessage tone="error">Não foi possível carregar as notas.</ListMessage>
+            ) : rows.length === 0 ? (
+              <ListMessage>Nenhuma nota encontrada.</ListMessage>
+            ) : (
+              rows.map((row) => (
+                <NoteRow
+                  key={row.id}
+                  row={row}
+                  onOpen={() => openNote(row)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    setNoteMenu({ row, x: event.clientX, y: event.clientY });
+                  }}
+                  onCopyKey={() => {
+                    if (!row.accessKey) return;
+                    void navigator.clipboard
+                      .writeText(row.accessKey)
+                      .then(() => toast.success('Chave copiada.'))
+                      .catch(() => toast.error('Não foi possível copiar a chave.'));
+                  }}
+                  onDiscover={() => void confirmDiscovery(row.id)}
+                  onDanfe={() => setDanfeRow(row)}
+                  onMenu={(event) => {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    setNoteMenu({ row, x: rect.left, y: rect.bottom });
+                  }}
+                />
+              ))
+            )}
           </div>
         </div>
-      ) : null}
+        {meta ? (
+          <ListPagination
+            page={meta.page}
+            limit={filter.limit ?? 10}
+            total={meta.total}
+            totalPages={meta.totalPages}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+          />
+        ) : null}
+      </ListPanel>
 
       <InboundNoteMenu
         cursor={noteMenu}
@@ -713,6 +603,116 @@ export function ListInbounds() {
           void queryClient.invalidateQueries({ queryKey: ['inbound', 'list'] });
         }}
       />
+    </div>
+  );
+}
+
+function NoteRow({
+  row,
+  onOpen,
+  onContextMenu,
+  onCopyKey,
+  onDiscover,
+  onDanfe,
+  onMenu,
+}: {
+  row: InboundListItem;
+  onOpen: () => void;
+  onContextMenu: (event: MouseEvent<HTMLDivElement>) => void;
+  onCopyKey: () => void;
+  onDiscover: () => void;
+  onDanfe: () => void;
+  onMenu: (event: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  const detail = statusDetail(row);
+  const supplier = row.linkedSupplierName || row.supplierName || '—';
+  const tone = inboundStatusTone[row.status];
+  return (
+    <div
+      tabIndex={0}
+      aria-label={`Nota ${row.number}/${row.series}, ${inboundStatusLabel[row.status]}, ${supplier}`}
+      className={cn(
+        columns,
+        'group mt-[5px] cursor-pointer items-center gap-3 rounded-[7px] border-l-4 border-l-[var(--status-accent)] bg-[var(--status-bg)] px-3.5 py-3 text-sm text-[#243145] transition-[background-color,box-shadow] duration-150 hover:bg-[var(--status-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]',
+      )}
+      style={statusToneStyle(tone)}
+      onClick={(event) => {
+        if ((event.target as HTMLElement).closest('[data-row-ignore]')) return;
+        onOpen();
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+      onContextMenu={onContextMenu}
+    >
+      <span className="min-w-0">
+        <span className="block font-bold text-[var(--status-text)]">
+          {inboundStatusLabel[row.status]}
+        </span>
+        {detail ? (
+          <span className="mt-1 block text-xs text-[var(--status-text)]">{detail}</span>
+        ) : null}
+      </span>
+      <span className="min-w-0 truncate text-[var(--status-text)]">
+        {row.number}/{row.series}
+      </span>
+      <span className="min-w-0 truncate text-[var(--status-text)]">{supplier}</span>
+      <span className="text-right tabular-nums text-[var(--status-text)]">
+        {formatCurrency(row.totalAmount)}
+      </span>
+      <span className="text-[var(--status-text)]">
+        {row.inboundOn ? formatRawDate(row.inboundOn) : '—'}
+      </span>
+      <span className="text-[var(--status-text)]">{formatRawDate(row.issueOn)}</span>
+      <span className="min-w-0 truncate text-[var(--status-text)]">
+        {row.natureName || '—'}
+      </span>
+      <span className="min-w-0 truncate text-[var(--status-text)]">
+        {recipientManifestationLabel[row.recipientManifestation]}
+      </span>
+      <span data-row-ignore>
+        <button
+          type="button"
+          className="font-mono text-xs text-[var(--status-text)] underline-offset-2 hover:underline"
+          title={row.accessKey ?? undefined}
+          onClick={onCopyKey}
+        >
+          {shortKey(row.accessKey)}
+        </button>
+      </span>
+      <span data-row-ignore className="flex justify-end gap-1">
+        {row.status === 'discovered' ? (
+          <Button type="button" size="sm" variant="outline" onClick={onDiscover}>
+            Consultar
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            title="DANFE"
+            aria-label="DANFE"
+            disabled={!row.accessKey}
+            onClick={onDanfe}
+          >
+            <FileText />
+          </Button>
+        )}
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          title="Ações da nota"
+          aria-label="Ações da nota"
+          onClick={onMenu}
+        >
+          <MoreHorizontal />
+        </Button>
+      </span>
     </div>
   );
 }

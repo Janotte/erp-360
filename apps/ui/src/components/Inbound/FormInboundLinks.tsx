@@ -22,6 +22,7 @@ import { useLocation, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 
 import { FormItem } from '@/components/Catalog/Items/FormItem';
+import { inboundStatusTone } from '@/components/Inbound/inboundTone';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,8 +41,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { FloatingInput } from '@/components/ui/FloatingField';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   type InboundDocument,
   type InboundDraft,
@@ -351,7 +352,7 @@ export function FormInboundLinks() {
   }
 
   if (detail.isPending || pricing.isPending) {
-    return <p className="text-sm text-zinc-500">Carregando...</p>;
+    return <p className="text-sm text-[#64748b]">Carregando...</p>;
   }
   if (detail.isError) {
     return <p className="text-sm text-rose-700">{detail.error.message}</p>;
@@ -483,7 +484,7 @@ export function FormInboundLinks() {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[820px] text-sm">
           <thead>
-            <tr className="border-b text-left text-zinc-500">
+            <tr className="border-b text-left text-[#64748b]">
               <th className="py-2 pr-2 font-medium">Nº</th>
               <th className="py-2 pr-2 font-medium">Código</th>
               <th className="py-2 pr-2 font-medium">Descrição</th>
@@ -540,7 +541,7 @@ export function FormInboundLinks() {
                             <li key={item.id}>
                               <button
                                 type="button"
-                                className="text-left text-zinc-700 hover:underline"
+                                className="text-left text-[#334155] hover:underline"
                                 onClick={() => link(line.lineNumber, item)}
                               >
                                 {item.code} · {item.name}
@@ -572,7 +573,7 @@ export function FormInboundLinks() {
                       <X />
                     </Button>
                   ) : (
-                    <span className="text-zinc-700">
+                    <span className="text-[#334155]">
                       {line.itemId
                         ? `${infos[line.itemId]?.code ?? ''} ${infos[line.itemId]?.name ?? ''}`.trim()
                         : 'Sem vínculo'}
@@ -591,15 +592,18 @@ export function FormInboundLinks() {
     <div className="space-y-4 pb-24">
       <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b bg-white py-3">
         <Button type="button" variant="outline" onClick={goBack}>
-          Voltar
+          Voltar à nota
         </Button>
-        <h2 className="text-xl font-bold text-zinc-900">
+        <h2 className="text-xl font-bold text-[#172337]">
           Vínculos da nota {document.number}/{document.series}
         </h2>
-        <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+        <span
+          className="text-sm font-semibold"
+          style={{ color: inboundStatusTone[document.status].text }}
+        >
           {inboundStatusLabel[document.status]}
         </span>
-        <span className="text-sm text-zinc-600">
+        <span className="text-sm text-[#64748b]">
           {document.supplierName || 'Sem emitente'}
         </span>
       </div>
@@ -609,8 +613,8 @@ export function FormInboundLinks() {
       ) : null}
 
       {unlinked.length > 0 ? (
-        <section className="space-y-3 rounded-lg border bg-white p-4">
-          <h3 className="font-medium text-amber-700">Sem vínculo</h3>
+        <section className="space-y-3 rounded-lg border bg-white p-6">
+          <h3 className="font-medium text-red-600">Sem vínculo</h3>
           {lineRows(unlinked, true)}
         </section>
       ) : null}
@@ -626,56 +630,54 @@ export function FormInboundLinks() {
         const price = fields[itemId];
         const catalogItem = catalogById.get(itemId);
         return (
-          <section key={itemId} className="space-y-3 rounded-lg border bg-white p-4">
+          <section key={itemId} className="space-y-3 rounded-lg border bg-white p-6">
             <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-              <h3 className="font-medium text-zinc-900">
+              <h3 className="font-medium text-[#172337]">
                 {info?.code} · {info?.name}
               </h3>
-              <p className="text-sm text-zinc-600">
+              <p className="text-sm text-[#64748b]">
                 Quantidade atual: {quantityText(info?.quantity ?? 0)}
               </p>
-              <p className="text-sm text-zinc-600">
+              <p className="text-sm text-[#64748b]">
                 Custo médio atual: {money4(info?.averageCost ?? 0)}
               </p>
-              <p className="text-sm text-zinc-600">
+              <p className="text-sm text-[#64748b]">
                 Quantidade nesta nota: {quantityText(incoming)}
               </p>
               {editable ? (
-                <p className="text-sm text-zinc-900">
+                <p className="text-sm text-[#172337]">
                   Custo médio projetado: {money4(average)}
                 </p>
               ) : null}
             </div>
             {editable ? (
               <div className="flex flex-wrap items-start gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor={`margin-${itemId}`}>Margem bruta (%)</Label>
-                  <Input
-                    id={`margin-${itemId}`}
-                    className="w-32"
-                    inputMode="decimal"
-                    placeholder="0,00"
-                    value={price?.margin ?? ''}
-                    onChange={(event) => typeMargin(itemId, event.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor={`price-${itemId}`}>Preço de lista</Label>
-                  <Input
-                    id={`price-${itemId}`}
-                    className="w-40"
-                    inputMode="decimal"
-                    placeholder="0,0000"
-                    value={price?.price ?? ''}
-                    onChange={(event) => typePrice(itemId, event.target.value)}
-                  />
-                </div>
+                <FloatingInput
+                  id={`margin-${itemId}`}
+                  className="w-40"
+                  label="Margem bruta (%)"
+                  pinned
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={price?.margin ?? ''}
+                  onChange={(event) => typeMargin(itemId, event.target.value)}
+                />
+                <FloatingInput
+                  id={`price-${itemId}`}
+                  className="w-44"
+                  label="Preço de lista"
+                  pinned
+                  inputMode="decimal"
+                  placeholder="0,0000"
+                  value={price?.price ?? ''}
+                  onChange={(event) => typePrice(itemId, event.target.value)}
+                />
                 {price?.error ? (
-                  <p className="pt-7 text-sm text-rose-700">{price.error}</p>
+                  <p className="pt-3 text-sm text-rose-700">{price.error}</p>
                 ) : null}
               </div>
             ) : (
-              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-700">
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-[#334155]">
                 <p>Margem bruta: {percentText(parseStored(info?.grossMargin)) || '—'}</p>
                 <p>Preço de lista: {money4(catalogItem?.listPrice)}</p>
               </div>
@@ -686,7 +688,7 @@ export function FormInboundLinks() {
       })}
 
       {editable ? (
-        <div className="sticky bottom-0 z-20 flex flex-wrap items-center gap-2 border-t bg-white py-3">
+        <div className="sticky bottom-0 z-20 flex flex-wrap items-center justify-end gap-2 border-t bg-white py-3">
           <Button
             type="button"
             variant="outline"

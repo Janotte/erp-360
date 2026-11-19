@@ -655,11 +655,7 @@ export async function listInboundDocuments(
   } as const;
   const order = query.sort
     ? [sortSql[query.sort], desc(inboundDocuments.createdAt)]
-    : [
-        sql`${inboundDocuments.inboundOn} DESC NULLS LAST`,
-        desc(inboundDocuments.issueOn),
-        desc(inboundDocuments.createdAt),
-      ];
+    : [desc(inboundDocuments.issueOn), desc(inboundDocuments.createdAt)];
 
   const page = query.page ?? 1;
   const limit = query.limit ?? 10;
