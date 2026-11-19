@@ -103,6 +103,7 @@ type FloatingInputProps = Omit<ComponentProps<'input'>, 'id' | 'className' | 'si
   required?: boolean;
   error?: string;
   className?: string;
+  pinned?: boolean;
 };
 
 export function FloatingInput({
@@ -114,9 +115,10 @@ export function FloatingInput({
   className,
   value,
   type,
+  pinned = false,
   ...props
 }: FloatingInputProps) {
-  const filled = keepsLabelUp(type) || (value != null && String(value) !== '');
+  const filled = pinned || keepsLabelUp(type) || (value != null && String(value) !== '');
   return (
     <FieldChrome
       id={id}

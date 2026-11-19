@@ -27,19 +27,19 @@ import {
 import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+  FloatingInput,
+  FloatingSelect,
+  FloatingTextarea,
+} from '@/components/ui/FloatingField';
 import { categoriesService } from '@/services/categories';
 import { type CatalogItem, type CatalogItemInput, itemsService } from '@/services/items';
 import { measuresService } from '@/services/measures';
 
-const selectClassName =
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
-
 function focusNextItemField(form: HTMLFormElement, current: HTMLElement) {
-  const fields = Array.from(form.querySelectorAll<HTMLElement>('[data-item-field]')).filter(
-    (field) => !field.hasAttribute('disabled'),
-  );
+  const fields = Array.from(
+    form.querySelectorAll<HTMLElement>('[data-item-field]'),
+  ).filter((field) => !field.hasAttribute('disabled'));
   const index = fields.findIndex((field) => field === current || field.contains(current));
   if (index < 0) return;
   fields[index + 1]?.focus();
@@ -128,7 +128,13 @@ interface FormItemProps {
   onDeleted?: () => void;
 }
 
-export function FormItem({ itemToUpdate, seed, onSuccess, onCancel, onDeleted }: FormItemProps) {
+export function FormItem({
+  itemToUpdate,
+  seed,
+  onSuccess,
+  onCancel,
+  onDeleted,
+}: FormItemProps) {
   const queryClient = useQueryClient();
   const [itemId, setItemId] = useState(itemToUpdate?.id);
   const [code, setCode] = useState(itemToUpdate?.code ?? '');
@@ -148,14 +154,18 @@ export function FormItem({ itemToUpdate, seed, onSuccess, onCancel, onDeleted }:
   );
   const [barcode, setBarcode] = useState(itemToUpdate?.barcode ?? seed?.barcode ?? '');
   const [listPrice, setListPrice] = useState(formatListPrice(itemToUpdate?.listPrice));
-  const [grossMargin, setGrossMargin] = useState(formatPercent(itemToUpdate?.grossMargin));
+  const [grossMargin, setGrossMargin] = useState(
+    formatPercent(itemToUpdate?.grossMargin),
+  );
   const [listPriceError, setListPriceError] = useState('');
   const [ncmCode, setNcmCode] = useState(itemToUpdate?.ncmCode ?? seed?.ncmCode ?? '');
   const [ncmDescription, setNcmDescription] = useState(
     itemToUpdate?.ncmDescription ?? '',
   );
   const [ncmOpen, setNcmOpen] = useState(false);
-  const [cestCode, setCestCode] = useState(itemToUpdate?.cestCode ?? seed?.cestCode ?? '');
+  const [cestCode, setCestCode] = useState(
+    itemToUpdate?.cestCode ?? seed?.cestCode ?? '',
+  );
   const [netWeightKg, setNetWeightKg] = useState(itemToUpdate?.netWeightKg ?? '');
   const [grossWeightKg, setGrossWeightKg] = useState(itemToUpdate?.grossWeightKg ?? '');
   const [lengthCm, setLengthCm] = useState(itemToUpdate?.lengthCm ?? '');
@@ -165,6 +175,7 @@ export function FormItem({ itemToUpdate, seed, onSuccess, onCancel, onDeleted }:
   const [ncmSearch, setNcmSearch] = useState('');
   const [openDelete, setOpenDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const { data: loaded } = useQuery({
     queryKey: ['item', itemId],
@@ -350,7 +361,16 @@ export function FormItem({ itemToUpdate, seed, onSuccess, onCancel, onDeleted }:
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (!measureId || listPriceError) return;
+    const errors: Record<string, string> = {};
+    if (!name.trim()) errors.name = 'Informe o nome.';
+    if (!measureId) errors.measure = 'Informe a medida.';
+    setFieldErrors(errors);
+    const message = errors.name ?? errors.measure;
+    if (message || !measureId) {
+      if (message) toast.error(message);
+      return;
+    }
+    if (listPriceError) return;
     mutation.mutate({
       sku,
       name,
@@ -374,10 +394,19 @@ export function FormItem({ itemToUpdate, seed, onSuccess, onCancel, onDeleted }:
     });
   };
 
+  function clearFieldError(key: string) {
+    setFieldErrors((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
+
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 pt-2"
+      className="space-y-4"
       onKeyDown={(event) => {
         if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
         const target = event.target;
@@ -389,89 +418,81 @@ export function FormItem({ itemToUpdate, seed, onSuccess, onCancel, onDeleted }:
         focusNextItemField(event.currentTarget, target);
       }}
     >
-      <p className="text-sm text-zinc-500">
-        Campos com <span className="text-destructive">*</span> são obrigatórios.
-      </p>
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="itemCode">Código</Label>
-          <Input
+        <div>
+          <FloatingInput
             id="itemCode"
+            label="Código"
             value={code}
             readOnly
             disabled
+            pinned
             placeholder="Gerado ao salvar"
           />
-          <p className="text-sm text-zinc-500">Segue de 000001 até 999999.</p>
+          <p className="mt-1 text-sm text-zinc-500">Segue de 000001 até 999999.</p>
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="itemSku">SKU</Label>
-          <Input
+        <div>
+          <FloatingInput
             id="itemSku"
-            data-item-field
+            label="SKU"
+            data-item-field=""
             autoFocus
             value={sku}
             maxLength={60}
             onChange={(event) => setSku(event.target.value)}
-            placeholder="Código livre da empresa"
           />
-          <p className="text-sm text-zinc-500">Opcional. A empresa define o formato.</p>
+          <p className="mt-1 text-sm text-zinc-500">
+            Opcional. A empresa define o formato.
+          </p>
         </div>
       </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="itemName">
-          Nome <span className="text-destructive">*</span>
-        </Label>
-        <Input
-          id="itemName"
-          data-item-field
-          value={name}
-          maxLength={120}
-          className="uppercase"
-          onChange={(event) => setName(event.target.value.toLocaleUpperCase('pt-BR'))}
-          required
-        />
-      </div>
+      <FloatingInput
+        id="itemName"
+        label="Nome"
+        data-item-field=""
+        value={name}
+        maxLength={120}
+        required
+        error={fieldErrors.name}
+        onChange={(event) => {
+          setName(event.target.value.toLocaleUpperCase('pt-BR'));
+          clearFieldError('name');
+        }}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="space-y-1">
-          <Label htmlFor="itemType">Tipo</Label>
-          <select
-            id="itemType"
-            data-item-field
-            value={type}
-            onChange={(event) => changeType(parseItemType(event.target.value))}
-            className={selectClassName}
-          >
-            {catalogItemTypes.map((itemType) => (
-              <option key={itemType} value={itemType}>
-                {catalogItemTypeLabels[itemType]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="itemFiscalType">Tipo fiscal</Label>
-          <select
-            id="itemFiscalType"
-            data-item-field
-            value={fiscalItemType}
-            onChange={(event) => changeFiscal(parseFiscalType(event.target.value))}
-            className={selectClassName}
-            disabled={type === 'service'}
-          >
-            {fiscalChoices.map((fiscalType) => (
-              <option key={fiscalType} value={fiscalType}>
-                {fiscalItemTypeLabels[fiscalType]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1" data-item-field>
-          <Label htmlFor="itemCategory">Categoria</Label>
+        <FloatingSelect
+          id="itemType"
+          label="Tipo"
+          data-item-field=""
+          value={type}
+          onChange={(event) => changeType(parseItemType(event.target.value))}
+        >
+          {catalogItemTypes.map((itemType) => (
+            <option key={itemType} value={itemType}>
+              {catalogItemTypeLabels[itemType]}
+            </option>
+          ))}
+        </FloatingSelect>
+        <FloatingSelect
+          id="itemFiscalType"
+          label="Tipo fiscal"
+          data-item-field=""
+          value={fiscalItemType}
+          disabled={type === 'service'}
+          onChange={(event) => changeFiscal(parseFiscalType(event.target.value))}
+        >
+          {fiscalChoices.map((fiscalType) => (
+            <option key={fiscalType} value={fiscalType}>
+              {fiscalItemTypeLabels[fiscalType]}
+            </option>
+          ))}
+        </FloatingSelect>
+        <div data-item-field="">
           <CatalogSearchSelect
             id="itemCategory"
+            label="Categoria"
             value={categoryId}
             onChange={setCategoryId}
             options={categoryOptions}
@@ -484,19 +505,20 @@ export function FormItem({ itemToUpdate, seed, onSuccess, onCancel, onDeleted }:
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="itemMeasure">
-            Medida <span className="text-destructive">*</span>
-          </Label>
-          <select
+        <div>
+          <FloatingSelect
             id="itemMeasure"
-            data-item-field
+            label="Medida"
+            data-item-field=""
+            required
+            error={fieldErrors.measure}
             value={
               measureChoices.some((measure) => measure.id === measureId) ? measureId : ''
             }
-            onChange={(event) => setMeasureId(event.target.value)}
-            className={selectClassName}
-            required
+            onChange={(event) => {
+              setMeasureId(event.target.value);
+              clearFieldError('measure');
+            }}
           >
             <option value="" disabled>
               Selecione a medida
@@ -506,91 +528,85 @@ export function FormItem({ itemToUpdate, seed, onSuccess, onCancel, onDeleted }:
                 {measure.abbreviation} - {measure.name}
               </option>
             ))}
-          </select>
+          </FloatingSelect>
           {!measuresLoading && measureOptions.length === 0 ? (
-            <p className="text-sm text-zinc-500">
+            <p className="mt-1 text-sm text-zinc-500">
               Cadastre uma medida marcada para {catalogItemTypeLabels[type].toLowerCase()}
               .
             </p>
           ) : null}
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="itemPrice">Preço de tabela</Label>
-          <Input
-            id="itemPrice"
-            data-item-field
-            value={listPrice}
-            inputMode="decimal"
-            placeholder="0,0000"
-            onChange={(event) => changeListPrice(event.target.value)}
-          />
-          {listPriceError ? (
-            <p className="text-sm text-destructive">{listPriceError}</p>
-          ) : null}
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="itemMargin">Margem bruta (%)</Label>
-          <Input
+        <FloatingInput
+          id="itemPrice"
+          label="Preço de tabela"
+          data-item-field=""
+          value={listPrice}
+          inputMode="decimal"
+          error={listPriceError}
+          onChange={(event) => changeListPrice(event.target.value)}
+        />
+        <div>
+          <FloatingInput
             id="itemMargin"
-            data-item-field
+            label="Margem bruta (%)"
+            data-item-field=""
             value={grossMargin}
             inputMode="decimal"
-            placeholder="0,00"
             onChange={(event) => changeGrossMargin(event.target.value)}
           />
-          <p className="text-sm text-zinc-500">
-            Havendo custo médio, o preço de lista é esse custo dividido por um menos a margem.
+          <p className="mt-1 text-sm text-zinc-500">
+            Havendo custo médio, o preço de lista é esse custo dividido por um menos a
+            margem.
           </p>
         </div>
-        <div className="space-y-1">
-          <Label>Custo médio</Label>
-          <p className="text-sm text-zinc-700">{formatMoney4(itemToUpdate?.averageCost)}</p>
-        </div>
-        <div className="space-y-1">
-          <Label>Última entrada</Label>
-          <p className="text-sm text-zinc-700">
-            {itemToUpdate?.lastInboundOn
+        <FloatingInput
+          id="itemAverageCost"
+          label="Custo médio"
+          value={formatMoney4(itemToUpdate?.averageCost)}
+          disabled
+          pinned
+        />
+        <FloatingInput
+          id="itemLastInbound"
+          label="Última entrada"
+          value={
+            itemToUpdate?.lastInboundOn
               ? formatRawDate(itemToUpdate.lastInboundOn)
-              : 'Ainda não houve entrada confirmada.'}
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="itemDescription">Descrição</Label>
-        <textarea
-          id="itemDescription"
-          data-item-field
-          value={description}
-          maxLength={2000}
-          rows={2}
-          onChange={(event) =>
-            setDescription(event.target.value.toLocaleUpperCase('pt-BR'))
+              : 'Ainda não houve entrada confirmada.'
           }
-          className="flex min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          disabled
+          pinned
         />
       </div>
 
+      <FloatingTextarea
+        id="itemDescription"
+        label="Descrição"
+        data-item-field=""
+        value={description}
+        maxLength={2000}
+        onChange={(event) =>
+          setDescription(event.target.value.toLocaleUpperCase('pt-BR'))
+        }
+      />
+
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="itemBarcode">Código de barras</Label>
-          <Input
-            id="itemBarcode"
-            data-item-field
-            value={barcode}
-            inputMode="numeric"
-            maxLength={14}
-            onChange={(event) => setBarcode(event.target.value.replace(/\D/g, ''))}
-          />
-        </div>
-        <div className="relative space-y-1">
-          <Label htmlFor="itemNcm">NCM</Label>
-          <Input
+        <FloatingInput
+          id="itemBarcode"
+          label="Código de barras"
+          data-item-field=""
+          value={barcode}
+          inputMode="numeric"
+          maxLength={14}
+          onChange={(event) => setBarcode(event.target.value.replace(/\D/g, ''))}
+        />
+        <div className="relative">
+          <FloatingInput
             id="itemNcm"
-            data-item-field
+            label="NCM"
+            data-item-field=""
             value={ncmCode}
             maxLength={10}
-            placeholder="0000.00.00"
             onChange={(event) => {
               setNcmCode(event.target.value);
               setNcmDescription('');
@@ -624,74 +640,62 @@ export function FormItem({ itemToUpdate, seed, onSuccess, onCancel, onDeleted }:
             </ul>
           ) : null}
           {ncmDescription ? (
-            <p className="line-clamp-2 text-sm text-zinc-500">{ncmDescription}</p>
+            <p className="mt-1 line-clamp-2 text-sm text-zinc-500">{ncmDescription}</p>
           ) : null}
         </div>
       </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="itemCest">CEST</Label>
-        <Input
-          id="itemCest"
-          data-item-field
-          value={cestCode}
-          inputMode="numeric"
-          maxLength={7}
-          onChange={(event) => setCestCode(event.target.value.replace(/\D/g, ''))}
-        />
-      </div>
+      <FloatingInput
+        id="itemCest"
+        label="CEST"
+        data-item-field=""
+        value={cestCode}
+        inputMode="numeric"
+        maxLength={7}
+        onChange={(event) => setCestCode(event.target.value.replace(/\D/g, ''))}
+      />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <div className="space-y-1">
-          <Label htmlFor="itemNetWeight">Peso líquido (kg)</Label>
-          <Input
-            id="itemNetWeight"
-            data-item-field
-            value={netWeightKg}
-            inputMode="decimal"
-            onChange={(event) => setNetWeightKg(event.target.value)}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="itemGrossWeight">Peso bruto (kg)</Label>
-          <Input
-            id="itemGrossWeight"
-            data-item-field
-            value={grossWeightKg}
-            inputMode="decimal"
-            onChange={(event) => setGrossWeightKg(event.target.value)}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="itemLength">Comprimento (cm)</Label>
-          <Input
-            id="itemLength"
-            data-item-field
-            value={lengthCm}
-            inputMode="decimal"
-            onChange={(event) => setLengthCm(event.target.value)}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="itemWidth">Largura (cm)</Label>
-          <Input
-            id="itemWidth"
-            data-item-field
-            value={widthCm}
-            inputMode="decimal"
-            onChange={(event) => setWidthCm(event.target.value)}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="itemHeight">Altura (cm)</Label>
-          <Input
-            id="itemHeight"
-            data-item-field
-            value={heightCm}
-            inputMode="decimal"
-            onChange={(event) => setHeightCm(event.target.value)}
-          />
-        </div>
+        <FloatingInput
+          id="itemNetWeight"
+          label="Peso líquido (kg)"
+          data-item-field=""
+          value={netWeightKg}
+          inputMode="decimal"
+          onChange={(event) => setNetWeightKg(event.target.value)}
+        />
+        <FloatingInput
+          id="itemGrossWeight"
+          label="Peso bruto (kg)"
+          data-item-field=""
+          value={grossWeightKg}
+          inputMode="decimal"
+          onChange={(event) => setGrossWeightKg(event.target.value)}
+        />
+        <FloatingInput
+          id="itemLength"
+          label="Comprimento (cm)"
+          data-item-field=""
+          value={lengthCm}
+          inputMode="decimal"
+          onChange={(event) => setLengthCm(event.target.value)}
+        />
+        <FloatingInput
+          id="itemWidth"
+          label="Largura (cm)"
+          data-item-field=""
+          value={widthCm}
+          inputMode="decimal"
+          onChange={(event) => setWidthCm(event.target.value)}
+        />
+        <FloatingInput
+          id="itemHeight"
+          label="Altura (cm)"
+          data-item-field=""
+          value={heightCm}
+          inputMode="decimal"
+          onChange={(event) => setHeightCm(event.target.value)}
+        />
       </div>
 
       <div className="flex flex-wrap gap-6">
@@ -750,7 +754,16 @@ export function FormItem({ itemToUpdate, seed, onSuccess, onCancel, onDeleted }:
             Excluir
           </Button>
         ) : null}
-        <Button type="submit" data-item-field disabled={mutation.isPending || deleteMutation.isPending || !measureId || Boolean(listPriceError)}>
+        <Button
+          type="submit"
+          data-item-field
+          disabled={
+            mutation.isPending ||
+            deleteMutation.isPending ||
+            !measureId ||
+            Boolean(listPriceError)
+          }
+        >
           {mutation.isPending ? 'Salvando...' : itemId ? 'Atualizar' : 'Cadastrar'}
         </Button>
       </div>

@@ -1,28 +1,54 @@
-import { catalogItemTypeLabels, formatRawDate } from '@erp-360/shared';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Search,
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
+  catalogItemTypeLabels,
+  formatRawDate,
+  type ListPageSize,
+  listPageSizes,
+} from '@erp-360/shared';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus } from 'lucide-react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { ListPagination } from '@/components/ui/ListPagination';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  ListMessage,
+  ListPageHeader,
+  ListPanel,
+  ListSearch,
+} from '@/components/ui/ListShell';
+import { StatusBadge, StatusListHeader, StatusListRow } from '@/components/ui/StatusList';
+import { type StatusTone } from '@/components/ui/statusTone';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { itemsService } from '@/services/items';
+
+const columns =
+  'grid grid-cols-[96px_110px_minmax(160px,1.4fr)_110px_72px_96px_128px_128px_88px_120px_120px]';
+
+const productTone: StatusTone = {
+  background: '#EFF6FF',
+  hover: '#DBEAFE',
+  border: '#2563EB',
+  text: '#1D4ED8',
+};
+
+const serviceTone: StatusTone = {
+  background: '#F5F3FF',
+  hover: '#EDE9FE',
+  border: '#8B5CF6',
+  text: '#6D28D9',
+};
+
+const inactiveTone: StatusTone = {
+  background: '#F8FAFC',
+  hover: '#F1F5F9',
+  border: '#64748B',
+  text: '#334155',
+};
+
+function itemTone(item: { isActive: boolean; type: 'product' | 'service' }) {
+  if (!item.isActive) return inactiveTone;
+  return item.type === 'service' ? serviceTone : productTone;
+}
 
 function formatMoney4(value: string | null) {
   if (!value) return '—';
@@ -65,38 +91,47 @@ function readOrder(params: URLSearchParams): 'asc' | 'desc' {
   return params.get('sortOrder') === 'desc' ? 'desc' : 'asc';
 }
 
+function readLimit(params: URLSearchParams): ListPageSize {
+  const value = Number(params.get('limit'));
+  if ((listPageSizes as readonly number[]).includes(value)) return value as ListPageSize;
+  return 10;
+}
+
 export function ListItems() {
   const navigate = useNavigate();
   const location = useLocation();
   const [params, setParams] = useSearchParams();
-  const [searchText, setSearchText] = useState(params.get('busca') ?? '');
   const page = readPage(params);
+  const limit = readLimit(params);
   const sortField = readSort(params);
   const sortOrder = readOrder(params);
   const search = params.get('busca') ?? '';
   const from = `/items${location.search}`;
+  const { text: searchText, setText: setSearchText } = useDebouncedSearch(
+    (next) => {
+      setParams(
+        (current) => {
+          const updated = new URLSearchParams(current);
+          if ((updated.get('busca') ?? '') === next) return current;
+          if (next) updated.set('busca', next);
+          else updated.delete('busca');
+          updated.delete('page');
+          return updated;
+        },
+        { replace: true },
+      );
+    },
+    400,
+    search,
+  );
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const next = searchText.trim();
-      const current = params.get('busca') ?? '';
-      if (next === current) return;
-      const updated = new URLSearchParams(params);
-      if (next) updated.set('busca', next);
-      else updated.delete('busca');
-      updated.delete('page');
-      setParams(updated, { replace: true });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchText, params, setParams]);
-
-  const { data: response, isLoading } = useQuery({
-    queryKey: ['listaItems', { page, search, sortField, sortOrder }],
+  const list = useQuery({
+    queryKey: ['listaItems', { page, limit, search, sortField, sortOrder }],
     placeholderData: keepPreviousData,
     queryFn: () =>
       itemsService.list({
         page,
-        limit: 10,
+        limit,
         sortField,
         sortOrder,
         search: search || undefined,
@@ -121,137 +156,136 @@ export function ListItems() {
     setParams(next, { replace: true });
   };
 
-  const renderSortIcon = (field: SortField) => {
-    if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4 shrink-0" />;
+  const setLimit = (nextLimit: ListPageSize) => {
+    const next = new URLSearchParams(params);
+    if (nextLimit === 10) next.delete('limit');
+    else next.set('limit', String(nextLimit));
+    next.delete('page');
+    setParams(next, { replace: true });
+  };
+
+  const sortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3.5 w-3.5" />;
     return sortOrder === 'asc' ? (
-      <ArrowUp className="ml-2 h-4 w-4 shrink-0 text-primary" />
+      <ArrowUp className="h-3.5 w-3.5" />
     ) : (
-      <ArrowDown className="ml-2 h-4 w-4 shrink-0 text-primary" />
+      <ArrowDown className="h-3.5 w-3.5" />
     );
   };
 
-  const openItem = (id: string) => {
-    navigate(`/items/${id}`, { state: { from } });
-  };
-
-  const meta = response?.meta;
-  const rows = response?.data;
-
-  if (isLoading && !response) return <p>Carregando registros...</p>;
+  const rows = list.data?.data ?? [];
+  const meta = list.data?.meta;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
-          <Input
-            placeholder="Buscar por código, SKU, nome ou barras..."
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            className="pl-9"
-          />
-        </div>
+      <ListPageHeader title="Itens" description="Código, nome, medida e situação.">
         <Button asChild>
           <Link to="/items/new" state={{ from }}>
-            <Plus className="h-4 w-4" /> Novo item
+            <Plus className="h-4 w-4" />
+            Novo item
           </Link>
         </Button>
-      </div>
+      </ListPageHeader>
 
-      <div className="rounded-md border border-zinc-200 bg-white shadow-2xs">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <Button variant="ghost" className="px-0" onClick={() => changeSort('code')}>
-                  Código
-                  {renderSortIcon('code')}
-                </Button>
-              </TableHead>
-              <TableHead>SKU</TableHead>
-              <TableHead>
-                <Button variant="ghost" className="px-0" onClick={() => changeSort('name')}>
-                  Nome
-                  {renderSortIcon('name')}
-                </Button>
-              </TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Medida</TableHead>
-              <TableHead>Disponível</TableHead>
-              <TableHead>Preço de lista</TableHead>
-              <TableHead>Custo médio</TableHead>
-              <TableHead>Margem</TableHead>
-              <TableHead>Última entrada</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows?.map((item) => (
-              <TableRow
-                key={item.id}
-                className={item.isActive ? 'cursor-pointer' : 'cursor-pointer text-zinc-400'}
-                onClick={() => openItem(item.id)}
+      <ListPanel
+        title="Lista de itens"
+        description="Clique na linha para abrir. Produto e serviço têm cores próprias; o inativo segue o cinza das outras listas."
+        toolbar={
+          <ListSearch
+            value={searchText}
+            onChange={setSearchText}
+            placeholder="Buscar por código, SKU, nome ou barras..."
+            label="Pesquisar itens"
+          />
+        }
+      >
+        <div className="overflow-x-auto">
+          <div className="min-w-[1240px]">
+            <StatusListHeader columns={columns}>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-left"
+                onClick={() => changeSort('code')}
               >
-                <TableCell className="font-medium">
-                  <Link
-                    to={`/items/${item.id}`}
-                    state={{ from }}
-                    className="font-medium"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {item.code}
-                  </Link>
-                </TableCell>
-                <TableCell>{item.sku || '—'}</TableCell>
-                <TableCell>{item.name}</TableCell>
-                <TableCell>{catalogItemTypeLabels[item.type]}</TableCell>
-                <TableCell>{item.measureAbbreviation}</TableCell>
-                <TableCell>{formatAvailable(item)}</TableCell>
-                <TableCell>{formatMoney4(item.listPrice)}</TableCell>
-                <TableCell>{formatMoney4(item.averageCost)}</TableCell>
-                <TableCell>{formatPercent(item.grossMargin)}</TableCell>
-                <TableCell>{formatRawDate(item.lastInboundOn) || '—'}</TableCell>
-              </TableRow>
-            ))}
-            {rows && rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={10} className="py-4 text-center text-zinc-500">
-                  Nenhum item encontrado.
-                </TableCell>
-              </TableRow>
-            ) : null}
-          </TableBody>
-        </Table>
-      </div>
+                Código
+                {sortIcon('code')}
+              </button>
+              <span>SKU</span>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-left"
+                onClick={() => changeSort('name')}
+              >
+                Nome
+                {sortIcon('name')}
+              </button>
+              <span>Tipo</span>
+              <span>Medida</span>
+              <span>Disponível</span>
+              <span>Preço de lista</span>
+              <span>Custo médio</span>
+              <span>Margem</span>
+              <span>Última entrada</span>
+              <span>Situação</span>
+            </StatusListHeader>
 
-      {meta && meta.totalPages > 1 ? (
-        <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3">
-          <div className="text-sm text-zinc-500">
-            Mostrando página <strong className="text-zinc-900">{meta.page}</strong> de{' '}
-            <strong className="text-zinc-900">{meta.totalPages}</strong> ({meta.total}{' '}
-            registros no total)
-          </div>
-          <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(Math.max(page - 1, 1))}
-              disabled={page === 1}
-              className="gap-1"
-            >
-              <ChevronLeft className="h-4 w-4" /> Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(page < meta.totalPages ? page + 1 : page)}
-              disabled={page === meta.totalPages}
-              className="gap-1"
-            >
-              Próximo <ChevronRight className="h-4 w-4" />
-            </Button>
+            {list.isLoading ? (
+              <ListMessage>Carregando os itens...</ListMessage>
+            ) : list.isError ? (
+              <ListMessage tone="error">Não foi possível carregar os itens.</ListMessage>
+            ) : rows.length === 0 ? (
+              <ListMessage>
+                {search ? 'Nenhum item encontrado.' : 'Ainda não há item.'}
+              </ListMessage>
+            ) : (
+              rows.map((item) => {
+                const status = item.isActive ? 'Ativo' : 'Inativo';
+                return (
+                  <StatusListRow
+                    key={item.id}
+                    columns={columns}
+                    tone={itemTone(item)}
+                    label={`${item.code}, ${item.name}, ${status}`}
+                    onOpen={() => navigate(`/items/${item.id}`, { state: { from } })}
+                  >
+                    <span className="font-bold">{item.code}</span>
+                    <span className="min-w-0 truncate">{item.sku || '—'}</span>
+                    <span className="min-w-0 truncate">{item.name}</span>
+                    <span className="min-w-0 truncate">
+                      {catalogItemTypeLabels[item.type]}
+                    </span>
+                    <span>{item.measureAbbreviation}</span>
+                    <span>{formatAvailable(item)}</span>
+                    <span className="whitespace-nowrap">
+                      {formatMoney4(item.listPrice)}
+                    </span>
+                    <span className="whitespace-nowrap">
+                      {formatMoney4(item.averageCost)}
+                    </span>
+                    <span>{formatPercent(item.grossMargin)}</span>
+                    <span className="whitespace-nowrap">
+                      {formatRawDate(item.lastInboundOn) || '—'}
+                    </span>
+                    <span>
+                      <StatusBadge label={status} />
+                    </span>
+                  </StatusListRow>
+                );
+              })
+            )}
           </div>
         </div>
-      ) : null}
+        {meta ? (
+          <ListPagination
+            page={page}
+            limit={limit}
+            total={meta.total}
+            totalPages={meta.totalPages}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+          />
+        ) : null}
+      </ListPanel>
     </div>
   );
 }

@@ -8,7 +8,8 @@ import { FormItem } from './FormItem';
 
 function listReturn(state: unknown) {
   const from = (state as { from?: unknown } | null)?.from;
-  if (from === '/items' || (typeof from === 'string' && from.startsWith('/items?'))) return from;
+  if (from === '/items' || (typeof from === 'string' && from.startsWith('/items?')))
+    return from;
   return '/items';
 }
 
@@ -41,16 +42,20 @@ export function ItemPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-bold text-zinc-900">{id ? 'Editar item' : 'Novo item'}</h2>
+        <h2 className="text-2xl font-bold text-[#172337]">
+          {id ? 'Editar item' : 'Novo item'}
+        </h2>
         {item.data ? (
-          <p className="text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-[#64748b]">
             {item.data.code} · {item.data.name}
           </p>
         ) : (
-          <p className="text-sm text-zinc-500">Preencha os dados e salve para gerar o código.</p>
+          <p className="mt-1 text-sm text-[#64748b]">
+            Preencha os dados e salve para gerar o código.
+          </p>
         )}
       </div>
-      <div className="rounded-lg border border-zinc-200 bg-white p-4 md:p-6">
+      <div className="rounded-lg border bg-white p-6">
         <FormItem
           key={id ?? 'new'}
           itemToUpdate={item.data ?? null}
