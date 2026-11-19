@@ -37,7 +37,7 @@ const statusLabels: Record<ContractStatus, string> = {
 
 const statusTone: Record<ContractStatus, StatusTone> = {
   draft: { background: '#F8FAFC', hover: '#F1F5F9', border: '#64748B', text: '#334155' },
-  active: { background: '#F0FDF4', hover: '#DCFCE7', border: '#16A34A', text: '#166534' },
+  active: { background: '#EFF6FF', hover: '#DBEAFE', border: '#2563EB', text: '#1D4ED8' },
   suspended: {
     background: '#FFFBEB',
     hover: '#FEF3C7',
