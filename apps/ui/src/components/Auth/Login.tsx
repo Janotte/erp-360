@@ -74,6 +74,7 @@ export function Login() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value.toLowerCase())}
+              pinned
               required
             />
             <FloatingInput
@@ -83,6 +84,7 @@ export function Login() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              pinned
               required
             />
             {error && (
