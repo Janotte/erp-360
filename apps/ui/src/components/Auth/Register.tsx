@@ -12,8 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FloatingInput } from '@/components/ui/FloatingField';
 
 import { sendRegisterAPI } from '../../services/auth';
 
@@ -40,7 +39,7 @@ export function Register() {
   };
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-zinc-50 px-4">
+    <div className="flex min-h-svh w-full items-center justify-center bg-zinc-50 px-4 py-8">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold tracking-tight">
@@ -52,64 +51,53 @@ export function Register() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="companyName">Nome da Empresa</Label>
-              <Input
-                id="companyName"
-                placeholder="Minha Empresa LTDA"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                onBlur={() => setCompanyName(toTitleCasePtBr(companyName))}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cnpj">CNPJ</Label>
-              <Input
-                id="cnpj"
-                placeholder="12.345.678/0001-00"
-                value={cnpj}
-                maxLength={18}
-                inputMode="numeric"
-                autoComplete="off"
-                onChange={(e) => setCnpj(formatCnpj(e.target.value))}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="name">Seu Nome completo</Label>
-              <Input
-                id="name"
-                placeholder="João Silva"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onBlur={() => setName(toTitleCasePtBr(name))}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail Corporativo</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="adm@empresa.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value.toLowerCase())}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha de Acesso</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Mínimo 8 caracteres"
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+            <FloatingInput
+              id="companyName"
+              label="Razão social"
+              autoComplete="organization"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              onBlur={() => setCompanyName(toTitleCasePtBr(companyName))}
+              required
+            />
+            <FloatingInput
+              id="cnpj"
+              label="CNPJ"
+              value={cnpj}
+              maxLength={18}
+              inputMode="numeric"
+              autoComplete="off"
+              onChange={(e) => setCnpj(formatCnpj(e.target.value))}
+              required
+            />
+            <FloatingInput
+              id="name"
+              label="Seu nome completo"
+              autoComplete="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={() => setName(toTitleCasePtBr(name))}
+              required
+            />
+            <FloatingInput
+              id="email"
+              label="E-mail corporativo"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value.toLowerCase())}
+              required
+            />
+            <FloatingInput
+              id="password"
+              label="Senha de acesso"
+              type="password"
+              autoComplete="new-password"
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
             {error && (
               <p className="text-sm font-medium text-destructive bg-destructive/10 p-3 rounded-md">
                 {error.message}

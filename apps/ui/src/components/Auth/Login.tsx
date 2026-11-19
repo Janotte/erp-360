@@ -13,8 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FloatingInput } from '@/components/ui/FloatingField';
 
 import { markSessionActive } from '../../services/apiClient';
 import { sendLoginAPI } from '../../services/auth';
@@ -58,7 +57,7 @@ export function Login() {
   };
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-zinc-50 px-4">
+    <div className="flex min-h-svh w-full items-center justify-center bg-zinc-50 px-4 py-8">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold tracking-tight">
@@ -68,28 +67,24 @@ export function Login() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="exemplo@empresa.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value.toLowerCase())}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+            <FloatingInput
+              id="email"
+              label="E-mail"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value.toLowerCase())}
+              required
+            />
+            <FloatingInput
+              id="password"
+              label="Senha"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
             {error && (
               <p className="text-sm font-medium text-destructive bg-destructive/10 p-3 rounded-md">
                 {error.message}
