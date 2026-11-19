@@ -19,10 +19,10 @@ import { categoriesService } from '@/services/categories';
 const columns = 'grid grid-cols-[minmax(180px,1.4fr)_minmax(160px,1fr)_132px]';
 
 const activeTone: StatusTone = {
-  background: '#F0FDF4',
-  hover: '#DCFCE7',
-  border: '#16A34A',
-  text: '#166534',
+  background: '#EFF6FF',
+  hover: '#DBEAFE',
+  border: '#2563EB',
+  text: '#1D4ED8',
 };
 
 const inactiveTone: StatusTone = {

@@ -19,10 +19,10 @@ import { type Measure, measuresService } from '@/services/measures';
 const columns = 'grid grid-cols-[88px_minmax(140px,1.2fr)_120px_minmax(140px,1fr)_132px]';
 
 const activeTone: StatusTone = {
-  background: '#F0FDF4',
-  hover: '#DCFCE7',
-  border: '#16A34A',
-  text: '#166534',
+  background: '#EFF6FF',
+  hover: '#DBEAFE',
+  border: '#2563EB',
+  text: '#1D4ED8',
 };
 
 const inactiveTone: StatusTone = {
