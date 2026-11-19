@@ -31,6 +31,7 @@ import { CompanyCardsPage } from './components/Financial/CompanyCards/CompanyCar
 import { IncomeStatementView } from './components/Financial/IncomeStatement/IncomeStatementView';
 import { PayableList } from './components/Financial/Payables/PayableList';
 import { PayablePage } from './components/Financial/Payables/PayablePage';
+import { ReplicatePayablePage } from './components/Financial/Payables/ReplicatePayablePage';
 import { ListPaymentMethods } from './components/Financial/PaymentMethods/ListPaymentMethods';
 import { ListPlanAccounts } from './components/Financial/PlanAccounts/ListPlanAccounts';
 import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
@@ -286,6 +287,14 @@ function App() {
               element={
                 <Pagina>
                   <PayablePage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/payables/:id/replicate"
+              element={
+                <Pagina>
+                  <ReplicatePayablePage />
                 </Pagina>
               }
             />

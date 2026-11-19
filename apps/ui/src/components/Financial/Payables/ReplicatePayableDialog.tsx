@@ -9,15 +9,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { FloatingInput, FloatingSelect } from '@/components/ui/FloatingField';
 import {
   type CreatePayableInput,
   type FinancialAccount,
@@ -45,9 +37,7 @@ export function ReplicatePayableDialog({
   const queryClient = useQueryClient();
   const [dueMode, setDueMode] = useState<DueMode>('fixedDay');
   const [intervalDays, setIntervalDays] = useState('30');
-  const [fixedDay, setFixedDay] = useState(
-    String(parseIsoDate(source.dueOn).getDate()),
-  );
+  const [fixedDay, setFixedDay] = useState(String(parseIsoDate(source.dueOn).getDate()));
   const [issueMode, setIssueMode] = useState<IssueMode>('advance');
   const [quantity, setQuantity] = useState('1');
   const [amountStr, setAmountStr] = useState(
@@ -84,8 +74,7 @@ export function ReplicatePayableDialog({
     );
     return {
       ...first,
-      documentNumber:
-        documentNumber || first.documentNumber || source.documentNumber,
+      documentNumber: documentNumber || first.documentNumber || source.documentNumber,
     };
   }, [source, schedule, documentNumber]);
 
@@ -142,111 +131,99 @@ export function ReplicatePayableDialog({
   });
 
   return (
-    <div className="space-y-4 pt-2">
-      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm space-y-1">
+    <div className="space-y-4">
+      <div className="space-y-1 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm">
         <p className="text-zinc-500">
           Origem: <strong className="text-zinc-900">{source.description}</strong>
         </p>
         <p className="text-zinc-500">
           Documento atual:{' '}
-          <strong className="text-zinc-900">{source.documentNumber || '-'}</strong>
+          <strong className="text-zinc-900">{source.documentNumber || '—'}</strong>
         </p>
       </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="replicateAmount">Valor (R$)</Label>
-        <Input
-          id="replicateAmount"
-          type="text"
-          inputMode="numeric"
-          autoComplete="off"
-          value={amountStr}
-          onChange={(e) => setAmountStr(maskCurrencyInput(e.target.value))}
-        />
-      </div>
+      <FloatingInput
+        id="replicateAmount"
+        label="Valor"
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        value={amountStr}
+        onChange={(event) => setAmountStr(maskCurrencyInput(event.target.value))}
+      />
 
-      <div className="space-y-1">
-        <Label htmlFor="replicateDoc">Nº Documento (1ª réplica)</Label>
-        <Input
+      <div className="space-y-2">
+        <FloatingInput
           id="replicateDoc"
+          label="Nº do documento da 1ª réplica"
           value={documentNumber}
           maxLength={44}
-          onChange={(e) => setDocumentNumber(e.target.value)}
+          onChange={(event) => setDocumentNumber(event.target.value)}
         />
-        <p className="text-xs text-zinc-500">
-          Se for AAAAMM (ex.: 202608), as próximas réplicas avançam o mês
-          automaticamente.
+        <p className="text-sm text-zinc-500">
+          Se terminar em AAAAMM, como 202608, as próximas réplicas avançam o mês.
         </p>
       </div>
 
-      <div className="space-y-1">
-        <Label>Vencimento</Label>
-        <Select value={dueMode} onValueChange={(v) => setDueMode(v as DueMode)}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="fixedDay">Dia fixo no próximo mês</SelectItem>
-            <SelectItem value="intervalDays">Somar intervalo de dias</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <FloatingSelect
+        id="replicateDueMode"
+        label="Vencimento"
+        value={dueMode}
+        pinned
+        onChange={(event) => setDueMode(event.target.value as DueMode)}
+      >
+        <option value="fixedDay">Dia fixo no próximo mês</option>
+        <option value="intervalDays">Somar intervalo de dias</option>
+      </FloatingSelect>
 
       {dueMode === 'fixedDay' ? (
-        <div className="space-y-1">
-          <Label htmlFor="fixedDay">Dia do vencimento</Label>
-          <Input
-            id="fixedDay"
-            type="number"
-            min={1}
-            max={31}
-            value={fixedDay}
-            onChange={(e) => setFixedDay(e.target.value)}
-          />
-        </div>
-      ) : (
-        <div className="space-y-1">
-          <Label htmlFor="intervalDays">Intervalo (dias)</Label>
-          <Input
-            id="intervalDays"
-            type="number"
-            min={1}
-            value={intervalDays}
-            onChange={(e) => setIntervalDays(e.target.value)}
-          />
-        </div>
-      )}
-
-      <div className="space-y-1">
-        <Label>Emissão</Label>
-        <Select value={issueMode} onValueChange={(v) => setIssueMode(v as IssueMode)}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="advance">Avançar junto com o vencimento</SelectItem>
-            <SelectItem value="keep">Manter emissão original</SelectItem>
-            <SelectItem value="today">Usar data de hoje</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="quantity">Quantidade de réplicas</Label>
-        <Input
-          id="quantity"
+        <FloatingInput
+          id="fixedDay"
+          label="Dia do vencimento"
           type="number"
           min={1}
-          max={12}
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
+          max={31}
+          value={fixedDay}
+          onChange={(event) => setFixedDay(event.target.value)}
         />
-      </div>
+      ) : (
+        <FloatingInput
+          id="intervalDays"
+          label="Intervalo em dias"
+          type="number"
+          min={1}
+          value={intervalDays}
+          onChange={(event) => setIntervalDays(event.target.value)}
+        />
+      )}
 
-      <div className="rounded-lg border border-zinc-200 bg-white p-3 text-sm space-y-1">
-        <p className="font-medium text-zinc-900">Preview da 1ª réplica</p>
+      <FloatingSelect
+        id="replicateIssueMode"
+        label="Emissão"
+        value={issueMode}
+        pinned
+        onChange={(event) => setIssueMode(event.target.value as IssueMode)}
+      >
+        <option value="advance">Avançar junto com o vencimento</option>
+        <option value="keep">Manter emissão original</option>
+        <option value="today">Usar data de hoje</option>
+      </FloatingSelect>
+
+      <FloatingInput
+        id="quantity"
+        label="Quantidade de réplicas"
+        type="number"
+        min={1}
+        max={12}
+        value={quantity}
+        onChange={(event) => setQuantity(event.target.value)}
+      />
+
+      <div className="space-y-1 rounded-lg border border-zinc-200 p-3 text-sm">
+        <p className="font-medium text-zinc-900">Prévia da 1ª réplica</p>
         <p className="text-zinc-500">
-          Documento: <strong className="text-zinc-900">{preview.documentNumber || '-'}</strong>
+          Documento:{' '}
+          <strong className="text-zinc-900">{preview.documentNumber || '—'}</strong>
         </p>
         <p className="text-zinc-500">
           Emissão:{' '}
@@ -256,22 +233,23 @@ export function ReplicatePayableDialog({
           Vencimento:{' '}
           <strong className="text-zinc-900">{formatRawDate(preview.dueOn)}</strong>
         </p>
-        {qty > 1 && (
-          <p className="text-xs text-zinc-500">Serão criados {qty} títulos em sequência.</p>
-        )}
+        {qty > 1 ? (
+          <p className="text-sm text-zinc-500">
+            Serão criados {qty} títulos em sequência.
+          </p>
+        ) : null}
       </div>
 
-      <div className="flex gap-2 pt-1">
-        <Button type="button" variant="outline" className="flex-1" onClick={onCancel}>
+      <div className="flex flex-wrap justify-end gap-2 pt-2">
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancelar
         </Button>
         <Button
           type="button"
-          className="flex-1"
           disabled={mutation.isPending}
           onClick={() => mutation.mutate()}
         >
-          {mutation.isPending ? 'Replicando...' : 'Confirmar réplica'}
+          {mutation.isPending ? 'Replicando...' : 'Replicar'}
         </Button>
       </div>
     </div>

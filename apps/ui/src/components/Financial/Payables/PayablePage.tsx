@@ -9,7 +9,6 @@ import { financialService } from '@/services/financials';
 
 import { PayableForm } from './PayableForm';
 import { PayModal } from './PayModal';
-import { ReplicatePayableDialog } from './ReplicatePayableDialog';
 
 function listReturn(state: unknown) {
   const from = (state as { from?: unknown } | null)?.from;
@@ -29,7 +28,6 @@ export function PayablePage() {
   const backTo = listReturn(location.state);
   const leave = () => navigate(backTo);
   const [paying, setPaying] = useState(false);
-  const [replicating, setReplicating] = useState(false);
 
   const account = useQuery({
     queryKey: ['financial', 'payable', id],
@@ -78,7 +76,14 @@ export function PayablePage() {
           onSuccess={leave}
           onDeleted={leave}
           onPay={loaded?.status === 'pendente' ? () => setPaying(true) : undefined}
-          onReplicate={loaded ? () => setReplicating(true) : undefined}
+          onReplicate={
+            loaded
+              ? () =>
+                  navigate(`/payables/${loaded.id}/replicate`, {
+                    state: { from: backTo },
+                  })
+              : undefined
+          }
         />
       </div>
 
@@ -92,21 +97,6 @@ export function PayablePage() {
               tipo="payable"
               account={loaded}
               onSuccess={() => setPaying(false)}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={replicating} onOpenChange={setReplicating}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Replicar conta a pagar</DialogTitle>
-          </DialogHeader>
-          {loaded ? (
-            <ReplicatePayableDialog
-              source={loaded}
-              onCancel={() => setReplicating(false)}
-              onSuccess={() => setReplicating(false)}
             />
           ) : null}
         </DialogContent>
