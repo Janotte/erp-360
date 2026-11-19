@@ -161,9 +161,22 @@ const orderBody = z
     }
   });
 
+const pageSizes = [5, 10, 20, 50] as const;
+
 const listQuery = z.object({
   q: z.string().optional(),
   status: z.enum(serviceOrderStatuses).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.preprocess(
+    (value) => (value === undefined || value === '' ? undefined : value),
+    z.coerce
+      .number()
+      .int()
+      .refine((value) => (pageSizes as readonly number[]).includes(value), {
+        message: 'A quantidade por página é 5, 10, 20 ou 50.',
+      })
+      .optional(),
+  ),
 });
 
 type OrderBody = z.infer<typeof orderBody>;
@@ -1209,7 +1222,16 @@ async function listServiceOrders(
     }
   }
 
-  const rows = await db
+  const where = and(...filters);
+  const [totalCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(serviceOrders)
+    .where(where);
+  const total = Number(totalCount?.count || 0);
+  const limit = query.limit;
+  const page = limit ? query.page : 1;
+
+  const base = db
     .select({
       id: serviceOrders.id,
       number: serviceOrders.number,
@@ -1220,8 +1242,9 @@ async function listServiceOrders(
       status: serviceOrders.status,
     })
     .from(serviceOrders)
-    .where(and(...filters))
+    .where(where)
     .orderBy(desc(serviceOrders.number));
+  const rows = limit ? await base.limit(limit).offset((page - 1) * limit) : await base;
 
   const ids = rows.map((row) => row.id);
   const summaries =
@@ -1258,6 +1281,12 @@ async function listServiceOrders(
       promisedAt: row.promisedAt,
       status: row.status,
     })),
+    meta: {
+      total,
+      page,
+      limit: limit ?? total,
+      totalPages: limit ? Math.ceil(total / limit) : 1,
+    },
   };
 }
 

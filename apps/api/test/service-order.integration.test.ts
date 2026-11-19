@@ -717,6 +717,77 @@ describe('gravação da ordem de serviço', { concurrency: false }, () => {
     assert.ok(digits.data.some((row) => row.number === 1));
   });
 
+  it('pagina a lista depois da pesquisa e do filtro de situação', async () => {
+    const all = await app.inject({
+      method: 'GET',
+      url: '/service-orders',
+      headers: headers(),
+    });
+    assert.equal(all.statusCode, 200, all.body);
+    const full = all.json() as {
+      data: { id: string; number: number; status: string }[];
+      meta: { total: number; page: number; limit: number; totalPages: number };
+    };
+    assert.equal(full.data.length, full.meta.total);
+    assert.equal(full.meta.page, 1);
+    assert.equal(full.meta.totalPages, 1);
+    assert.ok(full.meta.total > 5);
+
+    const firstPage = await app.inject({
+      method: 'GET',
+      url: '/service-orders?limit=5&page=1',
+      headers: headers(),
+    });
+    assert.equal(firstPage.statusCode, 200, firstPage.body);
+    const first = firstPage.json() as {
+      data: { id: string; number: number }[];
+      meta: { total: number; page: number; limit: number; totalPages: number };
+    };
+    assert.equal(first.meta.total, full.meta.total);
+    assert.equal(first.meta.page, 1);
+    assert.equal(first.meta.limit, 5);
+    assert.equal(first.meta.totalPages, Math.ceil(full.meta.total / 5));
+    assert.equal(first.data.length, 5);
+    for (let index = 1; index < first.data.length; index += 1) {
+      assert.ok(first.data[index - 1].number > first.data[index].number);
+    }
+
+    const secondPage = await app.inject({
+      method: 'GET',
+      url: '/service-orders?limit=5&page=2',
+      headers: headers(),
+    });
+    const second = secondPage.json() as { data: { id: string }[] };
+    const seen = new Set(first.data.map((row) => row.id));
+    assert.equal(second.data.length, Math.min(5, full.meta.total - 5));
+    assert.ok(second.data.every((row) => !seen.has(row.id)));
+
+    const filtered = await app.inject({
+      method: 'GET',
+      url: '/service-orders?status=cancelled&limit=5&page=1',
+      headers: headers(),
+    });
+    assert.equal(filtered.statusCode, 200, filtered.body);
+    const cancelled = filtered.json() as {
+      data: { status: string }[];
+      meta: { total: number; totalPages: number };
+    };
+    assert.ok(cancelled.data.every((row) => row.status === 'cancelled'));
+    assert.ok(cancelled.meta.total < full.meta.total);
+    assert.equal(cancelled.data.length, Math.min(5, cancelled.meta.total));
+    assert.equal(
+      cancelled.meta.totalPages,
+      cancelled.meta.total === 0 ? 0 : Math.ceil(cancelled.meta.total / 5),
+    );
+
+    const invalid = await app.inject({
+      method: 'GET',
+      url: '/service-orders?limit=7',
+      headers: headers(),
+    });
+    assert.equal(invalid.statusCode, 400);
+  });
+
   it('liga a ordem ao contrato vigente e imprime o número', async () => {
     const missing = await open({ attendance: 'contract' });
     assert.equal(missing.statusCode, 400);

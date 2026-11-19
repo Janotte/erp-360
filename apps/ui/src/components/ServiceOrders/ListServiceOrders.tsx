@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
-import { Plus, Search } from 'lucide-react';
-import { type CSSProperties, useEffect, useState } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router';
 
 import { ServiceOrderBillingDialog } from '@/components/ServiceOrders/ServiceOrderBillingDialog';
@@ -33,6 +33,24 @@ const statusLabels: Record<ServiceOrderStatus, string> = {
 };
 
 const statuses = Object.keys(statusLabels) as ServiceOrderStatus[];
+
+const pageSizes = [5, 10, 20, 50] as const;
+type PageSize = (typeof pageSizes)[number];
+
+function pageWindow(current: number, total: number): (number | 'gap')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1);
+  const pages = [1, total, current - 1, current, current + 1].filter(
+    (page) => page >= 1 && page <= total,
+  );
+  const unique = [...new Set(pages)].sort((left, right) => left - right);
+  const window: (number | 'gap')[] = [];
+  for (const page of unique) {
+    const previous = window.at(-1);
+    if (typeof previous === 'number' && page - previous > 1) window.push('gap');
+    window.push(page);
+  }
+  return window;
+}
 
 const statusTone: Record<
   ServiceOrderStatus,
@@ -111,7 +129,13 @@ function formatWhen(value: string | null) {
   }).format(date);
 }
 
-function StatusBadge({ status, pressed }: { status: ServiceOrderStatus; pressed?: boolean }) {
+function StatusBadge({
+  status,
+  pressed,
+}: {
+  status: ServiceOrderStatus;
+  pressed?: boolean;
+}) {
   return (
     <span
       className={cn(
@@ -129,6 +153,8 @@ export function ListServiceOrders() {
   const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ServiceOrderStatus | 'all'>('all');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState<PageSize>(10);
   const [menu, setMenu] = useState<{
     row: ServiceOrderListItem;
     x: number;
@@ -137,9 +163,21 @@ export function ListServiceOrders() {
   const [billingId, setBillingId] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setSearch(searchText.trim()), 400);
+    const timer = setTimeout(() => {
+      const next = searchText.trim();
+      setSearch((current) => {
+        if (current === next) return current;
+        setPage(1);
+        return next;
+      });
+    }, 400);
     return () => clearTimeout(timer);
   }, [searchText]);
+
+  function changeStatus(next: ServiceOrderStatus | 'all') {
+    setStatus(next);
+    setPage(1);
+  }
 
   const settings = useQuery({
     queryKey: ['settings', 'service-order'],
@@ -147,21 +185,33 @@ export function ListServiceOrders() {
   });
 
   const list = useQuery({
-    queryKey: ['service-orders', { q: search, status }],
+    queryKey: ['service-orders', { q: search, status, page, limit }],
+    placeholderData: keepPreviousData,
     queryFn: () =>
       serviceOrdersService.list({
         q: search || undefined,
         status: status === 'all' ? undefined : status,
+        page,
+        limit,
       }),
   });
 
   const rows = list.data?.data ?? [];
+  const meta = list.data?.meta;
+  const totalPages = meta?.totalPages ?? 0;
+
+  useEffect(() => {
+    if (totalPages > 0 && page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
   const summaryLabel =
     rows[0]?.summaryLabel ||
-    settings.data?.fields.find((field) => field.slot === settings.data.summarySlot)?.label ||
+    settings.data?.fields.find((field) => field.slot === settings.data.summarySlot)
+      ?.label ||
     'Resumo';
-  const countLabel =
-    rows.length === 1 ? '1 ordem exibida' : `${rows.length} ordens exibidas`;
+  const rangeStart = meta && meta.total > 0 ? (meta.page - 1) * meta.limit + 1 : 0;
+  const rangeEnd = meta ? Math.min(meta.page * meta.limit, meta.total) : 0;
+  const countLabel = meta ? `Exibindo ${rangeStart}–${rangeEnd} de ${meta.total}` : '';
+  const pages = pageWindow(page, totalPages);
 
   function openOrder(id: string) {
     navigate(`/service-orders/${id}`);
@@ -172,7 +222,9 @@ export function ListServiceOrders() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-[#172337]">Ordens de serviço</h2>
-          <p className="mt-1 text-sm text-[#64748b]">Número, cliente, previsão e situação.</p>
+          <p className="mt-1 text-sm text-[#64748b]">
+            Número, cliente, previsão e situação.
+          </p>
         </div>
         <Button asChild>
           <Link to="/service-orders/new">
@@ -185,7 +237,9 @@ export function ListServiceOrders() {
       <section className="rounded-[14px] border border-[#dfe5ee] bg-white p-4 shadow-[0_4px_22px_#1e293b0a] md:p-[22px]">
         <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="text-[19px] font-semibold text-[#172337]">Lista de ordens de serviço</h3>
+            <h3 className="text-[19px] font-semibold text-[#172337]">
+              Lista de ordens de serviço
+            </h3>
             <p className="mt-2 text-[13px] text-[#64748b]">
               Clique na linha para abrir. O hover mantém a cor de cada situação.
             </p>
@@ -203,9 +257,12 @@ export function ListServiceOrders() {
             </div>
             <Select
               value={status}
-              onValueChange={(value) => setStatus(value as ServiceOrderStatus | 'all')}
+              onValueChange={(value) => changeStatus(value as ServiceOrderStatus | 'all')}
             >
-              <SelectTrigger className="h-[42px] w-full border-[#cbd5e1] sm:w-[235px]" aria-label="Filtrar por situação">
+              <SelectTrigger
+                className="h-[42px] w-full border-[#cbd5e1] sm:w-[235px]"
+                aria-label="Filtrar por situação"
+              >
                 <SelectValue placeholder="Situação" />
               </SelectTrigger>
               <SelectContent>
@@ -246,7 +303,9 @@ export function ListServiceOrders() {
               </p>
             ) : rows.length === 0 ? (
               <p className="px-3.5 py-8 text-center text-sm text-[#64748b]">
-                {search || status !== 'all' ? 'Nenhuma ordem encontrada.' : 'Ainda não há ordem.'}
+                {search || status !== 'all'
+                  ? 'Nenhuma ordem encontrada.'
+                  : 'Ainda não há ordem.'}
               </p>
             ) : (
               rows.map((row) => (
@@ -274,7 +333,9 @@ export function ListServiceOrders() {
                 >
                   <span className="font-bold">{row.numberLabel}</span>
                   <span className="min-w-0 truncate">{row.customerName}</span>
-                  <span className="min-w-0 truncate">{row.summaryValue?.trim() || '—'}</span>
+                  <span className="min-w-0 truncate">
+                    {row.summaryValue?.trim() || '—'}
+                  </span>
                   <span className="whitespace-nowrap">{formatWhen(row.openedAt)}</span>
                   <span className="whitespace-nowrap">{formatWhen(row.promisedAt)}</span>
                   <span>
@@ -285,7 +346,7 @@ export function ListServiceOrders() {
             )}
           </div>
         </div>
-
+        {/*     
         <div className="mt-5 flex flex-wrap gap-2.5" aria-label="Legenda de situações">
           {statuses.map((value) => (
             <button
@@ -294,18 +355,88 @@ export function ListServiceOrders() {
               className="cursor-pointer rounded-[7px] border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
               style={toneStyle(value)}
               aria-pressed={status === value}
-              onClick={() => setStatus(status === value ? 'all' : value)}
+              onClick={() => changeStatus(status === value ? 'all' : value)}
             >
               <StatusBadge status={value} pressed={status === value} />
             </button>
           ))}
         </div>
-        <p className="mt-2 text-[13px] text-[#64748b]" aria-live="polite">
-          {list.isSuccess ? countLabel : ''}
-        </p>
+        */}
+        {meta ? (
+          <div className="mt-4 flex flex-col gap-3 border-t border-[#dfe5ee] pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-4">
+              <p className="text-[13px] text-[#64748b]" aria-live="polite">
+                {countLabel}
+              </p>
+              <label className="flex items-center gap-2 text-[13px] text-[#64748b]">
+                Por página
+                <select
+                  className="h-8 rounded-md border border-[#cbd5e1] bg-white px-2 text-sm text-[#172337]"
+                  value={limit}
+                  aria-label="Quantidade por página"
+                  onChange={(event) => {
+                    setLimit(Number(event.target.value) as PageSize);
+                    setPage(1);
+                  }}
+                >
+                  {pageSizes.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="flex flex-wrap items-center gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                <ChevronLeft className="h-4 w-4" /> Anterior
+              </Button>
+              {pages.map((item, index) =>
+                item === 'gap' ? (
+                  <span key={`gap-${index}`} className="px-1 text-sm text-[#64748b]">
+                    …
+                  </span>
+                ) : (
+                  <Button
+                    key={item}
+                    type="button"
+                    variant={item === page ? 'default' : 'outline'}
+                    size="sm"
+                    className="min-w-8 px-2"
+                    aria-current={item === page ? 'page' : undefined}
+                    onClick={() => setPage(item)}
+                  >
+                    {item}
+                  </Button>
+                ),
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1"
+                disabled={totalPages === 0 || page >= totalPages}
+                onClick={() => setPage(page + 1)}
+              >
+                Próxima <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </section>
 
-      <ServiceOrderRowMenu cursor={menu} onClose={() => setMenu(null)} onBill={setBillingId} />
+      <ServiceOrderRowMenu
+        cursor={menu}
+        onClose={() => setMenu(null)}
+        onBill={setBillingId}
+      />
       <ServiceOrderBillingDialog orderId={billingId} onClose={() => setBillingId(null)} />
     </div>
   );
