@@ -93,7 +93,12 @@ const itensMenu: ItemMenu[] = [
 ];
 
 function rotaDoFilho(url: string, path: string) {
-  if (url === '/categories' || url === '/items' || url === '/measures') {
+  if (
+    url === '/categories' ||
+    url === '/items' ||
+    url === '/measures' ||
+    url === '/payables'
+  ) {
     return path === url || path.startsWith(`${url}/`);
   }
   return path === url;

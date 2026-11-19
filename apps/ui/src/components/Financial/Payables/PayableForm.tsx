@@ -12,10 +12,19 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { PersonSearchSelect } from '@/components/Persons/PersonSearchSelect';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FloatingInput } from '@/components/ui/FloatingField';
 import { companyCardService } from '@/services/companyCards';
 import {
   type CreatePayableInput,
@@ -25,18 +34,30 @@ import {
 
 interface PayableFormProps {
   accountToUpdate?: FinancialAccount | null;
-  readOnly?: boolean;
-  onSuccess: () => void;
+  onSuccess?: () => void;
+  onCancel?: () => void;
+  onDeleted?: () => void;
+  onPay?: () => void;
   onReplicate?: () => void;
 }
 
+const statusLabels: Record<FinancialAccount['status'], string> = {
+  pendente: 'Pendente',
+  pago: 'Pago',
+  recebido: 'Recebido',
+  cancelado: 'Cancelado',
+};
+
 export function PayableForm({
   accountToUpdate,
-  readOnly = false,
   onSuccess,
+  onCancel,
+  onDeleted,
+  onPay,
   onReplicate,
 }: PayableFormProps) {
   const queryClient = useQueryClient();
+  const readOnly = Boolean(accountToUpdate && accountToUpdate.status !== 'pendente');
   const [personId, setPersonId] = useState('');
   const [documentNumber, setDocumentNumber] = useState('');
   const [description, setDescription] = useState('');
@@ -45,6 +66,9 @@ export function PayableForm({
   const [amountStr, setAmountStr] = useState('');
   const [planAccountId, setPlanAccountId] = useState('');
   const [companyCardId, setCompanyCardId] = useState('');
+  const [openDelete, setOpenDelete] = useState(false);
+  const [openReverse, setOpenReverse] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!accountToUpdate) return;
@@ -80,16 +104,53 @@ export function PayableForm({
           ? 'Conta a pagar atualizada com sucesso!'
           : 'Conta a pagar lançada com sucesso!',
       );
-      onSuccess();
+      onSuccess?.();
     },
     onError: (err: Error) => toast.error(`Erro: ${err.message}`),
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const deleteMutation = useMutation({
+    mutationFn: () => financialService.delete('payable', accountToUpdate?.id ?? ''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['financial', 'payable'] });
+      toast.success('Conta a pagar excluída com sucesso!');
+      onDeleted?.();
+    },
+    onError: (error: Error) => setActionError(error.message),
+  });
+
+  const reverseMutation = useMutation({
+    mutationFn: () => financialService.reverse('payable', accountToUpdate?.id ?? ''),
+    onSuccess: (saved) => {
+      queryClient.setQueryData(['financial', 'payable', saved.id], saved);
+      queryClient.invalidateQueries({ queryKey: ['financial', 'payable'] });
+      setOpenReverse(false);
+      setActionError(null);
+      toast.success('Pagamento estornado com sucesso!');
+    },
+    onError: (error: Error) => setActionError(error.message),
+  });
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
     if (readOnly) return;
     const installmentAmount = parseCurrencyToCents(amountStr);
-    if (!personId || !description || !dueOn || installmentAmount <= 0) return;
+    if (!personId) {
+      toast.error('Informe o credor.');
+      return;
+    }
+    if (!description.trim()) {
+      toast.error('Informe a descrição.');
+      return;
+    }
+    if (!dueOn) {
+      toast.error('Informe o vencimento.');
+      return;
+    }
+    if (installmentAmount <= 0) {
+      toast.error('Informe o valor.');
+      return;
+    }
 
     mutation.mutate({
       personId,
@@ -119,33 +180,30 @@ export function PayableForm({
   };
 
   const showSettlement =
-    readOnly &&
-    accountToUpdate &&
-    (accountToUpdate.status === 'pago' || accountToUpdate.settledOn);
+    accountToUpdate && (accountToUpdate.status === 'pago' || accountToUpdate.settledOn);
+  const busy =
+    mutation.isPending || deleteMutation.isPending || reverseMutation.isPending;
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pt-2"
-    >
-      {showSettlement && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm space-y-1">
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {showSettlement ? (
+        <div className="space-y-1 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
           <p className="font-medium text-emerald-800">Liquidação</p>
           <p className="text-emerald-700">
-            Data: <strong>{formatRawDate(accountToUpdate.settledOn) || '-'}</strong>
+            Data: <strong>{formatRawDate(accountToUpdate.settledOn) || '—'}</strong>
           </p>
           <p className="text-emerald-700">
             Valor pago: <strong>{formatCurrency(accountToUpdate.settledAmount)}</strong>
           </p>
           <p className="text-emerald-700">
-            Status: <strong>{accountToUpdate.status}</strong>
+            Situação: <strong>{statusLabels[accountToUpdate.status]}</strong>
           </p>
         </div>
-      )}
+      ) : null}
 
-      <div className="space-y-1">
-        <Label>Cartão</Label>
+      <div className="space-y-2">
         <CatalogSearchSelect
+          label="Cartão"
           value={companyCardId}
           onChange={selectCard}
           options={(cards.data ?? [])
@@ -165,126 +223,187 @@ export function PayableForm({
         ) : null}
       </div>
 
-      <div className="space-y-1">
-        <Label>Credor</Label>
-        <PersonSearchSelect
-          value={personId}
-          onChange={setPersonId}
-          type={['fornecedor', 'colaborador', 'instituicao']}
-          placeholder="Buscar fornecedor, colaborador ou instituição..."
-          required={!readOnly}
-          disabled={readOnly || Boolean(companyCardId)}
-        />
-      </div>
+      <PersonSearchSelect
+        label="Credor"
+        value={personId}
+        onChange={setPersonId}
+        type={['fornecedor', 'colaborador', 'instituicao']}
+        placeholder="Buscar fornecedor, colaborador ou instituição..."
+        required={!readOnly}
+        disabled={readOnly || Boolean(companyCardId)}
+      />
 
-      <div className="space-y-1">
-        <Label htmlFor="documentNumber">Nº do Documento</Label>
-        <Input
-          id="documentNumber"
-          value={documentNumber}
-          maxLength={44}
-          onChange={(e) => setDocumentNumber(e.target.value)}
-          disabled={readOnly}
-        />
-      </div>
+      <FloatingInput
+        id="documentNumber"
+        label="Nº do documento"
+        value={documentNumber}
+        maxLength={44}
+        disabled={readOnly}
+        onChange={(event) => setDocumentNumber(event.target.value)}
+      />
 
-      <div className="space-y-1">
-        <Label htmlFor="description">Descrição</Label>
-        <Input
-          id="description"
-          value={description}
-          maxLength={255}
-          onChange={(e) => setDescription(e.target.value)}
-          required={!readOnly}
-          disabled={readOnly}
-        />
-      </div>
+      <FloatingInput
+        id="description"
+        label="Descrição"
+        value={description}
+        maxLength={255}
+        required={!readOnly}
+        disabled={readOnly}
+        onChange={(event) => setDescription(event.target.value)}
+      />
 
-      <div className="space-y-1">
-        <Label>Plano de contas</Label>
-        <CatalogSearchSelect
-          value={planAccountId}
-          onChange={setPlanAccountId}
-          options={planAccounts}
-          placeholder="Buscar plano de contas..."
-          emptyMessage="Nenhum plano de contas cadastrado."
-          allowClear={!readOnly}
-          disabled={readOnly}
-        />
-      </div>
+      <CatalogSearchSelect
+        label="Plano de contas"
+        value={planAccountId}
+        onChange={setPlanAccountId}
+        options={planAccounts}
+        placeholder="Buscar plano de contas..."
+        emptyMessage="Nenhum plano de contas cadastrado."
+        allowClear={!readOnly}
+        disabled={readOnly}
+      />
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="issueOn">Emissão</Label>
-          <Input
-            id="issueOn"
-            type="date"
-            value={issueOn}
-            onChange={(e) => setIssueOn(e.target.value)}
-            required={!readOnly}
-            disabled={readOnly}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="dueOn">Vencimento</Label>
-          <Input
-            id="dueOn"
-            type="date"
-            value={dueOn}
-            onChange={(e) => setDueOn(e.target.value)}
-            required={!readOnly}
-            disabled={readOnly}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="amount">Valor (R$)</Label>
-        <Input
-          id="amount"
-          type="text"
-          inputMode="numeric"
-          autoComplete="off"
-          placeholder="0,00"
-          value={amountStr}
-          onChange={(e) => setAmountStr(maskCurrencyInput(e.target.value))}
+        <FloatingInput
+          id="issueOn"
+          label="Emissão"
+          type="date"
+          value={issueOn}
           required={!readOnly}
           disabled={readOnly}
+          onChange={(event) => setIssueOn(event.target.value)}
+        />
+        <FloatingInput
+          id="dueOn"
+          label="Vencimento"
+          type="date"
+          value={dueOn}
+          required={!readOnly}
+          disabled={readOnly}
+          onChange={(event) => setDueOn(event.target.value)}
         />
       </div>
 
-      {readOnly ? (
-        <div className="mt-2 flex gap-2">
-          {onReplicate && accountToUpdate && (
-            <Button type="button" className="flex-1" onClick={onReplicate}>
-              Replicar
-            </Button>
-          )}
-          <Button type="button" variant="outline" className="flex-1" onClick={onSuccess}>
-            Fechar
+      <FloatingInput
+        id="amount"
+        label="Valor"
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        value={amountStr}
+        required={!readOnly}
+        disabled={readOnly}
+        onChange={(event) => setAmountStr(maskCurrencyInput(event.target.value))}
+      />
+
+      {mutation.isError ? (
+        <p className="rounded-md bg-destructive/10 p-3 text-sm font-medium text-destructive">
+          {mutation.error.message}
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap justify-end gap-2 pt-2">
+        {onCancel ? (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancelar
           </Button>
-        </div>
-      ) : (
-        <div className="mt-2 flex gap-2">
-          {onReplicate && accountToUpdate && (
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1"
-              onClick={onReplicate}
-            >
-              Replicar
-            </Button>
-          )}
-          <Button type="submit" className="flex-1" disabled={mutation.isPending}>
+        ) : null}
+        {accountToUpdate && onDeleted && accountToUpdate.status === 'pendente' ? (
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={busy}
+            onClick={() => {
+              setActionError(null);
+              setOpenDelete(true);
+            }}
+          >
+            Excluir
+          </Button>
+        ) : null}
+        {onReplicate && accountToUpdate ? (
+          <Button type="button" variant="outline" disabled={busy} onClick={onReplicate}>
+            Replicar
+          </Button>
+        ) : null}
+        {accountToUpdate?.status === 'pago' ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() => {
+              setActionError(null);
+              setOpenReverse(true);
+            }}
+          >
+            Estornar
+          </Button>
+        ) : null}
+        {onPay ? (
+          <Button type="button" disabled={busy} onClick={onPay}>
+            Pagar
+          </Button>
+        ) : null}
+        {readOnly ? null : (
+          <Button type="submit" disabled={busy}>
             {mutation.isPending
               ? 'Salvando...'
               : accountToUpdate
                 ? 'Atualizar'
-                : 'Confirmar Lançamento'}
+                : 'Lançar'}
           </Button>
-        </div>
-      )}
+        )}
+      </div>
+
+      <AlertDialog open={openDelete} onOpenChange={setOpenDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir conta a pagar</AlertDialogTitle>
+            <AlertDialogDescription>
+              {actionError ??
+                `Deseja excluir ${description || 'esta conta'}? Essa ação não pode ser desfeita.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteMutation.isPending || !!actionError}
+              onClick={(event) => {
+                event.preventDefault();
+                deleteMutation.mutate();
+              }}
+            >
+              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={openReverse} onOpenChange={setOpenReverse}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Estornar pagamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              {actionError ??
+                `Deseja estornar o pagamento de ${description || 'esta conta'}? O título voltará para pendente.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700"
+              disabled={reverseMutation.isPending || !!actionError}
+              onClick={(event) => {
+                event.preventDefault();
+                reverseMutation.mutate();
+              }}
+            >
+              {reverseMutation.isPending ? 'Estornando...' : 'Estornar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </form>
   );
 }

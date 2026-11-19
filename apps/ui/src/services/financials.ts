@@ -315,6 +315,14 @@ export const financialService = {
       meta: parsed.data.meta,
     };
   },
+  get: async (tipo: FinancialTipo, id: string): Promise<FinancialAccount> => {
+    const res = await apiFetch(`/${collection(tipo)}/${id}`);
+    const body = await readBody(res);
+    if (!res.ok) {
+      throw new Error(apiErrorMessage(body, 'Falha ao carregar conta.'));
+    }
+    return parseTitle(tipo, body);
+  },
   create: async (
     tipo: FinancialTipo,
     dados: CreatePayableInput | CreateReceivableInput,

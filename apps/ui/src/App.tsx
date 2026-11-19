@@ -30,6 +30,7 @@ import { CashFlowView } from './components/Financial/CashFlow/CashFlowView';
 import { CompanyCardsPage } from './components/Financial/CompanyCards/CompanyCardsPage';
 import { IncomeStatementView } from './components/Financial/IncomeStatement/IncomeStatementView';
 import { PayableList } from './components/Financial/Payables/PayableList';
+import { PayablePage } from './components/Financial/Payables/PayablePage';
 import { ListPaymentMethods } from './components/Financial/PaymentMethods/ListPaymentMethods';
 import { ListPlanAccounts } from './components/Financial/PlanAccounts/ListPlanAccounts';
 import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
@@ -277,6 +278,22 @@ function App() {
               element={
                 <Pagina>
                   <PayableList />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/payables/new"
+              element={
+                <Pagina>
+                  <PayablePage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/payables/:id"
+              element={
+                <Pagina>
+                  <PayablePage />
                 </Pagina>
               }
             />

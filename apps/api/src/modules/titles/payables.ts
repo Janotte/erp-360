@@ -8,17 +8,25 @@ import {
   settlementPreviewSchema,
   titlePageSchema,
 } from '@erp-360/shared';
-import { and, asc, desc, eq, getTableColumns, gte, ilike, lt, lte, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableColumns,
+  gte,
+  ilike,
+  lt,
+  lte,
+  or,
+  sql,
+} from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
 import { titleListStatus } from './listStatus.ts';
-import {
-  previewSettlement,
-  reverseSettlement,
-  settleTitle,
-} from './settlement.ts';
+import { previewSettlement, reverseSettlement, settleTitle } from './settlement.ts';
 
 const dateString = z
   .string()
@@ -225,6 +233,41 @@ export const payablesRoutes: FastifyPluginAsyncZod = async (fastify) => {
           totalPages: Math.ceil(Number(totalCount?.count || 0) / limit),
         },
       });
+    },
+  );
+
+  fastify.get(
+    '/:id',
+    {
+      schema: {
+        params: z.object({ id: z.string().uuid() }),
+        response: {
+          200: payableTitleSchema,
+          404: errorMessageSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { tenantId } = request.user;
+      const { id } = request.params;
+      const creditor = and(
+        eq(persons.id, payables.creditorId),
+        eq(persons.tenantId, payables.tenantId),
+      );
+      const [row] = await db
+        .select({
+          ...getTableColumns(payables),
+          personName: persons.name,
+        })
+        .from(payables)
+        .innerJoin(persons, creditor)
+        .where(and(eq(payables.id, id), eq(payables.tenantId, tenantId)))
+        .limit(1);
+
+      if (!row) {
+        return reply.status(404).send({ message: 'Conta a pagar não encontrada.' });
+      }
+      return row;
     },
   );
 
