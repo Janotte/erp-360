@@ -16,15 +16,13 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { PersonSearchSelect } from '@/components/Persons/PersonSearchSelect';
 import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FloatingInput, FloatingSelect } from '@/components/ui/FloatingField';
 import { financialService, type MeansOfPaymentOption } from '@/services/financials';
 import {
   type PaymentMethod,
@@ -32,9 +30,6 @@ import {
   paymentMethodsService,
 } from '@/services/paymentMethods';
 import { treasuryService } from '@/services/treasury';
-
-const selectClassName =
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
 
 type TermDraft = {
   key: string;
@@ -105,12 +100,20 @@ function draftMessage(
     return 'O código usa letras, números e hífen, em maiúsculas.';
   }
   if (!draft.name.trim()) return 'Informe o nome da forma.';
-  if (group === 'other' && (draft.name.trim().length < 2 || draft.name.trim().length > 60)) {
+  if (
+    group === 'other' &&
+    (draft.name.trim().length < 2 || draft.name.trim().length > 60)
+  ) {
     return 'No meio Outros, o nome precisa ter de 2 a 60 caracteres.';
   }
   if (!draft.meansOfPaymentId) return 'Selecione o meio de pagamento.';
   if (!draft.receiptKind) return 'Selecione para onde o valor vai.';
-  if (!draft.useInQuote && !draft.useInSale && !draft.useInPos && !draft.useInServiceOrder) {
+  if (
+    !draft.useInQuote &&
+    !draft.useInSale &&
+    !draft.useInPos &&
+    !draft.useInServiceOrder
+  ) {
     return 'Marque ao menos um uso: orçamento, venda, PDV ou ordem de serviço.';
   }
   if (needsIntegration(group) && !draft.integrationType) {
@@ -123,7 +126,8 @@ function draftMessage(
   ) {
     return 'No cartão não integrado, informe a bandeira.';
   }
-  if (draft.receiptKind === 'bank' && !draft.bankAccountId) return 'Informe a conta bancária.';
+  if (draft.receiptKind === 'bank' && !draft.bankAccountId)
+    return 'Informe a conta bancária.';
   if (draft.receiptKind === 'acquirer_receivable' && !draft.acquirerId) {
     return 'Informe a credenciadora.';
   }
@@ -188,11 +192,16 @@ function draftMessage(
 interface FormPaymentMethodProps {
   methodToUpdate?: PaymentMethod | null;
   onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
-export function FormPaymentMethod({ methodToUpdate, onSuccess }: FormPaymentMethodProps) {
+export function FormPaymentMethod({
+  methodToUpdate,
+  onSuccess,
+  onCancel,
+}: FormPaymentMethodProps) {
   const queryClient = useQueryClient();
-  const [methodId, setMethodId] = useState(methodToUpdate?.id);
+  const methodId = methodToUpdate?.id;
   const [code, setCode] = useState(methodToUpdate?.code ?? '');
   const [name, setName] = useState(methodToUpdate?.name ?? '');
   const [meansOfPaymentId, setMeansOfPaymentId] = useState(
@@ -219,36 +228,10 @@ export function FormPaymentMethod({ methodToUpdate, onSuccess }: FormPaymentMeth
   );
   const [sortOrder, setSortOrder] = useState(String(methodToUpdate?.sortOrder ?? 0));
   const [terms, setTerms] = useState<TermDraft[]>(
-    methodToUpdate?.terms.length ? methodToUpdate.terms.map(termFromMethod) : [blankTerm()],
+    methodToUpdate?.terms.length
+      ? methodToUpdate.terms.map(termFromMethod)
+      : [blankTerm()],
   );
-
-  const { data: loaded } = useQuery({
-    queryKey: ['payment-method', methodId],
-    enabled: Boolean(methodId),
-    staleTime: 0,
-    queryFn: () => paymentMethodsService.get(methodId!),
-  });
-
-  useEffect(() => {
-    const method = loaded ?? methodToUpdate;
-    if (!method) return;
-    setCode(method.code);
-    setName(method.name);
-    setMeansOfPaymentId(method.meansOfPaymentId);
-    setIsActive(method.isActive);
-    setReceiptKind(method.receiptKind);
-    setSettlementDays(method.settlementDays != null ? String(method.settlementDays) : '');
-    setIntegrationType(method.integrationType ?? '');
-    setAcquirerId(method.acquirerId ?? '');
-    setCardBrandId(method.cardBrandId ?? '');
-    setBankAccountId(method.bankAccountId ?? '');
-    setUseInQuote(method.useInQuote);
-    setUseInSale(method.useInSale);
-    setUseInPos(method.useInPos);
-    setUseInServiceOrder(method.useInServiceOrder);
-    setSortOrder(String(method.sortOrder));
-    setTerms(method.terms.length ? method.terms.map(termFromMethod) : [blankTerm()]);
-  }, [loaded, methodToUpdate]);
 
   const { data: means = [], isLoading: loadingMeans } = useQuery({
     queryKey: ['financial', 'means-of-payment'],
@@ -268,7 +251,9 @@ export function FormPaymentMethod({ methodToUpdate, onSuccess }: FormPaymentMeth
   const showIntegration = needsIntegration(group);
   const showBrand = group === 'card';
   const showAcquirer =
-    receiptKind === 'acquirer_receivable' || integrationType === 'integrated' || showIntegration;
+    receiptKind === 'acquirer_receivable' ||
+    integrationType === 'integrated' ||
+    showIntegration;
   const showBank = receiptKind === 'bank' || receiptKind === 'acquirer_receivable';
   const showSettlement = receiptKind === 'acquirer_receivable';
 
@@ -289,10 +274,7 @@ export function FormPaymentMethod({ methodToUpdate, onSuccess }: FormPaymentMeth
           if (count === 1) next.intervalDays = '0';
           else if (parseCount(next.intervalDays) === 0) next.intervalDays = '30';
         }
-        if (
-          patch.interestType === 'none' ||
-          patch.interestType === 'issuer'
-        ) {
+        if (patch.interestType === 'none' || patch.interestType === 'issuer') {
           next.interestRateBps = '0';
         }
         return next;
@@ -306,16 +288,14 @@ export function FormPaymentMethod({ methodToUpdate, onSuccess }: FormPaymentMeth
         ? paymentMethodsService.update(methodId, dados)
         : paymentMethodsService.create(dados),
     onSuccess: (saved) => {
-      const created = !methodId;
-      setMethodId(saved.id);
       queryClient.setQueryData(['payment-method', saved.id], saved);
       queryClient.invalidateQueries({ queryKey: ['payment-methods'] });
-      onSuccess?.();
       toast.success(
-        created
-          ? 'Forma de pagamento cadastrada com sucesso!'
-          : 'Forma de pagamento atualizada com sucesso!',
+        methodId
+          ? 'Forma de pagamento atualizada com sucesso!'
+          : 'Forma de pagamento cadastrada com sucesso!',
       );
+      onSuccess?.();
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Falha ao salvar a forma de pagamento.');
@@ -379,71 +359,61 @@ export function FormPaymentMethod({ methodToUpdate, onSuccess }: FormPaymentMeth
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1">
-          <Label htmlFor="paymentMethodCode">Código</Label>
-          <Input
-            id="paymentMethodCode"
-            value={code}
-            maxLength={15}
-            className="uppercase"
-            onChange={(event) => setCode(event.target.value.toUpperCase())}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="paymentMethodSort">Ordem</Label>
-          <Input
-            id="paymentMethodSort"
-            inputMode="numeric"
-            value={sortOrder}
-            onChange={(event) => setSortOrder(event.target.value)}
-          />
-        </div>
+        <FloatingInput
+          label="Código"
+          value={code}
+          maxLength={15}
+          onChange={(event) => setCode(event.target.value.toUpperCase())}
+          required
+          autoFocus
+        />
+        <FloatingInput
+          label="Ordem"
+          inputMode="numeric"
+          value={sortOrder}
+          onChange={(event) => setSortOrder(event.target.value)}
+        />
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="paymentMethodName">Nome</Label>
-        <Input
-          id="paymentMethodName"
+        <FloatingInput
+          label="Nome"
           value={name}
           maxLength={60}
           onChange={(event) => setName(event.target.value)}
           required
         />
         {group === 'other' ? (
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-[#64748b]">
             Este nome vai na NF-e como descrição do pagamento, de 2 a 60 caracteres.
           </p>
         ) : null}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
+        <CatalogSearchSelect
+          label="Meio de pagamento"
+          value={meansOfPaymentId}
+          onChange={(id) => applyMean(id, means)}
+          options={means}
+          placeholder="Buscar meio..."
+          emptyMessage="Nenhum meio selecionável."
+          isLoading={loadingMeans}
+          required
+        />
         <div className="space-y-1">
-          <Label>Meio de pagamento</Label>
-          <CatalogSearchSelect
-            value={meansOfPaymentId}
-            onChange={(id) => applyMean(id, means)}
-            options={means}
-            placeholder="Buscar meio..."
-            emptyMessage="Nenhum meio selecionável."
-            isLoading={loadingMeans}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="paymentReceiptKind">Recebimento</Label>
-          <select
-            id="paymentReceiptKind"
+          <FloatingSelect
+            label="Recebimento"
             value={receiptKind}
+            pinned={Boolean(receiptKind)}
+            required
             onChange={(event) => {
               const next = event.target.value as PaymentReceiptKind | '';
               setReceiptKind(next);
               if (next !== 'acquirer_receivable') setSettlementDays('');
             }}
-            className={selectClassName}
-            required
           >
             <option value="" disabled>
               Selecione o recebimento
@@ -453,11 +423,11 @@ export function FormPaymentMethod({ methodToUpdate, onSuccess }: FormPaymentMeth
                 {paymentReceiptKindLabels[kind]}
               </option>
             ))}
-          </select>
+          </FloatingSelect>
           {receiptKind === 'store_credit' ? (
-            <p className="text-xs text-zinc-500">
-              A forma pode ser salva. Venda e PDV recusam este pagamento até existir o saldo do
-              cliente.
+            <p className="text-xs text-[#64748b]">
+              A forma pode ser salva. Venda e PDV recusam este pagamento até existir o
+              saldo do cliente.
             </p>
           ) : null}
         </div>
@@ -466,86 +436,76 @@ export function FormPaymentMethod({ methodToUpdate, onSuccess }: FormPaymentMeth
       {showIntegration || showBrand || showAcquirer || showBank || showSettlement ? (
         <div className="grid gap-4 sm:grid-cols-2">
           {showIntegration ? (
-            <div className="space-y-1">
-              <Label htmlFor="paymentIntegration">Integração</Label>
-              <select
-                id="paymentIntegration"
-                value={integrationType}
-                onChange={(event) =>
-                  setIntegrationType(event.target.value as PaymentIntegrationType | '')
-                }
-                className={selectClassName}
-                required
-              >
-                <option value="" disabled>
-                  Selecione a integração
+            <FloatingSelect
+              label="Integração"
+              value={integrationType}
+              pinned={Boolean(integrationType)}
+              required
+              onChange={(event) =>
+                setIntegrationType(event.target.value as PaymentIntegrationType | '')
+              }
+            >
+              <option value="" disabled>
+                Selecione a integração
+              </option>
+              {paymentIntegrationTypes.map((item) => (
+                <option key={item} value={item}>
+                  {paymentIntegrationTypeLabels[item]}
                 </option>
-                {paymentIntegrationTypes.map((item) => (
-                  <option key={item} value={item}>
-                    {paymentIntegrationTypeLabels[item]}
-                  </option>
-                ))}
-              </select>
-            </div>
+              ))}
+            </FloatingSelect>
           ) : null}
           {showBrand ? (
-            <div className="space-y-1">
-              <Label>Bandeira</Label>
-              <CatalogSearchSelect
-                value={cardBrandId}
-                onChange={setCardBrandId}
-                options={brands}
-                placeholder="Buscar bandeira..."
-                allowClear={integrationType !== 'not_integrated'}
-                isLoading={loadingBrands}
-                required={integrationType === 'not_integrated'}
-              />
-            </div>
+            <CatalogSearchSelect
+              label="Bandeira"
+              value={cardBrandId}
+              onChange={setCardBrandId}
+              options={brands}
+              placeholder="Buscar bandeira..."
+              allowClear={integrationType !== 'not_integrated'}
+              isLoading={loadingBrands}
+              required={integrationType === 'not_integrated'}
+            />
           ) : null}
           {showAcquirer ? (
-            <div className="space-y-1">
-              <Label>Credenciadora</Label>
-              <PersonSearchSelect
-                value={acquirerId}
-                onChange={setAcquirerId}
-                type="instituicao"
-                placeholder="Buscar instituição financeira..."
-                allowClear={
-                  receiptKind !== 'acquirer_receivable' && integrationType !== 'integrated'
-                }
-                required={
-                  receiptKind === 'acquirer_receivable' || integrationType === 'integrated'
-                }
-              />
-            </div>
+            <PersonSearchSelect
+              label="Credenciadora"
+              value={acquirerId}
+              onChange={setAcquirerId}
+              type="instituicao"
+              placeholder="Buscar instituição financeira..."
+              allowClear={
+                receiptKind !== 'acquirer_receivable' && integrationType !== 'integrated'
+              }
+              required={
+                receiptKind === 'acquirer_receivable' || integrationType === 'integrated'
+              }
+            />
           ) : null}
           {showBank ? (
-            <div className="space-y-1">
-              <Label>Conta bancária</Label>
-              <CatalogSearchSelect
-                value={bankAccountId}
-                onChange={setBankAccountId}
-                options={accounts.map((account) => ({
-                  id: account.id,
-                  label: account.name,
-                }))}
-                placeholder="Buscar conta..."
-                allowClear={receiptKind !== 'bank'}
-                isLoading={loadingAccounts}
-                required={receiptKind === 'bank'}
-              />
-            </div>
+            <CatalogSearchSelect
+              label="Conta bancária"
+              value={bankAccountId}
+              onChange={setBankAccountId}
+              options={accounts.map((account) => ({
+                id: account.id,
+                label: account.name,
+              }))}
+              placeholder="Buscar conta..."
+              allowClear={receiptKind !== 'bank'}
+              isLoading={loadingAccounts}
+              required={receiptKind === 'bank'}
+            />
           ) : null}
           {showSettlement ? (
             <div className="space-y-1">
-              <Label htmlFor="settlementDays">Dias até o crédito</Label>
-              <Input
-                id="settlementDays"
+              <FloatingInput
+                label="Dias até o crédito"
                 inputMode="numeric"
                 value={settlementDays}
                 onChange={(event) => setSettlementDays(event.target.value)}
               />
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-[#64748b]">
                 Obrigatório quando alguma condição usa juros do emissor.
               </p>
             </div>
@@ -553,41 +513,40 @@ export function FormPaymentMethod({ methodToUpdate, onSuccess }: FormPaymentMeth
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         {(
           [
-            ['useInQuote', 'Orçamento', useInQuote, setUseInQuote],
-            ['useInSale', 'Venda', useInSale, setUseInSale],
-            ['useInPos', 'PDV', useInPos, setUseInPos],
-            ['useInServiceOrder', 'Ordem de serviço', useInServiceOrder, setUseInServiceOrder],
+            ['Orçamento', useInQuote, setUseInQuote],
+            ['Venda', useInSale, setUseInSale],
+            ['PDV', useInPos, setUseInPos],
+            ['Ordem de serviço', useInServiceOrder, setUseInServiceOrder],
           ] as const
-        ).map(([id, label, checked, setChecked]) => (
-          <div key={id} className="flex items-center space-x-2">
-            <Checkbox
-              id={id}
-              checked={checked}
-              onCheckedChange={(value) => setChecked(value === true)}
-            />
-            <label htmlFor={id} className="text-sm font-medium">
-              {label}
-            </label>
-          </div>
+        ).map(([label, checked, setChecked]) => (
+          <FloatingSelect
+            key={label}
+            label={label}
+            value={checked ? 'sim' : 'nao'}
+            pinned
+            onChange={(event) => setChecked(event.target.value === 'sim')}
+          >
+            <option value="sim">Sim</option>
+            <option value="nao">Não</option>
+          </FloatingSelect>
         ))}
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="paymentMethodActive"
-            checked={isActive}
-            onCheckedChange={(value) => setIsActive(value === true)}
-          />
-          <label htmlFor="paymentMethodActive" className="text-sm font-medium">
-            Ativa
-          </label>
-        </div>
+        <FloatingSelect
+          label="Situação"
+          value={isActive ? 'ativo' : 'inativo'}
+          pinned
+          onChange={(event) => setIsActive(event.target.value === 'ativo')}
+        >
+          <option value="ativo">Ativo</option>
+          <option value="inativo">Inativo</option>
+        </FloatingSelect>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <Label>Condições</Label>
+          <p className="text-sm font-medium text-[#172337]">Condições</p>
           <Button
             type="button"
             variant="outline"
@@ -597,109 +556,90 @@ export function FormPaymentMethod({ methodToUpdate, onSuccess }: FormPaymentMeth
             <Plus className="h-4 w-4" /> Condição
           </Button>
         </div>
-        <p className="text-xs text-zinc-500">
-          100 basis points = 1,00%. A taxa administrativa é custo da loja e não entra no total do
-          cliente.
+        <p className="text-xs text-[#64748b]">
+          100 basis points = 1,00%. A taxa administrativa é custo da loja e não entra no
+          total do cliente.
         </p>
         <div className="space-y-3">
           {terms.map((term) => {
             const count = parseCount(term.installmentCount);
-            const rateLocked = term.interestType === 'none' || term.interestType === 'issuer';
+            const rateLocked =
+              term.interestType === 'none' || term.interestType === 'issuer';
             return (
               <div
                 key={term.key}
-                className="grid gap-2 rounded-md border border-zinc-200 p-3 md:grid-cols-4"
+                className="grid gap-3 rounded-md border border-zinc-200 p-3 md:grid-cols-4"
               >
-                <div className="space-y-1">
-                  <Label htmlFor={`${term.key}-count`}>Parcelas</Label>
-                  <Input
-                    id={`${term.key}-count`}
-                    inputMode="numeric"
-                    value={term.installmentCount}
-                    onChange={(event) =>
-                      updateTerm(term.key, { installmentCount: event.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor={`${term.key}-first`}>1ª em dias</Label>
-                  <Input
-                    id={`${term.key}-first`}
-                    inputMode="numeric"
-                    value={term.firstDueDays}
-                    onChange={(event) =>
-                      updateTerm(term.key, { firstDueDays: event.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor={`${term.key}-interval`}>Intervalo</Label>
-                  <Input
-                    id={`${term.key}-interval`}
-                    inputMode="numeric"
-                    value={term.intervalDays}
-                    disabled={count === 1}
-                    onChange={(event) =>
-                      updateTerm(term.key, { intervalDays: event.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor={`${term.key}-interest`}>Juros</Label>
-                  <select
-                    id={`${term.key}-interest`}
-                    value={term.interestType}
-                    onChange={(event) =>
-                      updateTerm(term.key, {
-                        interestType: event.target.value as PaymentInterestType,
-                      })
-                    }
-                    className={selectClassName}
-                  >
-                    {paymentInterestTypes.map((item) => (
-                      <option key={item} value={item}>
-                        {paymentInterestTypeLabels[item]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor={`${term.key}-rate`}>Juros (bps)</Label>
-                  <Input
-                    id={`${term.key}-rate`}
-                    inputMode="numeric"
-                    value={term.interestRateBps}
-                    disabled={rateLocked}
-                    onChange={(event) =>
-                      updateTerm(term.key, { interestRateBps: event.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor={`${term.key}-mdr`}>Taxa adm. (bps)</Label>
-                  <Input
-                    id={`${term.key}-mdr`}
-                    inputMode="numeric"
-                    value={term.administrativeFeeBps}
-                    onChange={(event) =>
-                      updateTerm(term.key, { administrativeFeeBps: event.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor={`${term.key}-fee`}>Taxa fixa</Label>
-                  <Input
-                    id={`${term.key}-fee`}
-                    inputMode="decimal"
-                    value={term.fixedFeeAmount}
-                    onChange={(event) =>
-                      updateTerm(term.key, {
-                        fixedFeeAmount: maskCurrencyInput(event.target.value),
-                      })
-                    }
-                  />
-                </div>
-                <div className="flex items-end">
+                <FloatingInput
+                  label="Parcelas"
+                  inputMode="numeric"
+                  value={term.installmentCount}
+                  onChange={(event) =>
+                    updateTerm(term.key, { installmentCount: event.target.value })
+                  }
+                />
+                <FloatingInput
+                  label="1ª em dias"
+                  inputMode="numeric"
+                  value={term.firstDueDays}
+                  onChange={(event) =>
+                    updateTerm(term.key, { firstDueDays: event.target.value })
+                  }
+                />
+                <FloatingInput
+                  label="Intervalo"
+                  inputMode="numeric"
+                  value={term.intervalDays}
+                  disabled={count === 1}
+                  onChange={(event) =>
+                    updateTerm(term.key, { intervalDays: event.target.value })
+                  }
+                />
+                <FloatingSelect
+                  label="Juros"
+                  value={term.interestType}
+                  pinned
+                  onChange={(event) =>
+                    updateTerm(term.key, {
+                      interestType: event.target.value as PaymentInterestType,
+                    })
+                  }
+                >
+                  {paymentInterestTypes.map((item) => (
+                    <option key={item} value={item}>
+                      {paymentInterestTypeLabels[item]}
+                    </option>
+                  ))}
+                </FloatingSelect>
+                <FloatingInput
+                  label="Juros (bps)"
+                  inputMode="numeric"
+                  value={term.interestRateBps}
+                  disabled={rateLocked}
+                  onChange={(event) =>
+                    updateTerm(term.key, { interestRateBps: event.target.value })
+                  }
+                />
+                <FloatingInput
+                  label="Taxa adm. (bps)"
+                  inputMode="numeric"
+                  value={term.administrativeFeeBps}
+                  onChange={(event) =>
+                    updateTerm(term.key, { administrativeFeeBps: event.target.value })
+                  }
+                />
+                <FloatingInput
+                  label="Taxa fixa"
+                  inputMode="decimal"
+                  value={term.fixedFeeAmount}
+                  pinned={Boolean(term.fixedFeeAmount)}
+                  onChange={(event) =>
+                    updateTerm(term.key, {
+                      fixedFeeAmount: maskCurrencyInput(event.target.value),
+                    })
+                  }
+                />
+                <div className="flex items-center">
                   <Button
                     type="button"
                     variant="ghost"
@@ -707,7 +647,9 @@ export function FormPaymentMethod({ methodToUpdate, onSuccess }: FormPaymentMeth
                     aria-label="Remover condição"
                     disabled={terms.length === 1}
                     onClick={() =>
-                      setTerms((current) => current.filter((item) => item.key !== term.key))
+                      setTerms((current) =>
+                        current.filter((item) => item.key !== term.key),
+                      )
                     }
                   >
                     <Trash2 className="h-4 w-4" />
@@ -719,9 +661,19 @@ export function FormPaymentMethod({ methodToUpdate, onSuccess }: FormPaymentMeth
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        {onCancel ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={mutation.isPending}
+          >
+            Cancelar
+          </Button>
+        ) : null}
         <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Salvando...' : 'Salvar'}
+          {mutation.isPending ? 'Salvando...' : methodId ? 'Atualizar' : 'Cadastrar'}
         </Button>
       </div>
     </form>

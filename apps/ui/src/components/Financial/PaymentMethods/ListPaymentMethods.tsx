@@ -1,51 +1,24 @@
-import { paymentReceiptKindLabels } from '@erp-360/shared';
 import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Search,
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
+  type ListPageSize,
+  listPageSizes,
+  paymentReceiptKindLabels,
+} from '@erp-360/shared';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus } from 'lucide-react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ListPagination } from '@/components/ui/ListPagination';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  ListFilter,
+  ListMessage,
+  ListPageHeader,
+  ListPanel,
+  ListSearch,
+} from '@/components/ui/ListShell';
+import { StatusListHeader, StatusListRow } from '@/components/ui/StatusList';
+import { type StatusTone } from '@/components/ui/statusTone';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { financialService } from '@/services/financials';
 import {
   type PaymentMethod,
@@ -54,17 +27,71 @@ import {
   paymentMethodsService,
 } from '@/services/paymentMethods';
 
-import { FormPaymentMethod } from './FormPaymentMethod';
+const columns =
+  'grid grid-cols-[72px_110px_minmax(160px,1.3fr)_minmax(140px,1fr)_minmax(150px,1fr)_120px_minmax(150px,1.1fr)]';
 
-const selectClassName =
-  'flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
+const channels = ['quote', 'sale', 'pos', 'serviceOrder'] as const;
 
 const channelLabels: Record<PaymentMethodChannel, string> = {
   quote: 'Orçamento',
   sale: 'Venda',
   pos: 'PDV',
-  serviceOrder: 'OS',
+  serviceOrder: 'Ordem de serviço',
 };
+
+const activeTone: StatusTone = {
+  background: '#EFF6FF',
+  hover: '#DBEAFE',
+  border: '#2563EB',
+  text: '#1D4ED8',
+};
+
+const inactiveTone: StatusTone = {
+  background: '#F8FAFC',
+  hover: '#F1F5F9',
+  border: '#64748B',
+  text: '#475569',
+};
+
+function readPage(params: URLSearchParams) {
+  const page = Number(params.get('page') ?? '1');
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function readLimit(params: URLSearchParams): ListPageSize {
+  const value = Number(params.get('limit'));
+  if ((listPageSizes as readonly number[]).includes(value)) return value as ListPageSize;
+  return 10;
+}
+
+function readSort(params: URLSearchParams): PaymentMethodSortField {
+  const value = params.get('sortField');
+  if (value === 'code' || value === 'name') return value;
+  return 'sortOrder';
+}
+
+function readOrder(params: URLSearchParams): 'asc' | 'desc' {
+  return params.get('sortOrder') === 'desc' ? 'desc' : 'asc';
+}
+
+function readSituation(params: URLSearchParams): 'all' | 'ativa' | 'inativa' {
+  const value = params.get('situacao');
+  if (value === 'ativa' || value === 'inativa') return value;
+  return 'all';
+}
+
+function readChannel(params: URLSearchParams): PaymentMethodChannel | 'all' {
+  const value = params.get('canal');
+  if (
+    value === 'quote' ||
+    value === 'sale' ||
+    value === 'pos' ||
+    value === 'serviceOrder'
+  ) {
+    return value;
+  }
+  return 'all';
+}
 
 function channelsOf(method: PaymentMethod) {
   const labels = [
@@ -81,319 +108,256 @@ function termsOf(method: PaymentMethod) {
 }
 
 export function ListPaymentMethods() {
-  const queryClient = useQueryClient();
-  const [openDialog, setOpenDialog] = useState(false);
-  const [openAlert, setOpenAlert] = useState(false);
-  const [selected, setSelected] = useState<PaymentMethod | null>(null);
-  const [searchText, setSearchText] = useState('');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState<PaymentMethodSortField>('sortOrder');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [activeFilter, setActiveFilter] = useState<'' | 'true' | 'false'>('');
-  const [channel, setChannel] = useState<'' | PaymentMethodChannel>('');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  const page = readPage(params);
+  const limit = readLimit(params);
+  const sortField = readSort(params);
+  const sortOrder = readOrder(params);
+  const situation = readSituation(params);
+  const channel = readChannel(params);
+  const search = params.get('busca') ?? '';
+  const from = `/payment-methods${location.search}`;
+  const { text: searchText, setText: setSearchText } = useDebouncedSearch(
+    (next) => {
+      setParams(
+        (current) => {
+          const updated = new URLSearchParams(current);
+          if ((updated.get('busca') ?? '') === next) return current;
+          if (next) updated.set('busca', next);
+          else updated.delete('busca');
+          updated.delete('page');
+          return updated;
+        },
+        { replace: true },
+      );
+    },
+    400,
+    search,
+  );
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearch((current) => {
-        const next = searchText.trim();
-        if (current !== next) setPage(1);
-        return next;
-      });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchText]);
-
-  const { data: response, isLoading, isError, error } = useQuery({
-    queryKey: ['payment-methods', { page, search, sortField, sortOrder, activeFilter, channel }],
+  const list = useQuery({
+    queryKey: [
+      'payment-methods',
+      { page, limit, search, sortField, sortOrder, situation, channel },
+    ],
     placeholderData: keepPreviousData,
     queryFn: () =>
       paymentMethodsService.list({
         page,
-        limit: 10,
+        limit,
         sortField,
         sortOrder,
         search: search || undefined,
-        isActive: activeFilter === '' ? undefined : activeFilter === 'true',
-        channel: channel || undefined,
+        isActive: situation === 'all' ? undefined : situation === 'ativa',
+        channel: channel === 'all' ? undefined : channel,
       }),
   });
 
-  const { data: means = [] } = useQuery({
+  const means = useQuery({
     queryKey: ['financial', 'means-of-payment'],
     queryFn: () => financialService.listMeansOfPayment(),
   });
 
-  const changeSort = (field: PaymentMethodSortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-    setPage(1);
+  const replaceParams = (change: (next: URLSearchParams) => void) => {
+    const next = new URLSearchParams(params);
+    change(next);
+    next.delete('page');
+    setParams(next, { replace: true });
   };
 
-  const renderSortIcon = (field: PaymentMethodSortField) => {
-    if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4 shrink-0" />;
+  const changeSort = (field: PaymentMethodSortField) => {
+    const order = sortField === field && sortOrder === 'asc' ? 'desc' : 'asc';
+    replaceParams((next) => {
+      if (field === 'sortOrder') next.delete('sortField');
+      else next.set('sortField', field);
+      if (order === 'asc') next.delete('sortOrder');
+      else next.set('sortOrder', order);
+    });
+  };
+
+  const setPage = (nextPage: number) => {
+    const next = new URLSearchParams(params);
+    if (nextPage <= 1) next.delete('page');
+    else next.set('page', String(nextPage));
+    setParams(next, { replace: true });
+  };
+
+  const setLimit = (nextLimit: ListPageSize) => {
+    const next = new URLSearchParams(params);
+    if (nextLimit === 10) next.delete('limit');
+    else next.set('limit', String(nextLimit));
+    next.delete('page');
+    setParams(next, { replace: true });
+  };
+
+  const sortIcon = (field: PaymentMethodSortField) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3.5 w-3.5" />;
     return sortOrder === 'asc' ? (
-      <ArrowUp className="ml-2 h-4 w-4 shrink-0 text-primary" />
+      <ArrowUp className="h-3.5 w-3.5" />
     ) : (
-      <ArrowDown className="ml-2 h-4 w-4 shrink-0 text-primary" />
+      <ArrowDown className="h-3.5 w-3.5" />
     );
   };
 
-  const activeMutation = useMutation({
-    mutationFn: (method: PaymentMethod) =>
-      paymentMethodsService.setActive(method.id, !method.isActive),
-    onSuccess: (saved) => {
-      queryClient.invalidateQueries({ queryKey: ['payment-methods'] });
-      queryClient.invalidateQueries({ queryKey: ['payment-method', saved.id] });
-      setOpenAlert(false);
-      toast.success(saved.isActive ? 'Forma ativada.' : 'Forma desativada.');
-    },
-    onError: (failure: Error) => {
-      toast.error(failure.message);
-      setOpenAlert(false);
-    },
-  });
-
-  const meta = response?.meta;
-  const methods = response?.data;
-  const meanLabel = (id: string) => means.find((item) => item.id === id)?.label ?? '—';
-
-  if (isLoading && !response) return <p>Carregando registros...</p>;
-  if (isError && !response) {
-    return <p>{error instanceof Error ? error.message : 'Falha ao carregar as formas.'}</p>;
-  }
+  const rows = list.data?.data ?? [];
+  const meta = list.data?.meta;
+  const meanLabel = (id: string) =>
+    means.data?.find((item) => item.id === id)?.label ?? '—';
+  const filtered = Boolean(search) || situation !== 'all' || channel !== 'all';
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 bg-white p-4 rounded-lg border border-zinc-200 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex w-full flex-col gap-3 sm:flex-row">
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
-            <Input
-              placeholder="Buscar por código ou nome..."
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <select
-            aria-label="Situação"
-            value={activeFilter}
-            onChange={(event) => {
-              setActiveFilter(event.target.value as '' | 'true' | 'false');
-              setPage(1);
-            }}
-            className={selectClassName}
-          >
-            <option value="">Todas</option>
-            <option value="true">Ativas</option>
-            <option value="false">Inativas</option>
-          </select>
-          <select
-            aria-label="Canal"
-            value={channel}
-            onChange={(event) => {
-              setChannel(event.target.value as '' | PaymentMethodChannel);
-              setPage(1);
-            }}
-            className={selectClassName}
-          >
-            <option value="">Todos os canais</option>
-            <option value="quote">Orçamento</option>
-            <option value="sale">Venda</option>
-            <option value="pos">PDV</option>
-            <option value="serviceOrder">Ordem de serviço</option>
-          </select>
-        </div>
-        <Button
-          onClick={() => {
-            setSelected(null);
-            setOpenDialog(true);
-          }}
-        >
-          <Plus className="h-4 w-4" /> Nova forma
-        </Button>
-      </div>
-
-      <div className="rounded-md border border-zinc-200 bg-white shadow-2xs">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead
-                onClick={() => changeSort('sortOrder')}
-                className="cursor-pointer select-none hover:bg-zinc-50"
-              >
-                <div className="flex items-center">Ordem {renderSortIcon('sortOrder')}</div>
-              </TableHead>
-              <TableHead
-                onClick={() => changeSort('code')}
-                className="cursor-pointer select-none hover:bg-zinc-50"
-              >
-                <div className="flex items-center">Código {renderSortIcon('code')}</div>
-              </TableHead>
-              <TableHead
-                onClick={() => changeSort('name')}
-                className="cursor-pointer select-none hover:bg-zinc-50"
-              >
-                <div className="flex items-center">Nome {renderSortIcon('name')}</div>
-              </TableHead>
-              <TableHead>Meio</TableHead>
-              <TableHead>Recebimento</TableHead>
-              <TableHead>Condições</TableHead>
-              <TableHead>Uso</TableHead>
-              <TableHead>Situação</TableHead>
-              <TableHead className="w-12" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={9} className="py-4 text-center">
-                  Carregando dados...
-                </TableCell>
-              </TableRow>
-            ) : methods?.length ? (
-              methods.map((method) => (
-                <TableRow key={method.id}>
-                  <TableCell>{method.sortOrder}</TableCell>
-                  <TableCell className="font-medium">{method.code}</TableCell>
-                  <TableCell>{method.name}</TableCell>
-                  <TableCell className="max-w-48 truncate" title={meanLabel(method.meansOfPaymentId)}>
-                    {meanLabel(method.meansOfPaymentId)}
-                  </TableCell>
-                  <TableCell>{paymentReceiptKindLabels[method.receiptKind]}</TableCell>
-                  <TableCell>{termsOf(method)}</TableCell>
-                  <TableCell>{channelsOf(method)}</TableCell>
-                  <TableCell>{method.isActive ? 'Ativa' : 'Inativa'}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Ações de ${method.name}`}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelected(method);
-                            setOpenDialog(true);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" /> Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelected(method);
-                            setOpenAlert(true);
-                          }}
-                        >
-                          {method.isActive ? 'Desativar' : 'Ativar'}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={9} className="py-4 text-center text-zinc-500">
-                  Nenhuma forma de pagamento encontrada.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {meta && meta.totalPages > 1 && (
-        <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3">
-          <div className="text-sm text-zinc-500">
-            Mostrando página <strong className="text-zinc-900">{meta.page}</strong> de{' '}
-            <strong className="text-zinc-900">{meta.totalPages}</strong> ({meta.total} registros
-            no total)
-          </div>
-          <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((old) => Math.max(old - 1, 1))}
-              disabled={page === 1}
-              className="gap-1"
-            >
-              <ChevronLeft className="h-4 w-4" /> Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((old) => (page < meta.totalPages ? old + 1 : old))}
-              disabled={page === meta.totalPages}
-              className="gap-1"
-            >
-              Próximo <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <Dialog
-        open={openDialog}
-        onOpenChange={(open) => {
-          setOpenDialog(open);
-          if (!open) setSelected(null);
-        }}
+      <ListPageHeader
+        title="Formas de pagamento"
+        description="Código, meio e condições. A cor da linha indica a situação."
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>
-              {selected ? 'Editar forma de pagamento' : 'Nova forma de pagamento'}
-            </DialogTitle>
-          </DialogHeader>
-          <FormPaymentMethod
-            key={selected?.id ?? 'new'}
-            methodToUpdate={selected}
-            onSuccess={() => setOpenDialog(false)}
-          />
-        </DialogContent>
-      </Dialog>
+        <Button asChild>
+          <Link to="/payment-methods/new" state={{ from }}>
+            <Plus className="h-4 w-4" />
+            Nova forma
+          </Link>
+        </Button>
+      </ListPageHeader>
 
-      <AlertDialog open={openAlert} onOpenChange={setOpenAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {selected?.isActive ? 'Desativar forma' : 'Ativar forma'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {selected?.isActive
-                ? `${selected.name} deixa de aparecer nos canais de uso.`
-                : `${selected?.name ?? 'Esta forma'} volta a passar pelas regras do meio antes de ficar ativa.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={activeMutation.isPending || !selected}
-              onClick={(event) => {
-                event.preventDefault();
-                if (selected) activeMutation.mutate(selected);
-              }}
-            >
-              {activeMutation.isPending
-                ? 'Salvando...'
-                : selected?.isActive
-                  ? 'Desativar'
-                  : 'Ativar'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ListPanel
+        title="Formas"
+        description="Clique na linha para abrir."
+        toolbar={
+          <>
+            <ListSearch
+              value={searchText}
+              onChange={setSearchText}
+              placeholder="Buscar por código ou nome..."
+              label="Pesquisar formas de pagamento"
+            />
+            <ListFilter
+              value={situation}
+              onValueChange={(value) =>
+                replaceParams((next) => {
+                  if (value === 'all') next.delete('situacao');
+                  else next.set('situacao', value);
+                })
+              }
+              label="Filtrar por situação"
+              allLabel="Todas as situações"
+              options={[
+                { value: 'ativa', label: 'Ativas' },
+                { value: 'inativa', label: 'Inativas' },
+              ]}
+            />
+            <ListFilter
+              value={channel}
+              onValueChange={(value) =>
+                replaceParams((next) => {
+                  if (value === 'all') next.delete('canal');
+                  else next.set('canal', value);
+                })
+              }
+              label="Filtrar por canal"
+              allLabel="Todos os canais"
+              options={channels.map((value) => ({
+                value,
+                label: channelLabels[value],
+              }))}
+            />
+          </>
+        }
+      >
+        <div className="overflow-x-auto">
+          <div className="min-w-[980px]">
+            <StatusListHeader columns={columns}>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-left"
+                onClick={() => changeSort('sortOrder')}
+              >
+                Ordem
+                {sortIcon('sortOrder')}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-left"
+                onClick={() => changeSort('code')}
+              >
+                Código
+                {sortIcon('code')}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-left"
+                onClick={() => changeSort('name')}
+              >
+                Nome
+                {sortIcon('name')}
+              </button>
+              <span>Meio</span>
+              <span>Recebimento</span>
+              <span>Condições</span>
+              <span>Uso</span>
+            </StatusListHeader>
+
+            {list.isLoading ? (
+              <ListMessage>Carregando as formas de pagamento...</ListMessage>
+            ) : list.isError ? (
+              <ListMessage tone="error">
+                Não foi possível carregar as formas de pagamento.
+              </ListMessage>
+            ) : rows.length === 0 ? (
+              <ListMessage>
+                {filtered
+                  ? 'Nenhuma forma de pagamento encontrada.'
+                  : 'Ainda não há forma de pagamento.'}
+              </ListMessage>
+            ) : (
+              rows.map((method) => (
+                <StatusListRow
+                  key={method.id}
+                  columns={columns}
+                  tone={method.isActive ? activeTone : inactiveTone}
+                  label={`${method.code}, ${method.name}, ${method.isActive ? 'ativa' : 'inativa'}`}
+                  onOpen={() =>
+                    navigate(`/payment-methods/${method.id}`, { state: { from } })
+                  }
+                >
+                  <span className="min-w-0 truncate text-[var(--status-text)]">
+                    {method.sortOrder}
+                  </span>
+                  <span className="min-w-0 truncate font-bold text-[var(--status-text)]">
+                    {method.code}
+                  </span>
+                  <span className="min-w-0 truncate text-[var(--status-text)]">
+                    {method.name}
+                  </span>
+                  <span className="min-w-0 truncate text-[var(--status-text)]">
+                    {meanLabel(method.meansOfPaymentId)}
+                  </span>
+                  <span className="min-w-0 truncate text-[var(--status-text)]">
+                    {paymentReceiptKindLabels[method.receiptKind]}
+                  </span>
+                  <span className="min-w-0 truncate text-[var(--status-text)]">
+                    {termsOf(method) || '—'}
+                  </span>
+                  <span className="min-w-0 truncate text-[var(--status-text)]">
+                    {channelsOf(method) || '—'}
+                  </span>
+                </StatusListRow>
+              ))
+            )}
+          </div>
+        </div>
+        {meta ? (
+          <ListPagination
+            page={page}
+            limit={limit}
+            total={meta.total}
+            totalPages={meta.totalPages}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+          />
+        ) : null}
+      </ListPanel>
     </div>
   );
 }

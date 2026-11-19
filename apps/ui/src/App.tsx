@@ -35,6 +35,7 @@ import { PayableList } from './components/Financial/Payables/PayableList';
 import { PayablePage } from './components/Financial/Payables/PayablePage';
 import { ReplicatePayablePage } from './components/Financial/Payables/ReplicatePayablePage';
 import { ListPaymentMethods } from './components/Financial/PaymentMethods/ListPaymentMethods';
+import { PaymentMethodPage } from './components/Financial/PaymentMethods/PaymentMethodPage';
 import { ListPlanAccounts } from './components/Financial/PlanAccounts/ListPlanAccounts';
 import { PlanAccountPage } from './components/Financial/PlanAccounts/PlanAccountPage';
 import { ReceivableList } from './components/Financial/Receivables/ReceivableList';
@@ -372,6 +373,22 @@ function App() {
               element={
                 <Pagina>
                   <ListPaymentMethods />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/payment-methods/new"
+              element={
+                <Pagina>
+                  <PaymentMethodPage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/payment-methods/:id"
+              element={
+                <Pagina>
+                  <PaymentMethodPage />
                 </Pagina>
               }
             />
