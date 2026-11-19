@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 
-export function useDebouncedSearch(onCommit: (value: string) => void, delay = 400) {
-  const [text, setText] = useState('');
+export function useDebouncedSearch(
+  onCommit: (value: string) => void,
+  delay = 400,
+  initial = '',
+) {
+  const [text, setText] = useState(initial);
   const onCommitRef = useRef(onCommit);
-  const committed = useRef('');
+  const committed = useRef(initial.trim());
 
   useEffect(() => {
     onCommitRef.current = onCommit;

@@ -15,16 +15,16 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+  FloatingInput,
+  FloatingSelect,
+  FloatingTextarea,
+} from '@/components/ui/FloatingField';
 import {
   categoriesService,
   type Category,
   type CategoryInput,
 } from '@/services/categories';
-
-const selectClassName =
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
 
 interface FormCategoryProps {
   categoryToUpdate?: Category | null;
@@ -47,6 +47,7 @@ export function FormCategory({
   const [isActive, setIsActive] = useState(categoryToUpdate?.isActive !== false);
   const [openDelete, setOpenDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState('');
 
   const { data: loaded } = useQuery({
     queryKey: ['category', categoryId],
@@ -108,6 +109,12 @@ export function FormCategory({
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
+    if (!name.trim()) {
+      setNameError('Informe o nome.');
+      toast.error('Informe o nome.');
+      return;
+    }
+    setNameError('');
     mutation.mutate({
       name,
       description,
@@ -117,46 +124,42 @@ export function FormCategory({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-      <div className="space-y-1">
-        <Label htmlFor="categoryName">Nome</Label>
-        <Input
-          id="categoryName"
-          value={name}
-          maxLength={80}
-          onChange={(event) => setName(event.target.value)}
-          required
-        />
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <FloatingInput
+        id="categoryName"
+        label="Nome"
+        value={name}
+        maxLength={80}
+        required
+        error={nameError}
+        onChange={(event) => {
+          setName(event.target.value);
+          if (nameError) setNameError('');
+        }}
+      />
 
-      <div className="space-y-1">
-        <Label htmlFor="categoryParent">Categoria pai</Label>
-        <select
-          id="categoryParent"
-          value={parentId}
-          onChange={(event) => setParentId(event.target.value)}
-          className={selectClassName}
-        >
-          <option value="">Nenhuma (raiz)</option>
-          {parents.map((parent) => (
-            <option key={parent.id} value={parent.id}>
-              {parent.path}
-            </option>
-          ))}
-        </select>
-      </div>
+      <FloatingSelect
+        id="categoryParent"
+        label="Categoria pai"
+        pinned
+        value={parentId}
+        onChange={(event) => setParentId(event.target.value)}
+      >
+        <option value="">Nenhuma (raiz)</option>
+        {parents.map((parent) => (
+          <option key={parent.id} value={parent.id}>
+            {parent.path}
+          </option>
+        ))}
+      </FloatingSelect>
 
-      <div className="space-y-1">
-        <Label htmlFor="categoryDescription">Descrição</Label>
-        <textarea
-          id="categoryDescription"
-          value={description}
-          maxLength={2000}
-          rows={3}
-          onChange={(event) => setDescription(event.target.value)}
-          className="flex min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        />
-      </div>
+      <FloatingTextarea
+        id="categoryDescription"
+        label="Descrição"
+        value={description}
+        maxLength={2000}
+        onChange={(event) => setDescription(event.target.value)}
+      />
 
       <div className="flex items-center space-x-2">
         <Checkbox

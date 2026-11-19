@@ -1,10 +1,5 @@
 import { ChevronDown } from 'lucide-react';
-import {
-  type ComponentProps,
-  type ReactNode,
-  useId,
-  useState,
-} from 'react';
+import { type ComponentProps, type ReactNode, useId, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -17,11 +12,7 @@ type FieldChrome = {
   className?: string;
   filled: boolean;
   multiline?: boolean;
-  control: (field: {
-    id: string;
-    describedBy?: string;
-    floated: boolean;
-  }) => ReactNode;
+  control: (field: { id: string; describedBy?: string; floated: boolean }) => ReactNode;
 };
 
 function FieldChrome({
@@ -101,7 +92,9 @@ const controlClass =
   'w-full bg-transparent text-sm text-zinc-900 outline-none disabled:cursor-not-allowed disabled:text-zinc-800';
 
 function keepsLabelUp(type: string | undefined) {
-  return type === 'date' || type === 'datetime-local' || type === 'time' || type === 'month';
+  return (
+    type === 'date' || type === 'datetime-local' || type === 'time' || type === 'month'
+  );
 }
 
 type FloatingInputProps = Omit<ComponentProps<'input'>, 'id' | 'className' | 'size'> & {
@@ -201,6 +194,7 @@ type FloatingSelectProps = Omit<ComponentProps<'select'>, 'id' | 'className'> & 
   required?: boolean;
   error?: string;
   className?: string;
+  pinned?: boolean;
 };
 
 export function FloatingSelect({
@@ -211,10 +205,11 @@ export function FloatingSelect({
   disabled,
   className,
   value,
+  pinned = false,
   children,
   ...props
 }: FloatingSelectProps) {
-  const filled = value != null && String(value) !== '';
+  const filled = pinned || (value != null && String(value) !== '');
   return (
     <FieldChrome
       id={id}

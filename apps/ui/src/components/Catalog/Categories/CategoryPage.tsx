@@ -46,19 +46,19 @@ export function CategoryPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-bold text-zinc-900">
+        <h2 className="text-2xl font-bold text-[#172337]">
           {id ? 'Editar categoria' : 'Nova categoria'}
         </h2>
         {category.data ? (
-          <p className="text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-[#64748b]">
             {category.data.name}
             {category.data.parentName ? ` · ${category.data.parentName}` : ''}
           </p>
         ) : (
-          <p className="text-sm text-zinc-500">Nome, categoria pai e descrição.</p>
+          <p className="mt-1 text-sm text-[#64748b]">Nome, categoria pai e descrição.</p>
         )}
       </div>
-      <div className="rounded-lg border border-zinc-200 bg-white p-4 md:p-6">
+      <div className="rounded-lg border bg-white p-6">
         <FormCategory
           key={id ?? 'new'}
           categoryToUpdate={category.data ?? null}
