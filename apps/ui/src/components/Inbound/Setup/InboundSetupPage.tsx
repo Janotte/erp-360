@@ -1,371 +1,350 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  ListMessage,
+  ListPageHeader,
+  ListPanel,
+  ListSearch,
+} from '@/components/ui/ListShell';
+import { StatusListHeader, StatusListRow } from '@/components/ui/StatusList';
+import { type StatusTone } from '@/components/ui/statusTone';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import {
   type CfopEntryRule,
+  type CfopScope,
   inboundSetupService,
   type OperationNature,
 } from '@/services/inboundSetup';
 
-import { FormCfopRule } from './FormCfopRule';
-import { FormNature } from './FormNature';
 import { cfopScopeLabels, fiscalPurposeLabels } from './labels';
+
+const natureColumns = 'grid grid-cols-[110px_minmax(180px,1.6fr)_160px_110px_110px]';
+const ruleColumns = 'grid grid-cols-[140px_160px_minmax(160px,1fr)_150px]';
+
+const activeTone: StatusTone = {
+  background: '#EFF6FF',
+  hover: '#DBEAFE',
+  border: '#2563EB',
+  text: '#1D4ED8',
+};
+
+const inactiveTone: StatusTone = {
+  background: '#F8FAFC',
+  hover: '#F1F5F9',
+  border: '#64748B',
+  text: '#475569',
+};
+
+const scopeTones: Record<CfopScope, StatusTone> = {
+  internal: activeTone,
+  interstate: {
+    background: '#FFF7ED',
+    hover: '#FFEDD5',
+    border: '#EA580C',
+    text: '#C2410C',
+  },
+  import: {
+    background: '#F5F3FF',
+    hover: '#EDE9FE',
+    border: '#7C3AED',
+    text: '#6D28D9',
+  },
+};
 
 function yesNo(value: boolean) {
   return value ? 'Sim' : 'Não';
 }
 
 export function InboundSetupPage() {
-  const queryClient = useQueryClient();
-  const [natureSearch, setNatureSearch] = useState('');
-  const [ruleSearch, setRuleSearch] = useState('');
-  const [natureDialog, setNatureDialog] = useState(false);
-  const [ruleDialog, setRuleDialog] = useState(false);
-  const [selectedNature, setSelectedNature] = useState<OperationNature | null>(null);
-  const [selectedRule, setSelectedRule] = useState<CfopEntryRule | null>(null);
-  const [deleteNature, setDeleteNature] = useState<OperationNature | null>(null);
-  const [deleteRule, setDeleteRule] = useState<CfopEntryRule | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('aba') === 'cfop' ? 'cfop' : 'natures';
+  const natureSearch = params.get('busca') ?? '';
+  const ruleSearch = params.get('regra') ?? '';
+  const from = `/inbound/setup${location.search}`;
+
+  const { text: natureText, setText: setNatureText } = useDebouncedSearch(
+    (next) => {
+      setParams(
+        (current) => {
+          const updated = new URLSearchParams(current);
+          if ((updated.get('busca') ?? '') === next) return current;
+          if (next) updated.set('busca', next);
+          else updated.delete('busca');
+          return updated;
+        },
+        { replace: true },
+      );
+    },
+    400,
+    natureSearch,
+  );
+  const { text: ruleText, setText: setRuleText } = useDebouncedSearch(
+    (next) => {
+      setParams(
+        (current) => {
+          const updated = new URLSearchParams(current);
+          if ((updated.get('regra') ?? '') === next) return current;
+          if (next) updated.set('regra', next);
+          else updated.delete('regra');
+          return updated;
+        },
+        { replace: true },
+      );
+    },
+    400,
+    ruleSearch,
+  );
 
   const natures = useQuery({
     queryKey: ['operation-natures'],
     queryFn: inboundSetupService.listNatures,
+    placeholderData: keepPreviousData,
   });
   const rules = useQuery({
     queryKey: ['cfop-rules'],
     queryFn: inboundSetupService.listCfopRules,
+    placeholderData: keepPreviousData,
   });
 
-  const removeNature = useMutation({
-    mutationFn: inboundSetupService.deleteNature,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['operation-natures'] });
-      queryClient.invalidateQueries({ queryKey: ['inbound', 'natures'] });
-      setDeleteNature(null);
-      toast.success('Natureza excluída.');
-    },
-    onError: (error: Error) => toast.error(error.message),
-  });
-  const removeRule = useMutation({
-    mutationFn: inboundSetupService.deleteCfopRule,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cfop-rules'] });
-      setDeleteRule(null);
-      toast.success('Regra excluída.');
-    },
-    onError: (error: Error) => toast.error(error.message),
-  });
+  const setTab = (value: string) => {
+    const next = new URLSearchParams(params);
+    if (value === 'cfop') next.set('aba', 'cfop');
+    else next.delete('aba');
+    setParams(next, { replace: true });
+  };
 
-  const natureRows = useMemo(() => {
-    const term = natureSearch.trim().toLowerCase();
-    return (natures.data ?? []).filter((nature) => {
-      if (!term) return true;
-      return (
-        nature.code.toLowerCase().includes(term) ||
-        nature.name.toLowerCase().includes(term) ||
-        fiscalPurposeLabels[nature.fiscalPurpose].toLowerCase().includes(term)
-      );
-    });
-  }, [natures.data, natureSearch]);
-
-  const ruleRows = useMemo(() => {
-    const term = ruleSearch.trim().toLowerCase();
-    return (rules.data ?? []).filter((rule) => {
-      if (!term) return true;
-      return (
-        rule.sourceCfop.includes(term) ||
-        rule.entryCfop.includes(term) ||
-        fiscalPurposeLabels[rule.fiscalPurpose].toLowerCase().includes(term) ||
-        cfopScopeLabels[rule.scope].toLowerCase().includes(term)
-      );
-    });
-  }, [rules.data, ruleSearch]);
+  const natureTerm = natureSearch.trim().toLowerCase();
+  const natureRows = (natures.data ?? []).filter((nature) => {
+    if (!natureTerm) return true;
+    return (
+      nature.code.toLowerCase().includes(natureTerm) ||
+      nature.name.toLowerCase().includes(natureTerm) ||
+      fiscalPurposeLabels[nature.fiscalPurpose].toLowerCase().includes(natureTerm)
+    );
+  });
+  const ruleTerm = ruleSearch.trim().toLowerCase();
+  const ruleRows = (rules.data ?? []).filter((rule) => {
+    if (!ruleTerm) return true;
+    return (
+      rule.sourceCfop.includes(ruleTerm) ||
+      rule.entryCfop.includes(ruleTerm) ||
+      fiscalPurposeLabels[rule.fiscalPurpose].toLowerCase().includes(ruleTerm) ||
+      cfopScopeLabels[rule.scope].toLowerCase().includes(ruleTerm)
+    );
+  });
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-2xl font-bold text-zinc-900">Naturezas e CFOP</h2>
-        <p className="text-sm text-zinc-500">
-          Ajuste da empresa para a entrada. O cadastro inicial continua disponível e uma alteração
-          daqui não é regravada.
-        </p>
-      </div>
+      <ListPageHeader
+        title="Naturezas e CFOP"
+        description="Ajuste da empresa para a entrada. O cadastro inicial continua disponível e uma alteração daqui não é regravada."
+      >
+        <Button asChild>
+          <Link
+            to={tab === 'cfop' ? '/inbound/setup/cfop/new' : '/inbound/setup/natures/new'}
+            state={{ from }}
+          >
+            <Plus className="h-4 w-4" />
+            {tab === 'cfop' ? 'Nova regra' : 'Nova natureza'}
+          </Link>
+        </Button>
+      </ListPageHeader>
 
-      <Tabs defaultValue="natures">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="natures">Naturezas</TabsTrigger>
           <TabsTrigger value="cfop">Regras de CFOP</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="natures" className="space-y-4">
-          <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-            <Input
-              value={natureSearch}
-              onChange={(event) => setNatureSearch(event.target.value)}
-              placeholder="Buscar por código, nome ou finalidade"
-              className="sm:max-w-xs"
-            />
-            <Button
-              onClick={() => {
-                setSelectedNature(null);
-                setNatureDialog(true);
-              }}
-            >
-              <Plus className="h-4 w-4" /> Nova natureza
-            </Button>
-          </div>
-          <div className="rounded-md border border-zinc-200 bg-white shadow-2xs">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Finalidade</TableHead>
-                  <TableHead>Estoque</TableHead>
-                  <TableHead>Custo</TableHead>
-                  <TableHead>Situação</TableHead>
-                  <TableHead className="w-12" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {natureRows.map((nature) => (
-                  <TableRow key={nature.id}>
-                    <TableCell className="font-medium">{nature.code}</TableCell>
-                    <TableCell>{nature.name}</TableCell>
-                    <TableCell>{fiscalPurposeLabels[nature.fiscalPurpose]}</TableCell>
-                    <TableCell>{yesNo(nature.movesStock)}</TableCell>
-                    <TableCell>{yesNo(nature.updatesAverageCost)}</TableCell>
-                    <TableCell>{nature.isActive ? 'Ativa' : 'Inativa'}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label="Ações">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedNature(nature);
-                              setNatureDialog(true);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" /> Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-600"
-                            onClick={() => setDeleteNature(nature)}
-                          >
-                            <Trash2 className="h-4 w-4" /> Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {natures.isSuccess && natureRows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-4 text-center text-zinc-500">
-                      Nenhuma natureza encontrada.
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-              </TableBody>
-            </Table>
-          </div>
+        <TabsContent value="natures">
+          <NatureList
+            rows={natureRows}
+            search={natureText}
+            onSearch={setNatureText}
+            filtering={Boolean(natureTerm)}
+            loading={natures.isLoading}
+            error={natures.isError}
+            onOpen={(nature) =>
+              navigate(`/inbound/setup/natures/${nature.id}`, { state: { from } })
+            }
+          />
         </TabsContent>
-
-        <TabsContent value="cfop" className="space-y-4">
-          <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-            <Input
-              value={ruleSearch}
-              onChange={(event) => setRuleSearch(event.target.value)}
-              placeholder="Buscar por CFOP, âmbito ou finalidade"
-              className="sm:max-w-xs"
-            />
-            <Button
-              onClick={() => {
-                setSelectedRule(null);
-                setRuleDialog(true);
-              }}
-            >
-              <Plus className="h-4 w-4" /> Nova regra
-            </Button>
-          </div>
-          <div className="rounded-md border border-zinc-200 bg-white shadow-2xs">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>CFOP da nota</TableHead>
-                  <TableHead>Âmbito</TableHead>
-                  <TableHead>Finalidade</TableHead>
-                  <TableHead>CFOP de entrada</TableHead>
-                  <TableHead className="w-12" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ruleRows.map((rule) => (
-                  <TableRow key={rule.id}>
-                    <TableCell className="font-medium">{rule.sourceCfop}</TableCell>
-                    <TableCell>{cfopScopeLabels[rule.scope]}</TableCell>
-                    <TableCell>{fiscalPurposeLabels[rule.fiscalPurpose]}</TableCell>
-                    <TableCell>{rule.entryCfop}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label="Ações">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedRule(rule);
-                              setRuleDialog(true);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" /> Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-600"
-                            onClick={() => setDeleteRule(rule)}
-                          >
-                            <Trash2 className="h-4 w-4" /> Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {rules.isSuccess && ruleRows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-4 text-center text-zinc-500">
-                      Nenhuma regra encontrada.
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-              </TableBody>
-            </Table>
-          </div>
+        <TabsContent value="cfop">
+          <RuleList
+            rows={ruleRows}
+            search={ruleText}
+            onSearch={setRuleText}
+            filtering={Boolean(ruleTerm)}
+            loading={rules.isLoading}
+            error={rules.isError}
+            onOpen={(rule) =>
+              navigate(`/inbound/setup/cfop/${rule.id}`, { state: { from } })
+            }
+          />
         </TabsContent>
       </Tabs>
-
-      <Dialog
-        open={natureDialog}
-        onOpenChange={(open) => {
-          setNatureDialog(open);
-          if (!open) setSelectedNature(null);
-        }}
-      >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{selectedNature ? 'Editar natureza' : 'Nova natureza'}</DialogTitle>
-          </DialogHeader>
-          <FormNature
-            key={selectedNature?.id ?? 'new'}
-            natureToUpdate={selectedNature}
-            onSuccess={() => setNatureDialog(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={ruleDialog}
-        onOpenChange={(open) => {
-          setRuleDialog(open);
-          if (!open) setSelectedRule(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{selectedRule ? 'Editar regra' : 'Nova regra'}</DialogTitle>
-          </DialogHeader>
-          <FormCfopRule
-            key={selectedRule?.id ?? 'new'}
-            ruleToUpdate={selectedRule}
-            onSuccess={() => setRuleDialog(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={Boolean(deleteNature)} onOpenChange={(open) => !open && setDeleteNature(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir natureza</AlertDialogTitle>
-            <AlertDialogDescription>
-              Deseja excluir {deleteNature?.name ?? 'esta natureza'}? Uma natureza usada em nota não
-              pode sair.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              disabled={removeNature.isPending}
-              onClick={(event) => {
-                event.preventDefault();
-                if (deleteNature) removeNature.mutate(deleteNature.id);
-              }}
-            >
-              {removeNature.isPending ? 'Excluindo...' : 'Excluir'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={Boolean(deleteRule)} onOpenChange={(open) => !open && setDeleteRule(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir regra</AlertDialogTitle>
-            <AlertDialogDescription>
-              Deseja excluir a conversão de {deleteRule?.sourceCfop} para {deleteRule?.entryCfop}?
-              Notas já lançadas permanecem com o CFOP gravado.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              disabled={removeRule.isPending}
-              onClick={(event) => {
-                event.preventDefault();
-                if (deleteRule) removeRule.mutate(deleteRule.id);
-              }}
-            >
-              {removeRule.isPending ? 'Excluindo...' : 'Excluir'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
+  );
+}
+
+function NatureList({
+  rows,
+  search,
+  onSearch,
+  filtering,
+  loading,
+  error,
+  onOpen,
+}: {
+  rows: OperationNature[];
+  search: string;
+  onSearch: (value: string) => void;
+  filtering: boolean;
+  loading: boolean;
+  error: boolean;
+  onOpen: (nature: OperationNature) => void;
+}) {
+  return (
+    <ListPanel
+      title="Naturezas"
+      description="Clique na linha para abrir. A cor indica se a natureza está ativa."
+      toolbar={
+        <ListSearch
+          value={search}
+          onChange={onSearch}
+          placeholder="Buscar por código, nome ou finalidade..."
+          label="Pesquisar naturezas"
+        />
+      }
+    >
+      <div className="overflow-x-auto">
+        <div className="min-w-[720px]">
+          <StatusListHeader columns={natureColumns}>
+            <span>Código</span>
+            <span>Nome</span>
+            <span>Finalidade</span>
+            <span>Estoque</span>
+            <span>Custo</span>
+          </StatusListHeader>
+          {loading ? (
+            <ListMessage>Carregando as naturezas...</ListMessage>
+          ) : error ? (
+            <ListMessage tone="error">
+              Não foi possível carregar as naturezas.
+            </ListMessage>
+          ) : rows.length === 0 ? (
+            <ListMessage>
+              {filtering ? 'Nenhuma natureza encontrada.' : 'Ainda não há natureza.'}
+            </ListMessage>
+          ) : (
+            rows.map((nature) => (
+              <StatusListRow
+                key={nature.id}
+                columns={natureColumns}
+                tone={nature.isActive ? activeTone : inactiveTone}
+                label={`${nature.code}, ${nature.name}, ${nature.isActive ? 'ativa' : 'inativa'}`}
+                onOpen={() => onOpen(nature)}
+              >
+                <span className="min-w-0 truncate font-bold text-[var(--status-text)]">
+                  {nature.code}
+                </span>
+                <span className="min-w-0 truncate text-[var(--status-text)]">
+                  {nature.name}
+                </span>
+                <span className="min-w-0 truncate text-[var(--status-text)]">
+                  {fiscalPurposeLabels[nature.fiscalPurpose]}
+                </span>
+                <span className="text-[var(--status-text)]">
+                  {yesNo(nature.movesStock)}
+                </span>
+                <span className="text-[var(--status-text)]">
+                  {yesNo(nature.updatesAverageCost)}
+                </span>
+              </StatusListRow>
+            ))
+          )}
+        </div>
+      </div>
+    </ListPanel>
+  );
+}
+
+function RuleList({
+  rows,
+  search,
+  onSearch,
+  filtering,
+  loading,
+  error,
+  onOpen,
+}: {
+  rows: CfopEntryRule[];
+  search: string;
+  onSearch: (value: string) => void;
+  filtering: boolean;
+  loading: boolean;
+  error: boolean;
+  onOpen: (rule: CfopEntryRule) => void;
+}) {
+  return (
+    <ListPanel
+      title="Regras de CFOP"
+      description="Clique na linha para abrir. A cor indica o âmbito."
+      toolbar={
+        <ListSearch
+          value={search}
+          onChange={onSearch}
+          placeholder="Buscar por CFOP, âmbito ou finalidade..."
+          label="Pesquisar regras de CFOP"
+        />
+      }
+    >
+      <StatusListHeader columns={ruleColumns}>
+        <span>CFOP da nota</span>
+        <span>Âmbito</span>
+        <span>Finalidade</span>
+        <span>CFOP de entrada</span>
+      </StatusListHeader>
+      {loading ? (
+        <ListMessage>Carregando as regras de CFOP...</ListMessage>
+      ) : error ? (
+        <ListMessage tone="error">
+          Não foi possível carregar as regras de CFOP.
+        </ListMessage>
+      ) : rows.length === 0 ? (
+        <ListMessage>
+          {filtering ? 'Nenhuma regra encontrada.' : 'Ainda não há regra.'}
+        </ListMessage>
+      ) : (
+        rows.map((rule) => (
+          <StatusListRow
+            key={rule.id}
+            columns={ruleColumns}
+            tone={scopeTones[rule.scope]}
+            label={`${rule.sourceCfop}, ${cfopScopeLabels[rule.scope]}, ${rule.entryCfop}`}
+            onOpen={() => onOpen(rule)}
+          >
+            <span className="min-w-0 truncate font-bold text-[var(--status-text)]">
+              {rule.sourceCfop}
+            </span>
+            <span className="min-w-0 truncate text-[var(--status-text)]">
+              {cfopScopeLabels[rule.scope]}
+            </span>
+            <span className="min-w-0 truncate text-[var(--status-text)]">
+              {fiscalPurposeLabels[rule.fiscalPurpose]}
+            </span>
+            <span className="min-w-0 truncate text-[var(--status-text)]">
+              {rule.entryCfop}
+            </span>
+          </StatusListRow>
+        ))
+      )}
+    </ListPanel>
   );
 }

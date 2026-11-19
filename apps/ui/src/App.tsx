@@ -44,7 +44,9 @@ import { ReplicateReceivablePage } from './components/Financial/Receivables/Repl
 import { FormInbound } from './components/Inbound/FormInbound';
 import { FormInboundLinks } from './components/Inbound/FormInboundLinks';
 import { ListInbounds } from './components/Inbound/ListInbounds';
+import { CfopRulePage } from './components/Inbound/Setup/CfopRulePage';
 import { InboundSetupPage } from './components/Inbound/Setup/InboundSetupPage';
+import { NaturePage } from './components/Inbound/Setup/NaturePage';
 import { Navbar } from './components/Navbar';
 import { ListPersons } from './components/Persons/ListPersons';
 import { PersonPage } from './components/Persons/PersonPage';
@@ -493,6 +495,38 @@ function App() {
               element={
                 <Pagina>
                   <InboundSetupPage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/inbound/setup/natures/new"
+              element={
+                <Pagina>
+                  <NaturePage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/inbound/setup/natures/:id"
+              element={
+                <Pagina>
+                  <NaturePage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/inbound/setup/cfop/new"
+              element={
+                <Pagina>
+                  <CfopRulePage />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/inbound/setup/cfop/:id"
+              element={
+                <Pagina>
+                  <CfopRulePage />
                 </Pagina>
               }
             />
