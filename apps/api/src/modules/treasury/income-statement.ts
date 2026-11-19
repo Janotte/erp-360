@@ -9,6 +9,7 @@ import { and, eq, gte, isNotNull, isNull, lte } from 'drizzle-orm';
 import { db } from '../../db/index.ts';
 
 type Movement = {
+  id: string;
   dreLine: PlanAccountDreLine | null;
   nature: PlanAccountNature;
   accountCode: string;
@@ -43,6 +44,7 @@ export async function listIncomeStatement(tenantId: string, from: string, to: st
     isNotNull(planAccounts.dreLine),
   );
   const columns = {
+    id: planAccounts.id,
     dreLine: planAccounts.dreLine,
     nature: planAccounts.nature,
     accountCode: planAccounts.accountCode,
@@ -82,10 +84,17 @@ export async function listIncomeStatement(tenantId: string, from: string, to: st
       .where(bankConditions),
   ]);
 
-  const accounts = new Map<PlanAccountDreLine, Map<string, Movement & { amount: number }>>();
+  const accounts = new Map<
+    PlanAccountDreLine,
+    Map<string, Movement & { amount: number }>
+  >();
   for (const movement of [...cash, ...bank]) {
     if (!movement.dreLine) continue;
-    const amount = lineAmount(movement.nature, movement.inflowAmount, movement.outflowAmount);
+    const amount = lineAmount(
+      movement.nature,
+      movement.inflowAmount,
+      movement.outflowAmount,
+    );
     if (amount === 0) continue;
     const byAccount = accounts.get(movement.dreLine) ?? new Map();
     const current = byAccount.get(movement.accountCode);
@@ -108,6 +117,7 @@ export async function listIncomeStatement(tenantId: string, from: string, to: st
       line,
       amount,
       accounts: grouped.map((account) => ({
+        id: account.id,
         accountCode: account.accountCode,
         name: account.name,
         amount: account.amount,

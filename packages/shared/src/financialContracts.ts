@@ -109,13 +109,16 @@ const expenseDreLines = [
   'other_expense',
 ] as const;
 
-export function dreLinesForNature(nature: PlanAccountNature): readonly PlanAccountDreLine[] {
+export function dreLinesForNature(
+  nature: PlanAccountNature,
+): readonly PlanAccountDreLine[] {
   if (nature === 'revenue') return revenueDreLines;
   if (nature === 'expense') return expenseDreLines;
   return [];
 }
 
 export const incomeStatementAccountSchema = z.object({
+  id: z.string().uuid(),
   accountCode: z.string(),
   name: z.string(),
   amount: z.number().int(),
@@ -190,7 +193,13 @@ export const paymentIntegrationTypeLabels: Record<PaymentIntegrationType, string
   not_integrated: 'Não integrado',
 };
 
-export const paymentInterestTypes = ['none', 'simple', 'price', 'flat', 'issuer'] as const;
+export const paymentInterestTypes = [
+  'none',
+  'simple',
+  'price',
+  'flat',
+  'issuer',
+] as const;
 export type PaymentInterestType = (typeof paymentInterestTypes)[number];
 
 export const paymentInterestTypeLabels: Record<PaymentInterestType, string> = {

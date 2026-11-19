@@ -11,7 +11,9 @@ function listReturn(state: unknown) {
   const from = (state as { from?: unknown } | null)?.from;
   if (
     from === '/plan-accounts' ||
-    (typeof from === 'string' && from.startsWith('/plan-accounts?'))
+    (typeof from === 'string' && from.startsWith('/plan-accounts?')) ||
+    from === '/income-statement' ||
+    (typeof from === 'string' && from.startsWith('/income-statement?'))
   ) {
     return from;
   }
