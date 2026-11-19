@@ -92,36 +92,22 @@ const itensMenu: ItemMenu[] = [
   { title: 'Configurações', icon: Settings, url: '/settings' },
 ];
 
-function rotaDoFilho(url: string, path: string) {
+function rotaAtiva(url: string, path: string) {
   if (url === '/inbound') {
     return (
       path === '/inbound' ||
       (path.startsWith('/inbound/') && !path.startsWith('/inbound/setup'))
     );
   }
-  if (
-    url === '/categories' ||
-    url === '/items' ||
-    url === '/measures' ||
-    url === '/payables' ||
-    url === '/receivables' ||
-    url === '/bank-accounts' ||
-    url === '/company-cards' ||
-    url === '/plan-accounts' ||
-    url === '/payment-methods' ||
-    url === '/inbound/setup'
-  ) {
-    return path === url || path.startsWith(`${url}/`);
-  }
-  return path === url;
+  return path === url || path.startsWith(`${url}/`);
 }
 
 export function AppSidebar() {
   const { pathname } = useLocation();
   const pathAtivo = pathname.replace(/\/$/, '') || '/';
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, setOpenMobile, state } = useSidebar();
   const grupoDaRota = itensMenu.find((item) =>
-    item.filhos?.some((filho) => rotaDoFilho(filho.url, pathAtivo)),
+    item.filhos?.some((filho) => rotaAtiva(filho.url, pathAtivo)),
   )?.title;
   const [abertos, setAbertos] = useState<Record<string, boolean>>(() =>
     grupoDaRota ? { [grupoDaRota]: true } : {},
@@ -137,7 +123,7 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" className="border-zinc-200">
       <SidebarHeader className="flex h-16 shrink-0 flex-row items-center gap-2 border-b border-zinc-200 px-4">
         <div className="flex h-7 w-7 items-center justify-center rounded-md bg-zinc-900 text-sm font-bold text-white">
           E
@@ -156,13 +142,19 @@ export function AppSidebar() {
                 if (item.filhos?.length) {
                   const aberto = abertos[item.title] ?? false;
                   const ativo = item.filhos.some((filho) =>
-                    rotaDoFilho(filho.url, pathAtivo),
+                    rotaAtiva(filho.url, pathAtivo),
                   );
+                  const secaoAberta = ativo && (isMobile || state !== 'collapsed');
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
                         tooltip={item.title}
-                        isActive={ativo}
+                        isActive={ativo && !secaoAberta}
+                        className={
+                          secaoAberta
+                            ? 'font-semibold text-sidebar-foreground before:pointer-events-none before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-sidebar-primary'
+                            : undefined
+                        }
                         onClick={() =>
                           setAbertos((atual) => ({
                             ...atual,
@@ -185,9 +177,15 @@ export function AppSidebar() {
                             <SidebarMenuSubItem key={filho.url}>
                               <SidebarMenuSubButton
                                 asChild
-                                isActive={rotaDoFilho(filho.url, pathAtivo)}
+                                isActive={rotaAtiva(filho.url, pathAtivo)}
                               >
-                                <Link to={filho.url} onClick={fecharNoCelular}>
+                                <Link
+                                  to={filho.url}
+                                  aria-current={
+                                    rotaAtiva(filho.url, pathAtivo) ? 'page' : undefined
+                                  }
+                                  onClick={fecharNoCelular}
+                                >
                                   <filho.icon className="h-4 w-4" />
                                   <span>{filho.title}</span>
                                 </Link>
@@ -205,16 +203,13 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       asChild
                       tooltip={item.title}
-                      isActive={
-                        item.url === '/service-orders' ||
-                        item.url === '/contracts' ||
-                        item.url === '/persons'
-                          ? pathAtivo === item.url || pathAtivo.startsWith(`${item.url}/`)
-                          : pathAtivo === item.url
-                      }
+                      isActive={item.url ? rotaAtiva(item.url, pathAtivo) : false}
                     >
                       <Link
                         to={item.url ?? '/dashboard'}
+                        aria-current={
+                          item.url && rotaAtiva(item.url, pathAtivo) ? 'page' : undefined
+                        }
                         className="flex items-center gap-3"
                         onClick={fecharNoCelular}
                       >
