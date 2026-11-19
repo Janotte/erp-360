@@ -1,5 +1,5 @@
 import { Check, ChevronsUpDown, Search, X } from 'lucide-react';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,10 +49,13 @@ export function CatalogSearchSelect({
   const generatedId = useId();
   const fieldId = id ?? generatedId;
   const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [open, setOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [selectedLabel, setSelectedLabel] = useState('');
   const [focused, setFocused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const framed = Boolean(label);
   const controlHeight = framed ? 'h-11' : 'h-9';
 
@@ -90,12 +93,65 @@ export function CatalogSearchSelect({
     if (!term) return options;
     return options.filter((item) => fold(item.label).includes(term));
   }, [onSearch, options, searchText]);
+  const highlighted =
+    activeIndex >= 0 && results.length ? Math.min(activeIndex, results.length - 1) : -1;
+
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [searchText]);
+
+  useEffect(() => {
+    if (!open || highlighted < 0) return;
+    optionRefs.current[highlighted]?.scrollIntoView({ block: 'nearest' });
+  }, [highlighted, open]);
+
+  useEffect(() => {
+    if (open && !disabled) inputRef.current?.focus();
+  }, [open, disabled]);
+
+  const moveActive = (delta: number) => {
+    if (!results.length) return;
+    setActiveIndex((current) => {
+      if (current < 0) return delta > 0 ? 0 : results.length - 1;
+      const next = current + delta;
+      if (next < 0) return results.length - 1;
+      if (next >= results.length) return 0;
+      return next;
+    });
+  };
 
   const pick = (item: CatalogOption) => {
     onChange(item.id);
     setSelectedLabel(item.label);
     setSearchText('');
     setOpen(false);
+  };
+
+  const onSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setOpen(true);
+      moveActive(1);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setOpen(true);
+      moveActive(-1);
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      return;
+    }
+    if (event.key !== 'Enter') return;
+    const match = highlighted >= 0 ? results[highlighted] : results[0];
+    if (!open || !searchText.trim() || !match) return;
+    event.preventDefault();
+    pick(match);
   };
 
   const clear = () => {
@@ -130,6 +186,12 @@ export function CatalogSearchSelect({
         {...(enterSequence ? { 'data-enter-sequence': '' } : {})}
         className="flex min-w-0 flex-1 items-center gap-2 px-1 text-left text-sm"
         onClick={() => setOpen(true)}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+          event.preventDefault();
+          setSearchText('');
+          setOpen(true);
+        }}
       >
         <span className="truncate">{selectedLabel}</span>
         <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
@@ -156,6 +218,7 @@ export function CatalogSearchSelect({
         )}
       />
       <Input
+        ref={inputRef}
         id={fieldId}
         {...(enterSequence ? { 'data-enter-sequence': '' } : {})}
         value={searchText}
@@ -165,6 +228,9 @@ export function CatalogSearchSelect({
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}
+        aria-activedescendant={
+          highlighted >= 0 ? `${listId}-option-${highlighted}` : undefined
+        }
         autoComplete="off"
         onFocus={() => setOpen(true)}
         onBlur={() => {
@@ -174,20 +240,7 @@ export function CatalogSearchSelect({
           setSearchText(e.target.value);
           setOpen(true);
         }}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.preventDefault();
-            event.stopPropagation();
-            setOpen(false);
-            return;
-          }
-          if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
-          const match = results[0];
-          if (!open || !searchText.trim() || !match) return;
-          event.preventDefault();
-          event.stopPropagation();
-          pick(match);
-        }}
+        onKeyDown={onSearchKeyDown}
       />
     </div>
   );
@@ -229,41 +282,50 @@ export function CatalogSearchSelect({
       )}
 
       {open && !disabled ? (
-        <div
-          id={listId}
-          role="listbox"
-          className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-md border border-zinc-200 bg-white py-1 shadow-md"
-        >
-          {isLoading ? (
-            <p className="px-3 py-2 text-sm text-zinc-500">Carregando...</p>
-          ) : results.length ? (
-            results.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                role="option"
-                aria-selected={item.id === value}
-                className={cn(
-                  'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-100',
-                  item.id === value && 'bg-zinc-50',
-                )}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => pick(item)}
-              >
-                <Check
+        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-zinc-200 bg-white shadow-md">
+          <div id={listId} role="listbox" className="max-h-56 overflow-auto py-1">
+            {isLoading ? (
+              <p className="px-3 py-2 text-sm text-zinc-500">Carregando...</p>
+            ) : results.length ? (
+              results.map((item, index) => (
+                <button
+                  key={item.id}
+                  id={`${listId}-option-${index}`}
+                  ref={(node) => {
+                    optionRefs.current[index] = node;
+                  }}
+                  type="button"
+                  role="option"
+                  aria-selected={index === highlighted}
                   className={cn(
-                    'h-4 w-4 shrink-0',
-                    item.id === value ? 'opacity-100' : 'opacity-0',
+                    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-100',
+                    index === highlighted && 'bg-zinc-100',
+                    item.id === value && index !== highlighted && 'bg-zinc-50',
                   )}
-                />
-                <span className="truncate font-medium">{item.label}</span>
-              </button>
-            ))
-          ) : (
-            <p className="px-3 py-2 text-sm text-zinc-500">
-              {searchText.trim() ? 'Nenhum resultado para a busca.' : emptyMessage}
-            </p>
-          )}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => pick(item)}
+                >
+                  <Check
+                    className={cn(
+                      'h-4 w-4 shrink-0',
+                      item.id === value ? 'opacity-100' : 'opacity-0',
+                    )}
+                  />
+                  <span className="truncate font-medium">{item.label}</span>
+                </button>
+              ))
+            ) : (
+              <p className="px-3 py-2 text-sm text-zinc-500">
+                {searchText.trim() ? 'Nenhum resultado para a busca.' : emptyMessage}
+              </p>
+            )}
+          </div>
+          {results.length ? (
+            <div className="border-t border-zinc-100 px-3 py-1.5">
+              <p className="text-xs text-zinc-400">↑ ↓ navega · Enter seleciona</p>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

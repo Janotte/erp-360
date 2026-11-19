@@ -36,13 +36,28 @@ import { categoriesService } from '@/services/categories';
 import { type CatalogItem, type CatalogItemInput, itemsService } from '@/services/items';
 import { measuresService } from '@/services/measures';
 
+const itemFieldControl =
+  'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]):not([tabindex="-1"])';
+
+function focusItemControl(field: HTMLElement) {
+  const control = field.matches(itemFieldControl)
+    ? field
+    : field.querySelector<HTMLElement>(itemFieldControl);
+  if (!control) return;
+  queueMicrotask(() => {
+    if (control.isConnected) control.focus();
+  });
+}
+
 function focusNextItemField(form: HTMLFormElement, current: HTMLElement) {
   const fields = Array.from(
     form.querySelectorAll<HTMLElement>('[data-item-field]'),
   ).filter((field) => !field.hasAttribute('disabled'));
   const index = fields.findIndex((field) => field === current || field.contains(current));
   if (index < 0) return;
-  fields[index + 1]?.focus();
+  const next = fields[index + 1];
+  if (!next) return;
+  focusItemControl(next);
 }
 
 function maskListPrice(value: string) {
@@ -408,14 +423,16 @@ export function FormItem({
       onSubmit={handleSubmit}
       className="space-y-4"
       onKeyDown={(event) => {
-        if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+        if (event.key !== 'Enter' || event.repeat || event.nativeEvent.isComposing)
+          return;
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
         if (target instanceof HTMLTextAreaElement && event.shiftKey) return;
         if (target instanceof HTMLButtonElement && target.type === 'submit') return;
-        if (!target.closest('[data-item-field]')) return;
+        const field = target.closest<HTMLElement>('[data-item-field]');
+        if (!field || field.hasAttribute('disabled')) return;
         event.preventDefault();
-        focusNextItemField(event.currentTarget, target);
+        focusNextItemField(event.currentTarget, field);
       }}
     >
       <div className="grid grid-cols-2 gap-4">

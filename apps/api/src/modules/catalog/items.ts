@@ -102,20 +102,23 @@ async function nextItemCode(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   tenantId: string,
 ) {
-  const [created] = await tx
-    .insert(catalogItemCounters)
-    .values({ tenantId, lastNumber: 1 })
-    .onConflictDoNothing({ target: catalogItemCounters.tenantId })
-    .returning({ lastNumber: catalogItemCounters.lastNumber });
-  if (created) return formatItemCode(created.lastNumber);
+  const issuedCode = () =>
+    sql`COALESCE((SELECT MAX(code::integer) FROM catalog_items WHERE tenant_id = ${tenantId}), 0)`;
+  await tx.execute(sql`
+    INSERT INTO catalog_item_counters (tenant_id, last_number)
+    VALUES (${tenantId}, LEAST(${itemCodeLimit}, ${issuedCode()}))
+    ON CONFLICT (tenant_id) DO NOTHING
+  `);
 
   const [updated] = await tx
     .update(catalogItemCounters)
-    .set({ lastNumber: sql`${catalogItemCounters.lastNumber} + 1` })
+    .set({
+      lastNumber: sql`GREATEST(${catalogItemCounters.lastNumber}, ${issuedCode()}) + 1`,
+    })
     .where(
       and(
         eq(catalogItemCounters.tenantId, tenantId),
-        sql`${catalogItemCounters.lastNumber} < ${itemCodeLimit}`,
+        sql`GREATEST(${catalogItemCounters.lastNumber}, ${issuedCode()}) < ${itemCodeLimit}`,
       ),
     )
     .returning({ lastNumber: catalogItemCounters.lastNumber });
