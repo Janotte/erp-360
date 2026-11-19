@@ -1,27 +1,22 @@
-import { formatCurrency } from '@erp-360/shared';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { Plus, Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { formatCurrency, type ListPageSize } from '@erp-360/shared';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { ListPagination } from '@/components/ui/ListPagination';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  ListFilter,
+  ListMessage,
+  ListPageHeader,
+  ListPanel,
+  ListSearch,
+} from '@/components/ui/ListShell';
+import { StatusBadge, StatusListHeader, StatusListRow } from '@/components/ui/StatusList';
+import { type StatusTone } from '@/components/ui/statusTone';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import {
   billingConfirmText,
   billingDoneText,
@@ -40,6 +35,24 @@ const statusLabels: Record<ContractStatus, string> = {
   cancelled: 'Cancelado',
 };
 
+const statusTone: Record<ContractStatus, StatusTone> = {
+  draft: { background: '#F8FAFC', hover: '#F1F5F9', border: '#64748B', text: '#334155' },
+  active: { background: '#F0FDF4', hover: '#DCFCE7', border: '#16A34A', text: '#166534' },
+  suspended: {
+    background: '#FFFBEB',
+    hover: '#FEF3C7',
+    border: '#D97706',
+    text: '#92400E',
+  },
+  closed: { background: '#F0FDFA', hover: '#CCFBF1', border: '#0D9488', text: '#0F766E' },
+  cancelled: {
+    background: '#FEF2F2',
+    hover: '#FEE2E2',
+    border: '#DC2626',
+    text: '#B91C1C',
+  },
+};
+
 const billingKindLabels: Record<ContractBillingKind, string> = {
   none: 'Sem cobrança',
   monthly: 'Mensal',
@@ -49,6 +62,9 @@ const billingKindLabels: Record<ContractBillingKind, string> = {
 };
 
 const statuses = Object.keys(statusLabels) as ContractStatus[];
+
+const columns =
+  'grid grid-cols-[88px_minmax(140px,1.1fr)_minmax(140px,1fr)_minmax(168px,1.15fr)_minmax(140px,1fr)_132px]';
 
 function formatDate(value: string | null) {
   if (!value) return '';
@@ -70,24 +86,32 @@ function billingLabel(row: ContractListItem) {
 
 export function ListContracts() {
   const navigate = useNavigate();
-  const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ContractStatus | 'all'>('all');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState<ListPageSize>(10);
   const [billingPreview, setBillingPreview] = useState<ContractBillingResult | null>(
     null,
   );
+  const { text: searchText, setText: setSearchText } = useDebouncedSearch((next) => {
+    setSearch(next);
+    setPage(1);
+  });
 
-  useEffect(() => {
-    const timer = setTimeout(() => setSearch(searchText.trim()), 400);
-    return () => clearTimeout(timer);
-  }, [searchText]);
+  function changeStatus(next: ContractStatus | 'all') {
+    setStatus(next);
+    setPage(1);
+  }
 
   const list = useQuery({
-    queryKey: ['contracts', { q: search, status }],
+    queryKey: ['contracts', { q: search, status, page, limit }],
+    placeholderData: keepPreviousData,
     queryFn: () =>
       contractsService.list({
         q: search || undefined,
         status: status === 'all' ? undefined : status,
+        page,
+        limit,
       }),
   });
 
@@ -122,37 +146,33 @@ export function ListContracts() {
 
   const billingPending = previewBillings.isPending || generateBillings.isPending;
   const rows = list.data?.data ?? [];
+  const meta = list.data?.meta;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-zinc-900">Contratos</h2>
-          <p className="text-sm text-zinc-500">
-            Cliente, vigência e cobrança do período.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={billingPending}
-            onClick={() => previewBillings.mutate()}
-          >
-            Gerar cobranças
-          </Button>
-          <Button asChild>
-            <Link to="/contracts/new">
-              <Plus className="h-4 w-4" />
-              Novo contrato
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <ListPageHeader
+        title="Contratos"
+        description="Cliente, vigência e cobrança do período."
+      >
+        <Button
+          type="button"
+          variant="outline"
+          disabled={billingPending}
+          onClick={() => previewBillings.mutate()}
+        >
+          Gerar cobranças
+        </Button>
+        <Button asChild>
+          <Link to="/contracts/new">
+            <Plus className="h-4 w-4" />
+            Novo contrato
+          </Link>
+        </Button>
+      </ListPageHeader>
 
       {billingPreview ? (
-        <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-zinc-700">{billingConfirmText(billingPreview)}</p>
+        <div className="flex flex-col gap-3 rounded-[14px] border border-[#dfe5ee] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-[#243145]">{billingConfirmText(billingPreview)}</p>
           <div className="flex gap-2">
             <Button
               type="button"
@@ -173,98 +193,91 @@ export function ListContracts() {
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center">
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-zinc-400" />
-          <Input
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Número, título ou cliente"
-            className="pl-9"
-          />
-        </div>
-        <Select
-          value={status}
-          onValueChange={(value) => setStatus(value as ContractStatus | 'all')}
-        >
-          <SelectTrigger className="w-full sm:w-56">
-            <SelectValue placeholder="Situação" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as situações</SelectItem>
-            {statuses.map((value) => (
-              <SelectItem key={value} value={value}>
-                {statusLabels[value]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <ListPanel
+        title="Lista de contratos"
+        description="Clique na linha para abrir. O hover mantém a cor de cada situação."
+        toolbar={
+          <>
+            <ListSearch
+              value={searchText}
+              onChange={setSearchText}
+              placeholder="Número, título ou cliente"
+              label="Pesquisar contratos"
+            />
+            <ListFilter
+              value={status}
+              onValueChange={changeStatus}
+              label="Filtrar por situação"
+              allLabel="Todas as situações"
+              options={statuses.map((value) => ({ value, label: statusLabels[value] }))}
+            />
+          </>
+        }
+      >
+        <div className="overflow-x-auto">
+          <div className="min-w-[920px]">
+            <StatusListHeader columns={columns}>
+              <span>Número</span>
+              <span>Cliente</span>
+              <span>Título</span>
+              <span>Vigência</span>
+              <span>Cobrança</span>
+              <span>Situação</span>
+            </StatusListHeader>
 
-      <div className="rounded-md border border-zinc-200 bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Número</TableHead>
-              <TableHead>Cliente</TableHead>
-              <TableHead>Título</TableHead>
-              <TableHead>Situação</TableHead>
-              <TableHead>Vigência</TableHead>
-              <TableHead>Cobrança</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
             {list.isLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-zinc-500">
-                  Carregando os contratos...
-                </TableCell>
-              </TableRow>
+              <ListMessage>Carregando os contratos...</ListMessage>
             ) : list.isError ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-red-600">
-                  Não foi possível carregar os contratos.
-                </TableCell>
-              </TableRow>
+              <ListMessage tone="error">
+                Não foi possível carregar os contratos.
+              </ListMessage>
             ) : rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-zinc-500">
-                  Ainda não há contrato.
-                </TableCell>
-              </TableRow>
+              <ListMessage>
+                {search || status !== 'all'
+                  ? 'Nenhum contrato encontrado.'
+                  : 'Ainda não há contrato.'}
+              </ListMessage>
             ) : (
               rows.map((row) => (
-                <TableRow
+                <StatusListRow
                   key={row.id}
-                  className="cursor-pointer"
-                  onClick={() => navigate(`/contracts/${row.id}`)}
+                  columns={columns}
+                  tone={statusTone[row.status]}
+                  label={`${row.numberLabel}, ${row.customerName}, ${statusLabels[row.status]}`}
+                  onOpen={() => navigate(`/contracts/${row.id}`)}
                 >
-                  <TableCell>
-                    <Link
-                      to={`/contracts/${row.id}`}
-                      className="font-medium text-zinc-900"
-                    >
-                      {row.numberLabel}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{row.customerName}</TableCell>
-                  <TableCell>{row.title}</TableCell>
-                  <TableCell>
-                    {statusLabels[row.status]}
+                  <span className="font-bold">{row.numberLabel}</span>
+                  <span className="min-w-0 truncate">{row.customerName}</span>
+                  <span className="min-w-0 truncate">{row.title.trim() || '—'}</span>
+                  <span className="whitespace-nowrap">{termLabel(row)}</span>
+                  <span className="min-w-0 truncate">{billingLabel(row)}</span>
+                  <span>
+                    <StatusBadge label={statusLabels[row.status]} />
                     {row.termExpired ? (
-                      <span className="mt-1 block text-xs text-amber-700">
+                      <span className="mt-1 block text-xs font-medium text-amber-700">
                         Vigência vencida
                       </span>
                     ) : null}
-                  </TableCell>
-                  <TableCell>{termLabel(row)}</TableCell>
-                  <TableCell>{billingLabel(row)}</TableCell>
-                </TableRow>
+                  </span>
+                </StatusListRow>
               ))
             )}
-          </TableBody>
-        </Table>
-      </div>
+          </div>
+        </div>
+        {meta ? (
+          <ListPagination
+            page={page}
+            limit={limit}
+            total={meta.total}
+            totalPages={meta.totalPages}
+            onPageChange={setPage}
+            onLimitChange={(next) => {
+              setLimit(next);
+              setPage(1);
+            }}
+          />
+        ) : null}
+      </ListPanel>
     </div>
   );
 }

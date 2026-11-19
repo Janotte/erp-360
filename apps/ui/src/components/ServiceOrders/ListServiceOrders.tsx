@@ -1,25 +1,26 @@
 import { type ListPageSize } from '@erp-360/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Plus, Search } from 'lucide-react';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { Plus } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 
 import { ServiceOrderBillingDialog } from '@/components/ServiceOrders/ServiceOrderBillingDialog';
 import { ServiceOrderRowMenu } from '@/components/ServiceOrders/ServiceOrderRowMenu';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { ListPagination } from '@/components/ui/ListPagination';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { cn } from '@/lib/utils';
+  ListFilter,
+  ListMessage,
+  ListPageHeader,
+  ListPanel,
+  ListSearch,
+} from '@/components/ui/ListShell';
+import { StatusBadge, StatusListHeader, StatusListRow } from '@/components/ui/StatusList';
+import { type StatusTone } from '@/components/ui/statusTone';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import {
-  serviceOrdersService,
   type ServiceOrderListItem,
+  serviceOrdersService,
   type ServiceOrderStatus,
 } from '@/services/serviceOrders';
 
@@ -36,16 +37,8 @@ const statusLabels: Record<ServiceOrderStatus, string> = {
 
 const statuses = Object.keys(statusLabels) as ServiceOrderStatus[];
 
-const statusTone: Record<
-  ServiceOrderStatus,
-  { background: string; hover: string; border: string; text: string }
-> = {
-  open: {
-    background: '#EFF6FF',
-    hover: '#DBEAFE',
-    border: '#2563EB',
-    text: '#1D4ED8',
-  },
+const statusTone: Record<ServiceOrderStatus, StatusTone> = {
+  open: { background: '#EFF6FF', hover: '#DBEAFE', border: '#2563EB', text: '#1D4ED8' },
   analyzing: {
     background: '#F5F3FF',
     hover: '#EDE9FE',
@@ -70,12 +63,7 @@ const statusTone: Record<
     border: '#0891B2',
     text: '#0E7490',
   },
-  ready: {
-    background: '#F0FDF4',
-    hover: '#DCFCE7',
-    border: '#16A34A',
-    text: '#166534',
-  },
+  ready: { background: '#F0FDF4', hover: '#DCFCE7', border: '#16A34A', text: '#166534' },
   delivered: {
     background: '#F0FDFA',
     hover: '#CCFBF1',
@@ -90,18 +78,7 @@ const statusTone: Record<
   },
 };
 
-const columns =
-  'grid grid-cols-[96px_minmax(150px,1fr)_minmax(160px,1.3fr)_132px_176px] items-center gap-3 px-3.5';
-
-function toneStyle(status: ServiceOrderStatus): CSSProperties {
-  const tone = statusTone[status];
-  return {
-    '--os-bg': tone.background,
-    '--os-hover': tone.hover,
-    '--os-accent': tone.border,
-    '--os-text': tone.text,
-  } as CSSProperties;
-}
+const columns = 'grid grid-cols-[96px_minmax(150px,1fr)_minmax(160px,1.3fr)_132px_176px]';
 
 function formatWhen(value: string | null) {
   if (!value) return '—';
@@ -113,28 +90,8 @@ function formatWhen(value: string | null) {
   }).format(date);
 }
 
-function StatusBadge({
-  status,
-  pressed,
-}: {
-  status: ServiceOrderStatus;
-  pressed?: boolean;
-}) {
-  return (
-    <span
-      className={cn(
-        'inline-flex max-w-full items-center rounded-[7px] border border-[var(--os-accent)] bg-[var(--os-bg)] px-2 py-[5px] text-xs leading-snug font-bold text-[var(--os-text)] group-hover:bg-[var(--os-hover)]',
-        pressed && 'shadow-[inset_0_0_0_1px_var(--os-accent)]',
-      )}
-    >
-      {statusLabels[status]}
-    </span>
-  );
-}
-
 export function ListServiceOrders() {
   const navigate = useNavigate();
-  const [searchText, setSearchText] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ServiceOrderStatus | 'all'>('all');
   const [page, setPage] = useState(1);
@@ -145,18 +102,10 @@ export function ListServiceOrders() {
     y: number;
   } | null>(null);
   const [billingId, setBillingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const next = searchText.trim();
-      setSearch((current) => {
-        if (current === next) return current;
-        setPage(1);
-        return next;
-      });
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchText]);
+  const { text: searchText, setText: setSearchText } = useDebouncedSearch((next) => {
+    setSearch(next);
+    setPage(1);
+  });
 
   function changeStatus(next: ServiceOrderStatus | 'all') {
     setStatus(next);
@@ -194,112 +143,67 @@ export function ListServiceOrders() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-[#172337]">Ordens de serviço</h2>
-          <p className="mt-1 text-sm text-[#64748b]">
-            Número, cliente, abertura e situação.
-          </p>
-        </div>
+      <ListPageHeader
+        title="Ordens de serviço"
+        description="Número, cliente, abertura e situação."
+      >
         <Button asChild>
           <Link to="/service-orders/new">
             <Plus className="h-4 w-4" />
             Nova ordem
           </Link>
         </Button>
-      </div>
+      </ListPageHeader>
 
-      <section className="rounded-[14px] border border-[#dfe5ee] bg-white p-4 shadow-[0_4px_22px_#1e293b0a] md:p-[22px]">
-        <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h3 className="text-[19px] font-semibold text-[#172337]">
-              Lista de ordens de serviço
-            </h3>
-            <p className="mt-2 text-[13px] text-[#64748b]">
-              Clique na linha para abrir. O hover mantém a cor de cada situação.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
-            <div className="relative w-full sm:w-[235px]">
-              <Search className="absolute top-3 left-3 h-4 w-4 text-[#64748b]" />
-              <Input
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-                placeholder="Número, cliente ou campo"
-                className="h-[42px] border-[#cbd5e1] pl-9"
-                aria-label="Pesquisar ordens"
-              />
-            </div>
-            <Select
+      <ListPanel
+        title="Lista de ordens de serviço"
+        description="Clique na linha para abrir. O hover mantém a cor de cada situação."
+        toolbar={
+          <>
+            <ListSearch
+              value={searchText}
+              onChange={setSearchText}
+              placeholder="Número, cliente ou campo"
+              label="Pesquisar ordens"
+            />
+            <ListFilter
               value={status}
-              onValueChange={(value) => changeStatus(value as ServiceOrderStatus | 'all')}
-            >
-              <SelectTrigger
-                className="h-[42px] w-full border-[#cbd5e1] sm:w-[235px]"
-                aria-label="Filtrar por situação"
-              >
-                <SelectValue placeholder="Situação" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as situações</SelectItem>
-                {statuses.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {statusLabels[value]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
+              onValueChange={changeStatus}
+              label="Filtrar por situação"
+              allLabel="Todas as situações"
+              options={statuses.map((value) => ({ value, label: statusLabels[value] }))}
+            />
+          </>
+        }
+      >
         <div className="overflow-x-auto">
           <div className="min-w-[740px]">
-            <div
-              className={cn(
-                columns,
-                'border-b border-b-[#dfe5ee] border-l-4 border-l-transparent py-3 text-xs font-bold text-[#64748b]',
-              )}
-            >
+            <StatusListHeader columns={columns}>
               <span>Número</span>
               <span>Cliente</span>
               <span>{summaryLabel}</span>
               <span>Abertura</span>
               <span>Situação</span>
-            </div>
+            </StatusListHeader>
 
             {list.isLoading ? (
-              <p className="px-3.5 py-8 text-center text-sm text-[#64748b]">
-                Carregando as ordens...
-              </p>
+              <ListMessage>Carregando as ordens...</ListMessage>
             ) : list.isError ? (
-              <p className="px-3.5 py-8 text-center text-sm text-red-600">
-                Não foi possível carregar as ordens.
-              </p>
+              <ListMessage tone="error">Não foi possível carregar as ordens.</ListMessage>
             ) : rows.length === 0 ? (
-              <p className="px-3.5 py-8 text-center text-sm text-[#64748b]">
+              <ListMessage>
                 {search || status !== 'all'
                   ? 'Nenhuma ordem encontrada.'
                   : 'Ainda não há ordem.'}
-              </p>
+              </ListMessage>
             ) : (
               rows.map((row) => (
-                <div
+                <StatusListRow
                   key={row.id}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${row.numberLabel}, ${row.customerName}, ${statusLabels[row.status]}`}
-                  className={cn(
-                    columns,
-                    'group mt-[5px] cursor-pointer rounded-[7px] border-l-4 border-l-[var(--os-accent)] bg-[var(--os-bg)] py-3 text-sm text-[#243145] transition-[background-color,box-shadow] duration-150 hover:bg-[var(--os-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]',
-                  )}
-                  style={toneStyle(row.status)}
-                  onClick={() => openOrder(row.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      openOrder(row.id);
-                    }
-                  }}
+                  columns={columns}
+                  tone={statusTone[row.status]}
+                  label={`${row.numberLabel}, ${row.customerName}, ${statusLabels[row.status]}`}
+                  onOpen={() => openOrder(row.id)}
                   onContextMenu={(event) => {
                     event.preventDefault();
                     setMenu({ row, x: event.clientX, y: event.clientY });
@@ -312,25 +216,25 @@ export function ListServiceOrders() {
                   </span>
                   <span className="whitespace-nowrap">{formatWhen(row.openedAt)}</span>
                   <span>
-                    <StatusBadge status={row.status} />
+                    <StatusBadge label={statusLabels[row.status]} />
                   </span>
-                </div>
+                </StatusListRow>
               ))
             )}
           </div>
         </div>
-        {/*     
+        {/*
         <div className="mt-5 flex flex-wrap gap-2.5" aria-label="Legenda de situações">
           {statuses.map((value) => (
             <button
               key={value}
               type="button"
               className="cursor-pointer rounded-[7px] border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
-              style={toneStyle(value)}
+              style={statusToneStyle(statusTone[value])}
               aria-pressed={status === value}
               onClick={() => changeStatus(status === value ? 'all' : value)}
             >
-              <StatusBadge status={value} pressed={status === value} />
+              <StatusBadge label={statusLabels[value]} pressed={status === value} />
             </button>
           ))}
         </div>
@@ -348,7 +252,7 @@ export function ListServiceOrders() {
             }}
           />
         ) : null}
-      </section>
+      </ListPanel>
 
       <ServiceOrderRowMenu
         cursor={menu}
