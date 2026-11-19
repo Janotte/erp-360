@@ -55,27 +55,33 @@ export function StatusListRow({
   columns: string;
   tone: StatusTone;
   label: string;
-  onOpen: () => void;
+  onOpen?: () => void;
   onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void;
   children: ReactNode;
 }) {
   return (
     <div
-      role="button"
-      tabIndex={0}
+      role={onOpen ? 'button' : undefined}
+      tabIndex={onOpen ? 0 : undefined}
       aria-label={label}
       className={cn(
         columns,
-        'group mt-[5px] cursor-pointer items-center gap-3 rounded-[7px] border-l-4 border-l-[var(--status-accent)] bg-[var(--status-bg)] px-3.5 py-3 text-sm text-[#243145] transition-[background-color,box-shadow] duration-150 hover:bg-[var(--status-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]',
+        'group mt-[5px] items-center gap-3 rounded-[7px] border-l-4 border-l-[var(--status-accent)] bg-[var(--status-bg)] px-3.5 py-3 text-sm text-[#243145] transition-[background-color,box-shadow] duration-150 hover:bg-[var(--status-hover)]',
+        onOpen &&
+          'cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]',
       )}
       style={statusToneStyle(tone)}
       onClick={onOpen}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onOpen();
-        }
-      }}
+      onKeyDown={
+        onOpen
+          ? (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onOpen();
+              }
+            }
+          : undefined
+      }
       onContextMenu={onContextMenu}
     >
       {children}
