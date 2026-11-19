@@ -1,337 +1,297 @@
 import {
   formatCurrency,
   formatRawDate,
+  type ListPageSize,
+  listPageSizes,
   planAccountDreLineLabels,
+  type PlanAccountNature,
   planAccountNatureLabels,
 } from '@erp-360/shared';
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus } from 'lucide-react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ListPagination } from '@/components/ui/ListPagination';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  ListMessage,
+  ListPageHeader,
+  ListPanel,
+  ListSearch,
+} from '@/components/ui/ListShell';
+import { StatusListHeader, StatusListRow } from '@/components/ui/StatusList';
+import { type StatusTone } from '@/components/ui/statusTone';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { type PlanAccount, planAccountsService } from '@/services/planAccounts';
 
-import { FormPlanAccount } from './FormPlanAccount';
+const columns =
+  'grid grid-cols-[100px_minmax(180px,1.4fr)_150px_minmax(140px,1fr)_minmax(140px,1fr)_130px_110px]';
 
 type SortField = 'accountCode' | 'name';
 
+const natureTones: Record<PlanAccountNature, StatusTone> = {
+  asset: {
+    background: '#EFF6FF',
+    hover: '#DBEAFE',
+    border: '#2563EB',
+    text: '#1D4ED8',
+  },
+  liability: {
+    background: '#FFF7ED',
+    hover: '#FFEDD5',
+    border: '#EA580C',
+    text: '#C2410C',
+  },
+  equity: {
+    background: '#F5F3FF',
+    hover: '#EDE9FE',
+    border: '#7C3AED',
+    text: '#6D28D9',
+  },
+  revenue: {
+    background: '#ECFDF5',
+    hover: '#D1FAE5',
+    border: '#059669',
+    text: '#047857',
+  },
+  expense: {
+    background: '#FEF2F2',
+    hover: '#FEE2E2',
+    border: '#DC2626',
+    text: '#B91C1C',
+  },
+};
+
+const inactiveTone: StatusTone = {
+  background: '#F8FAFC',
+  hover: '#F1F5F9',
+  border: '#64748B',
+  text: '#475569',
+};
+
+function readPage(params: URLSearchParams) {
+  const page = Number(params.get('page') ?? '1');
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function readLimit(params: URLSearchParams): ListPageSize {
+  const value = Number(params.get('limit'));
+  if ((listPageSizes as readonly number[]).includes(value)) return value as ListPageSize;
+  return 10;
+}
+
+function readSort(params: URLSearchParams): SortField {
+  return params.get('sortField') === 'name' ? 'name' : 'accountCode';
+}
+
+function readOrder(params: URLSearchParams): 'asc' | 'desc' {
+  return params.get('sortOrder') === 'desc' ? 'desc' : 'asc';
+}
+
+function accountTone(account: PlanAccount): StatusTone {
+  if (!account.isActive) return inactiveTone;
+  return natureTones[account.nature] ?? inactiveTone;
+}
+
 export function ListPlanAccounts() {
-  const queryClient = useQueryClient();
-  const [openDialog, setOpenDialog] = useState(false);
-  const [openAlert, setOpenAlert] = useState(false);
-  const [selected, setSelected] = useState<PlanAccount | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  const page = readPage(params);
+  const limit = readLimit(params);
+  const sortField = readSort(params);
+  const sortOrder = readOrder(params);
+  const search = params.get('busca') ?? '';
+  const from = `/plan-accounts${location.search}`;
+  const { text: searchText, setText: setSearchText } = useDebouncedSearch(
+    (next) => {
+      setParams(
+        (current) => {
+          const updated = new URLSearchParams(current);
+          if ((updated.get('busca') ?? '') === next) return current;
+          if (next) updated.set('busca', next);
+          else updated.delete('busca');
+          updated.delete('page');
+          return updated;
+        },
+        { replace: true },
+      );
+    },
+    400,
+    search,
+  );
 
-  const [searchText, setSearchText] = useState('');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState<SortField>('accountCode');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearch((current) => {
-        const next = searchText.trim();
-        if (current !== next) setPage(1);
-        return next;
-      });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchText]);
-
-  const { data: response, isLoading } = useQuery({
-    queryKey: ['listaPlanAccounts', { page, search, sortField, sortOrder }],
+  const list = useQuery({
+    queryKey: ['listaPlanAccounts', { page, limit, search, sortField, sortOrder }],
     placeholderData: keepPreviousData,
     queryFn: () =>
       planAccountsService.list({
         page,
-        limit: 10,
+        limit,
         sortField,
         sortOrder,
         search: search || undefined,
       }),
   });
 
-  const changeSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-    setPage(1);
+  const replaceParams = (change: (next: URLSearchParams) => void) => {
+    const next = new URLSearchParams(params);
+    change(next);
+    next.delete('page');
+    setParams(next, { replace: true });
   };
 
-  const renderSortIcon = (field: SortField) => {
-    if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4 shrink-0" />;
+  const changeSort = (field: SortField) => {
+    const order = sortField === field && sortOrder === 'asc' ? 'desc' : 'asc';
+    replaceParams((next) => {
+      if (field === 'accountCode') next.delete('sortField');
+      else next.set('sortField', field);
+      if (order === 'asc') next.delete('sortOrder');
+      else next.set('sortOrder', order);
+    });
+  };
+
+  const setPage = (nextPage: number) => {
+    const next = new URLSearchParams(params);
+    if (nextPage <= 1) next.delete('page');
+    else next.set('page', String(nextPage));
+    setParams(next, { replace: true });
+  };
+
+  const setLimit = (nextLimit: ListPageSize) => {
+    const next = new URLSearchParams(params);
+    if (nextLimit === 10) next.delete('limit');
+    else next.set('limit', String(nextLimit));
+    next.delete('page');
+    setParams(next, { replace: true });
+  };
+
+  const sortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3.5 w-3.5" />;
     return sortOrder === 'asc' ? (
-      <ArrowUp className="ml-2 h-4 w-4 shrink-0 text-primary" />
+      <ArrowUp className="h-3.5 w-3.5" />
     ) : (
-      <ArrowDown className="ml-2 h-4 w-4 shrink-0 text-primary" />
+      <ArrowDown className="h-3.5 w-3.5" />
     );
   };
 
-  const meta = response?.meta;
-  const accounts = response?.data;
-
-  const deleteMutation = useMutation({
-    mutationFn: planAccountsService.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['listaPlanAccounts'] });
-      queryClient.invalidateQueries({ queryKey: ['financial', 'plan-accounts'] });
-      setOpenAlert(false);
-      setDeleteError(null);
-      toast.success('Plano de contas removido com sucesso!');
-    },
-    onError: (error: Error) => {
-      setDeleteError(error.message);
-    },
-  });
-
-  const openEdit = (account: PlanAccount) => {
-    setSelected(account);
-    setOpenDialog(true);
-  };
-
-  const openDelete = (account: PlanAccount) => {
-    setSelected(account);
-    setDeleteError(null);
-    setOpenAlert(true);
-  };
-
-  if (isLoading && !response) return <p>Carregando registros...</p>;
+  const rows = list.data?.data ?? [];
+  const meta = list.data?.meta;
+  const balanceNote =
+    meta?.balanceFrom && meta.balanceTo
+      ? ` Receita e despesa mostram o saldo de ${formatRawDate(meta.balanceFrom)} a ${formatRawDate(meta.balanceTo)}. As demais contas mostram o saldo acumulado.`
+      : '';
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-4 rounded-lg border border-zinc-200">
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
-          <Input
-            placeholder="Buscar por código ou nome..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Button
-          onClick={() => {
-            setSelected(null);
-            setOpenDialog(true);
-          }}
-        >
-          <Plus className="h-4 w-4" /> Novo Plano
-        </Button>
-      </div>
-
-      {meta?.balanceFrom && meta.balanceTo ? (
-        <p className="text-sm text-zinc-500">
-          Receita e despesa mostram o saldo de {formatRawDate(meta.balanceFrom)} a{' '}
-          {formatRawDate(meta.balanceTo)}. As demais contas mostram o saldo acumulado.
-        </p>
-      ) : null}
-
-      <div className="rounded-md border border-zinc-200 bg-white shadow-2xs">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead
-                onClick={() => changeSort('accountCode')}
-                className="cursor-pointer select-none hover:bg-zinc-50"
-              >
-                <div className="flex items-center">
-                  Código {renderSortIcon('accountCode')}
-                </div>
-              </TableHead>
-              <TableHead
-                onClick={() => changeSort('name')}
-                className="cursor-pointer select-none hover:bg-zinc-50"
-              >
-                <div className="flex items-center">Nome {renderSortIcon('name')}</div>
-              </TableHead>
-              <TableHead>Natureza</TableHead>
-              <TableHead>Linha da DRE</TableHead>
-              <TableHead>Descrição contábil</TableHead>
-              <TableHead>Código contábil</TableHead>
-              <TableHead className="text-right">Saldo</TableHead>
-              <TableHead className="w-12" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-4">
-                  Carregando dados...
-                </TableCell>
-              </TableRow>
-            ) : accounts?.length ? (
-              accounts.map((account) => (
-                <TableRow key={account.id}>
-                  <TableCell className="font-medium">{account.accountCode}</TableCell>
-                  <TableCell>{account.name}</TableCell>
-                  <TableCell>{planAccountNatureLabels[account.nature]}</TableCell>
-                  <TableCell>
-                    {account.dreLine ? planAccountDreLineLabels[account.dreLine] : '-'}
-                  </TableCell>
-                  <TableCell>{account.accountingDescription || '-'}</TableCell>
-                  <TableCell>{account.accountingAccountCode || '-'}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {account.balance != null ? formatCurrency(account.balance) : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Ações de ${account.name}`}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEdit(account)}>
-                          <Pencil className="h-4 w-4" /> Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600 focus:text-red-600"
-                          onClick={() => openDelete(account)}
-                        >
-                          <Trash2 className="h-4 w-4" /> Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-4 text-zinc-500">
-                  Nenhum plano de contas encontrado.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {meta && meta.totalPages > 1 && (
-        <div className="flex items-center justify-between bg-white px-4 py-3 rounded-lg border border-zinc-200">
-          <div className="text-sm text-zinc-500">
-            Mostrando página <strong className="text-zinc-900">{meta.page}</strong> de{' '}
-            <strong className="text-zinc-900">{meta.totalPages}</strong> ({meta.total}{' '}
-            registros no total)
-          </div>
-          <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((old) => Math.max(old - 1, 1))}
-              disabled={page === 1}
-              className="gap-1"
-            >
-              <ChevronLeft className="h-4 w-4" /> Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((old) => (page < meta.totalPages ? old + 1 : old))}
-              disabled={page === meta.totalPages}
-              className="gap-1"
-            >
-              Próximo <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <Dialog
-        open={openDialog}
-        onOpenChange={(open) => {
-          setOpenDialog(open);
-          if (!open) setSelected(null);
-        }}
+      <ListPageHeader
+        title="Plano de contas"
+        description="Código, natureza e saldo. A cor da linha indica a natureza, e a conta inativa fica cinza."
       >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {selected ? 'Editar Plano de Contas' : 'Novo Plano de Contas'}
-            </DialogTitle>
-          </DialogHeader>
-          <FormPlanAccount
-            key={selected?.id ?? 'new'}
-            accountToUpdate={selected}
-            onSuccess={() => setOpenDialog(false)}
-          />
-        </DialogContent>
-      </Dialog>
+        <Button asChild>
+          <Link to="/plan-accounts/new" state={{ from }}>
+            <Plus className="h-4 w-4" />
+            Novo plano
+          </Link>
+        </Button>
+      </ListPageHeader>
 
-      <AlertDialog open={openAlert} onOpenChange={setOpenAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir plano de contas</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteError ??
-                `Deseja excluir ${selected?.name ?? 'este plano de contas'}? Essa ação não pode ser desfeita.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              disabled={deleteMutation.isPending || !!deleteError}
-              onClick={(event) => {
-                event.preventDefault();
-                if (selected) deleteMutation.mutate(selected.id);
-              }}
-            >
-              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ListPanel
+        title="Contas"
+        description={`Clique na linha para abrir.${balanceNote}`}
+        toolbar={
+          <ListSearch
+            value={searchText}
+            onChange={setSearchText}
+            placeholder="Buscar por código ou nome..."
+            label="Pesquisar o plano de contas"
+          />
+        }
+      >
+        <div className="overflow-x-auto">
+          <div className="min-w-[1040px]">
+            <StatusListHeader columns={columns}>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-left"
+                onClick={() => changeSort('accountCode')}
+              >
+                Código
+                {sortIcon('accountCode')}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-left"
+                onClick={() => changeSort('name')}
+              >
+                Nome
+                {sortIcon('name')}
+              </button>
+              <span>Natureza</span>
+              <span>Linha da DRE</span>
+              <span>Descrição contábil</span>
+              <span>Código contábil</span>
+              <span className="text-right">Saldo</span>
+            </StatusListHeader>
+
+            {list.isLoading ? (
+              <ListMessage>Carregando o plano de contas...</ListMessage>
+            ) : list.isError ? (
+              <ListMessage tone="error">
+                Não foi possível carregar o plano de contas.
+              </ListMessage>
+            ) : rows.length === 0 ? (
+              <ListMessage>
+                {search ? 'Nenhuma conta encontrada.' : 'Ainda não há conta no plano.'}
+              </ListMessage>
+            ) : (
+              rows.map((account) => (
+                <StatusListRow
+                  key={account.id}
+                  columns={columns}
+                  tone={accountTone(account)}
+                  label={`${account.accountCode}, ${account.name}, ${planAccountNatureLabels[account.nature]}, ${account.isActive ? 'ativa' : 'inativa'}`}
+                  onOpen={() =>
+                    navigate(`/plan-accounts/${account.id}`, { state: { from } })
+                  }
+                >
+                  <span className="min-w-0 truncate font-bold text-[var(--status-text)]">
+                    {account.accountCode}
+                  </span>
+                  <span className="min-w-0 truncate text-[var(--status-text)]">
+                    {account.name}
+                  </span>
+                  <span className="min-w-0 truncate text-[var(--status-text)]">
+                    {planAccountNatureLabels[account.nature]}
+                  </span>
+                  <span className="min-w-0 truncate text-[var(--status-text)]">
+                    {account.dreLine ? planAccountDreLineLabels[account.dreLine] : '—'}
+                  </span>
+                  <span className="min-w-0 truncate text-[var(--status-text)]">
+                    {account.accountingDescription || '—'}
+                  </span>
+                  <span className="min-w-0 truncate text-[var(--status-text)]">
+                    {account.accountingAccountCode || '—'}
+                  </span>
+                  <span className="text-right tabular-nums text-[var(--status-text)]">
+                    {account.balance != null ? formatCurrency(account.balance) : '—'}
+                  </span>
+                </StatusListRow>
+              ))
+            )}
+          </div>
+        </div>
+        {meta ? (
+          <ListPagination
+            page={page}
+            limit={limit}
+            total={meta.total}
+            totalPages={meta.totalPages}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+          />
+        ) : null}
+      </ListPanel>
     </div>
   );
 }

@@ -7,23 +7,27 @@ import {
   planAccountNatureLabels,
   planAccountNatures,
 } from '@erp-360/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { FormEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FloatingInput, FloatingSelect } from '@/components/ui/FloatingField';
 import {
   type PlanAccount,
   type PlanAccountInput,
   planAccountsService,
 } from '@/services/planAccounts';
-
-const selectClassName =
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
 
 function parseNature(value: unknown): PlanAccountNature | '' {
   return planAccountNatures.includes(value as PlanAccountNature)
@@ -37,14 +41,19 @@ function parseDreLine(value: unknown): PlanAccountDreLine | '' {
     : '';
 }
 
-interface FormPlanAccountProps {
+export function FormPlanAccount({
+  accountToUpdate,
+  onSuccess,
+  onCancel,
+  onDeleted,
+}: {
   accountToUpdate?: PlanAccount | null;
   onSuccess?: () => void;
-}
-
-export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountProps) {
+  onCancel?: () => void;
+  onDeleted?: () => void;
+}) {
   const queryClient = useQueryClient();
-  const [accountId, setAccountId] = useState(accountToUpdate?.id);
+  const accountId = accountToUpdate?.id;
   const [accountCode, setAccountCode] = useState(accountToUpdate?.accountCode ?? '');
   const [name, setName] = useState(accountToUpdate?.name ?? '');
   const [nature, setNature] = useState<PlanAccountNature | ''>(
@@ -70,29 +79,8 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
   const [accountingAccountCode, setAccountingAccountCode] = useState(
     accountToUpdate?.accountingAccountCode || '',
   );
-
-  const { data: accountLoaded } = useQuery({
-    queryKey: ['plan-account', accountId],
-    enabled: Boolean(accountId),
-    staleTime: 0,
-    queryFn: () => planAccountsService.get(accountId!),
-  });
-
-  useEffect(() => {
-    if (!accountLoaded && !accountToUpdate) return;
-    const account = { ...accountToUpdate, ...accountLoaded };
-    setAccountCode(account.accountCode ?? '');
-    setName(account.name ?? '');
-    setNature(parseNature(account.nature));
-    setDreLine(parseDreLine(account.dreLine));
-    setAcceptsEntries(account.acceptsEntries !== false);
-    setIsTreasury(account.isTreasury === true);
-    setParentAccountCode(account.parentAccountCode || '');
-    setIsActive(account.isActive !== false);
-    setAccountingDescription(account.accountingDescription || '');
-    setAccountIdentifier(account.accountIdentifier || '');
-    setAccountingAccountCode(account.accountingAccountCode || '');
-  }, [accountLoaded, accountToUpdate]);
+  const [openDelete, setOpenDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: (dados: PlanAccountInput) =>
@@ -100,201 +88,240 @@ export function FormPlanAccount({ accountToUpdate, onSuccess }: FormPlanAccountP
         ? planAccountsService.update(accountId, dados)
         : planAccountsService.create(dados),
     onSuccess: (saved) => {
-      const created = !accountId;
-      setAccountId(saved.id);
       queryClient.setQueryData(['plan-account', saved.id], saved);
       queryClient.invalidateQueries({ queryKey: ['listaPlanAccounts'] });
       queryClient.invalidateQueries({ queryKey: ['financial', 'plan-accounts'] });
-      onSuccess?.();
       toast.success(
-        created
-          ? 'Plano de contas cadastrado com sucesso!'
-          : 'Plano de contas atualizado com sucesso!',
+        accountId
+          ? 'Plano de contas atualizado com sucesso!'
+          : 'Plano de contas cadastrado com sucesso!',
       );
+      onSuccess?.();
     },
-    onError: (error) => {
-      toast.error(`Falha ao salvar: ${error.message || 'Erro inesperado'}`);
+    onError: (error: Error) => {
+      toast.error(error.message || 'Falha ao salvar o plano de contas.');
     },
   });
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!nature) return;
-    const allowedLines = dreLinesForNature(nature);
-    if (allowedLines.length > 0 && !dreLine) return;
-    mutation.mutate({
-      accountCode,
-      name,
-      nature,
-      dreLine: allowedLines.length > 0 ? dreLine || null : null,
-      acceptsEntries,
-      isTreasury: nature === 'asset' ? isTreasury : false,
-      parentAccountCode: parentAccountCode || null,
-      isActive,
-      accountingDescription: accountingDescription || null,
-      accountIdentifier: accountIdentifier || null,
-      accountingAccountCode: accountingAccountCode || null,
-    });
-  };
+  const deleteMutation = useMutation({
+    mutationFn: () => planAccountsService.delete(accountId ?? ''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['listaPlanAccounts'] });
+      queryClient.invalidateQueries({ queryKey: ['financial', 'plan-accounts'] });
+      toast.success('Plano de contas removido com sucesso!');
+      onDeleted?.();
+    },
+    onError: (error: Error) => setDeleteError(error.message),
+  });
+
+  const dreLines =
+    nature === 'revenue' || nature === 'expense' ? dreLinesForNature(nature) : [];
+  const busy = mutation.isPending || deleteMutation.isPending;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="accountCode">Código</Label>
-          <Input
-            id="accountCode"
-            value={accountCode}
-            maxLength={15}
-            onChange={(e) => setAccountCode(e.target.value)}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="planAccountNature">Natureza</Label>
-          <select
-            id="planAccountNature"
-            value={nature}
-            onChange={(event) => {
-              const next = parseNature(event.target.value);
-              setNature(next);
-              if (!next || !dreLinesForNature(next).includes(dreLine as PlanAccountDreLine)) {
-                setDreLine('');
-              }
-              if (next !== 'asset') setIsTreasury(false);
-            }}
-            className={selectClassName}
-            required
-          >
-            <option value="" disabled>
-              Selecione a natureza
+    <form
+      className="space-y-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!accountCode.trim()) {
+          toast.error('Informe o código.');
+          return;
+        }
+        if (!name.trim()) {
+          toast.error('Informe o nome.');
+          return;
+        }
+        if (!nature) {
+          toast.error('Informe a natureza.');
+          return;
+        }
+        if (dreLines.length > 0 && !dreLine) {
+          toast.error('Informe a linha da DRE.');
+          return;
+        }
+        mutation.mutate({
+          accountCode,
+          name,
+          nature,
+          dreLine: dreLines.length > 0 ? dreLine || null : null,
+          acceptsEntries,
+          isTreasury: nature === 'asset' ? isTreasury : false,
+          parentAccountCode: parentAccountCode || null,
+          isActive,
+          accountingDescription: accountingDescription || null,
+          accountIdentifier: accountIdentifier || null,
+          accountingAccountCode: accountingAccountCode || null,
+        });
+      }}
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FloatingInput
+          label="Código"
+          value={accountCode}
+          maxLength={15}
+          onChange={(event) => setAccountCode(event.target.value)}
+          required
+          autoFocus
+        />
+        <FloatingSelect
+          label="Natureza"
+          value={nature}
+          pinned={Boolean(nature)}
+          required
+          onChange={(event) => {
+            const next = parseNature(event.target.value);
+            setNature(next);
+            if (
+              !next ||
+              !dreLinesForNature(next).includes(dreLine as PlanAccountDreLine)
+            ) {
+              setDreLine('');
+            }
+            if (next !== 'asset') setIsTreasury(false);
+          }}
+        >
+          <option value="" disabled>
+            Selecione a natureza
+          </option>
+          {planAccountNatures.map((item) => (
+            <option key={item} value={item}>
+              {planAccountNatureLabels[item]}
             </option>
-            {planAccountNatures.map((item) => (
-              <option key={item} value={item}>
-                {planAccountNatureLabels[item]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="parentAccountCode">Conta pai</Label>
-          <Input
-            id="parentAccountCode"
-            value={parentAccountCode}
-            maxLength={15}
-            onChange={(e) => setParentAccountCode(e.target.value)}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="accountIdentifier">Identificador</Label>
-          <Input
-            id="accountIdentifier"
-            value={accountIdentifier}
-            maxLength={10}
-            onChange={(e) => setAccountIdentifier(e.target.value)}
-          />
-        </div>
+          ))}
+        </FloatingSelect>
+        <FloatingInput
+          label="Conta pai"
+          value={parentAccountCode}
+          maxLength={15}
+          onChange={(event) => setParentAccountCode(event.target.value)}
+        />
+        <FloatingInput
+          label="Identificador"
+          value={accountIdentifier}
+          maxLength={10}
+          onChange={(event) => setAccountIdentifier(event.target.value)}
+        />
       </div>
 
-      {nature === 'revenue' || nature === 'expense' ? (
-        <div className="space-y-1">
-          <Label htmlFor="planAccountDreLine">Linha da DRE</Label>
-          <select
-            id="planAccountDreLine"
-            value={dreLine}
-            onChange={(event) => setDreLine(parseDreLine(event.target.value))}
-            className={selectClassName}
-            required
-          >
-            <option value="" disabled>
-              Selecione a linha
+      {dreLines.length > 0 ? (
+        <FloatingSelect
+          label="Linha da DRE"
+          value={dreLine}
+          pinned={Boolean(dreLine)}
+          required
+          onChange={(event) => setDreLine(parseDreLine(event.target.value))}
+        >
+          <option value="" disabled>
+            Selecione a linha
+          </option>
+          {dreLines.map((line) => (
+            <option key={line} value={line}>
+              {planAccountDreLineLabels[line]}
             </option>
-            {dreLinesForNature(nature).map((line) => (
-              <option key={line} value={line}>
-                {planAccountDreLineLabels[line]}
-              </option>
-            ))}
-          </select>
-        </div>
+          ))}
+        </FloatingSelect>
       ) : null}
 
-      <div className="space-y-1">
-        <Label htmlFor="name">Nome</Label>
-        <Input
-          id="name"
-          value={name}
-          maxLength={120}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-      </div>
+      <FloatingInput
+        label="Nome"
+        value={name}
+        maxLength={120}
+        onChange={(event) => setName(event.target.value)}
+        required
+      />
+      <FloatingInput
+        label="Descrição contábil"
+        value={accountingDescription}
+        maxLength={60}
+        onChange={(event) => setAccountingDescription(event.target.value)}
+      />
+      <FloatingInput
+        label="Código contábil"
+        value={accountingAccountCode}
+        maxLength={20}
+        onChange={(event) => setAccountingAccountCode(event.target.value)}
+      />
 
-      <div className="space-y-1">
-        <Label htmlFor="accountingDescription">Descrição contábil</Label>
-        <Input
-          id="accountingDescription"
-          value={accountingDescription}
-          maxLength={60}
-          onChange={(e) => setAccountingDescription(e.target.value)}
-        />
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="accountingAccountCode">Código contábil</Label>
-        <Input
-          id="accountingAccountCode"
-          value={accountingAccountCode}
-          maxLength={20}
-          onChange={(e) => setAccountingAccountCode(e.target.value)}
-        />
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="acceptsEntries"
-            checked={acceptsEntries}
-            onCheckedChange={(v) => setAcceptsEntries(!!v)}
-          />
-          <label htmlFor="acceptsEntries" className="text-sm font-medium">
-            Recebe lançamento
-          </label>
-        </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FloatingSelect
+          label="Recebe lançamento"
+          value={acceptsEntries ? 'sim' : 'nao'}
+          pinned
+          onChange={(event) => setAcceptsEntries(event.target.value === 'sim')}
+        >
+          <option value="sim">Sim</option>
+          <option value="nao">Não</option>
+        </FloatingSelect>
         {nature === 'asset' ? (
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="isTreasury"
-              checked={isTreasury}
-              onCheckedChange={(v) => setIsTreasury(!!v)}
-            />
-            <label htmlFor="isTreasury" className="text-sm font-medium">
-              Conta de caixa ou banco
-            </label>
-          </div>
+          <FloatingSelect
+            label="Conta de caixa ou banco"
+            value={isTreasury ? 'sim' : 'nao'}
+            pinned
+            onChange={(event) => setIsTreasury(event.target.value === 'sim')}
+          >
+            <option value="sim">Sim</option>
+            <option value="nao">Não</option>
+          </FloatingSelect>
         ) : null}
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="isActive"
-            checked={isActive}
-            onCheckedChange={(v) => setIsActive(!!v)}
-          />
-          <label htmlFor="isActive" className="text-sm font-medium">
-            Ativo
-          </label>
-        </div>
+        <FloatingSelect
+          label="Situação"
+          value={isActive ? 'ativo' : 'inativo'}
+          pinned
+          onChange={(event) => setIsActive(event.target.value === 'ativo')}
+        >
+          <option value="ativo">Ativo</option>
+          <option value="inativo">Inativo</option>
+        </FloatingSelect>
       </div>
 
-      {mutation.isError && (
-        <p className="text-sm font-medium text-destructive bg-destructive/10 p-3 rounded-md">
-          {mutation.error.message}
-        </p>
-      )}
-
-      <div className="flex justify-end pt-2">
-        <Button type="submit" disabled={mutation.isPending}>
+      <div className="flex flex-wrap justify-end gap-2">
+        {onCancel ? (
+          <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>
+            Cancelar
+          </Button>
+        ) : null}
+        {accountId && onDeleted ? (
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={busy}
+            onClick={() => {
+              setDeleteError(null);
+              setOpenDelete(true);
+            }}
+          >
+            Excluir
+          </Button>
+        ) : null}
+        <Button type="submit" disabled={busy}>
           {mutation.isPending ? 'Salvando...' : accountId ? 'Atualizar' : 'Cadastrar'}
         </Button>
       </div>
+
+      <AlertDialog open={openDelete} onOpenChange={setOpenDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir plano de contas</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteError ??
+                `Deseja excluir ${name || 'esta conta'}? Essa ação não pode ser desfeita.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteMutation.isPending || !!deleteError}
+              onClick={(event) => {
+                event.preventDefault();
+                deleteMutation.mutate();
+              }}
+            >
+              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </form>
   );
 }
