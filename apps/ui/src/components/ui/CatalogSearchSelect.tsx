@@ -24,6 +24,9 @@ interface CatalogSearchSelectProps {
   enterSequence?: boolean;
   /** Quando informado, a busca vai para quem chamou em vez de filtrar as opções locais. */
   onSearch?: (term: string) => void;
+  /** Rótulo fixo sobre a borda, no mesmo desenho dos campos flutuantes. */
+  label?: string;
+  className?: string;
 }
 
 export function CatalogSearchSelect({
@@ -39,12 +42,19 @@ export function CatalogSearchSelect({
   id,
   enterSequence = false,
   onSearch,
+  label,
+  className,
 }: CatalogSearchSelectProps) {
   const listId = useId();
+  const generatedId = useId();
+  const fieldId = id ?? generatedId;
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [selectedLabel, setSelectedLabel] = useState('');
+  const [focused, setFocused] = useState(false);
+  const framed = Boolean(label);
+  const controlHeight = framed ? 'h-11' : 'h-9';
 
   useEffect(() => {
     if (!value) {
@@ -94,7 +104,7 @@ export function CatalogSearchSelect({
     setSearchText('');
   };
 
-  if (disabled) {
+  if (disabled && !framed) {
     return (
       <div className="flex h-9 items-center rounded-md border border-input bg-zinc-50 px-3 text-sm text-zinc-700">
         <span className="truncate">{selectedLabel || placeholder}</span>
@@ -102,74 +112,123 @@ export function CatalogSearchSelect({
     );
   }
 
+  const control = disabled ? (
+    <div id={fieldId} className="flex h-11 items-center px-3 text-sm text-zinc-800">
+      <span className="truncate">{selectedLabel || placeholder}</span>
+    </div>
+  ) : value && selectedLabel && !open ? (
+    <div
+      className={cn(
+        'flex items-center gap-1 bg-transparent px-2',
+        controlHeight,
+        framed ? undefined : 'rounded-md border border-input shadow-sm',
+      )}
+    >
+      <button
+        type="button"
+        id={fieldId}
+        {...(enterSequence ? { 'data-enter-sequence': '' } : {})}
+        className="flex min-w-0 flex-1 items-center gap-2 px-1 text-left text-sm"
+        onClick={() => setOpen(true)}
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
+      </button>
+      {allowClear && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onClick={clear}
+          aria-label="Limpar seleção"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
+    </div>
+  ) : (
+    <div className="relative">
+      <Search
+        className={cn(
+          'pointer-events-none absolute left-2.5 h-4 w-4 text-zinc-400',
+          framed ? 'top-1/2 -translate-y-1/2' : 'top-2.5',
+        )}
+      />
+      <Input
+        id={fieldId}
+        {...(enterSequence ? { 'data-enter-sequence': '' } : {})}
+        value={searchText}
+        placeholder={placeholder}
+        className={cn('pl-9', framed && 'h-11 border-0 shadow-none focus-visible:ring-0')}
+        required={required && !value}
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listId}
+        autoComplete="off"
+        onFocus={() => setOpen(true)}
+        onBlur={() => {
+          window.setTimeout(() => setOpen(false), 150);
+        }}
+        onChange={(e) => {
+          setSearchText(e.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            setOpen(false);
+            return;
+          }
+          if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+          const match = results[0];
+          if (!open || !searchText.trim() || !match) return;
+          event.preventDefault();
+          event.stopPropagation();
+          pick(match);
+        }}
+      />
+    </div>
+  );
+
   return (
-    <div ref={rootRef} className="relative">
-      {value && selectedLabel && !open ? (
-        <div className="flex h-9 items-center gap-1 rounded-md border border-input bg-transparent px-2 shadow-sm">
-          <button
-            type="button"
-            id={id}
-            {...(enterSequence ? { 'data-enter-sequence': '' } : {})}
-            className="flex min-w-0 flex-1 items-center gap-2 px-1 text-left text-sm"
-            onClick={() => setOpen(true)}
-          >
-            <span className="truncate">{selectedLabel}</span>
-            <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
-          </button>
-          {allowClear && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 shrink-0"
-              onClick={clear}
-              aria-label="Limpar seleção"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+    <div
+      ref={rootRef}
+      className={cn('relative', className)}
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      }}
+    >
+      {framed ? (
+        <div
+          className={cn(
+            'relative rounded-md border bg-transparent transition-colors',
+            focused ? 'border-primary' : 'border-input',
+            disabled && 'border-zinc-300',
           )}
+        >
+          {control}
+          <label
+            htmlFor={fieldId}
+            className={cn(
+              'absolute top-0 left-2.5 z-10 max-w-[calc(100%-1.25rem)] -translate-y-1/2 truncate bg-white px-1 text-xs leading-none font-medium',
+              focused
+                ? 'text-primary'
+                : disabled
+                  ? 'text-zinc-700'
+                  : 'text-muted-foreground',
+            )}
+          >
+            {label}
+          </label>
         </div>
       ) : (
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
-          <Input
-            id={id}
-            {...(enterSequence ? { 'data-enter-sequence': '' } : {})}
-            value={searchText}
-            placeholder={placeholder}
-            className="pl-9"
-            required={required && !value}
-            role="combobox"
-            aria-expanded={open}
-            aria-controls={listId}
-            autoComplete="off"
-            onFocus={() => setOpen(true)}
-            onBlur={() => {
-              window.setTimeout(() => setOpen(false), 150);
-            }}
-            onChange={(e) => {
-              setSearchText(e.target.value);
-              setOpen(true);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.preventDefault();
-                event.stopPropagation();
-                setOpen(false);
-                return;
-              }
-              if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
-              const match = results[0];
-              if (!open || !searchText.trim() || !match) return;
-              event.preventDefault();
-              event.stopPropagation();
-              pick(match);
-            }}
-          />
-        </div>
+        control
       )}
 
-      {open && (
+      {open && !disabled ? (
         <div
           id={listId}
           role="listbox"
@@ -206,7 +265,7 @@ export function CatalogSearchSelect({
             </p>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

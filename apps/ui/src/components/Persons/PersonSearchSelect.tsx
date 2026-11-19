@@ -1,7 +1,14 @@
 import { formatTaxId, parsePersonKind } from '@erp-360/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronRight, ChevronsUpDown, Plus, Search, X } from 'lucide-react';
-import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 
 import { FormPerson } from '@/components/Persons/FormPerson';
 import { Button } from '@/components/ui/button';
@@ -19,9 +26,9 @@ import { type Person, personsService } from '@/services/persons';
 function focusNextSequence(current: HTMLElement) {
   const form = current.closest('form');
   if (!form) return;
-  const fields = Array.from(form.querySelectorAll<HTMLElement>('[data-enter-sequence]')).filter(
-    (field) => !field.hasAttribute('disabled'),
-  );
+  const fields = Array.from(
+    form.querySelectorAll<HTMLElement>('[data-enter-sequence]'),
+  ).filter((field) => !field.hasAttribute('disabled'));
   const index = fields.findIndex((field) => field === current);
   const next = fields[index + 1];
   if (!next) return;
@@ -42,6 +49,9 @@ interface PersonSearchSelectProps {
   enterSequence?: boolean;
   /** Abre o cadastro de pessoa e seleciona quem for gravado. */
   allowCreate?: boolean;
+  /** Rótulo fixo sobre a borda, no mesmo desenho dos campos flutuantes. */
+  label?: string;
+  className?: string;
 }
 
 export function PersonSearchSelect({
@@ -54,9 +64,12 @@ export function PersonSearchSelect({
   disabled = false,
   enterSequence = false,
   allowCreate = false,
+  label,
+  className,
 }: PersonSearchSelectProps) {
   const types = Array.isArray(type) ? type : [type];
   const listId = useId();
+  const fieldId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -68,6 +81,9 @@ export function PersonSearchSelect({
   const [activeIndex, setActiveIndex] = useState(0);
   const [creating, setCreating] = useState(false);
   const [createdPerson, setCreatedPerson] = useState<Person | null>(null);
+  const [focused, setFocused] = useState(false);
+  const framed = Boolean(label);
+  const controlHeight = framed ? 'h-11' : 'h-9';
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchText.trim()), 400);
@@ -132,7 +148,9 @@ export function PersonSearchSelect({
   });
 
   const results = response?.data ?? [];
-  const highlighted = results.length ? Math.min(Math.max(activeIndex, 0), results.length - 1) : -1;
+  const highlighted = results.length
+    ? Math.min(Math.max(activeIndex, 0), results.length - 1)
+    : -1;
 
   useEffect(() => {
     if (!open || highlighted < 0) return;
@@ -220,16 +238,6 @@ export function PersonSearchSelect({
     focusNextSequence(event.currentTarget);
   };
 
-  if (disabled) {
-    return (
-      <div className="flex h-9 items-center rounded-md border border-input bg-zinc-50 px-3 text-sm text-zinc-700">
-        <span className="truncate">
-          {selectedLabel || (labelPending ? 'Carregando...' : placeholder)}
-        </span>
-      </div>
-    );
-  }
-
   const createButton = allowCreate ? (
     <button
       type="button"
@@ -243,160 +251,232 @@ export function PersonSearchSelect({
     </button>
   ) : null;
 
+  const control: ReactNode = disabled ? (
+    <div
+      id={fieldId}
+      className={cn(
+        'flex items-center px-3 text-sm',
+        controlHeight,
+        framed
+          ? 'text-zinc-800'
+          : 'rounded-md border border-input bg-zinc-50 text-zinc-700',
+      )}
+    >
+      <span className="truncate">
+        {selectedLabel || (labelPending ? 'Carregando...' : placeholder)}
+      </span>
+    </div>
+  ) : value && !open ? (
+    <div
+      className={cn(
+        'flex bg-transparent',
+        controlHeight,
+        framed
+          ? allowCreate
+            ? 'overflow-hidden'
+            : 'items-center gap-1 px-2'
+          : allowCreate
+            ? 'overflow-hidden rounded-md border border-input shadow-sm'
+            : 'items-center gap-1 rounded-md border border-input px-2 shadow-sm',
+      )}
+    >
+      <button
+        type="button"
+        id={fieldId}
+        className={cn(
+          'flex min-w-0 flex-1 items-center gap-2 text-left text-sm',
+          allowCreate ? 'h-full px-3' : 'px-1',
+        )}
+        data-enter-sequence={enterSequence ? '' : undefined}
+        onClick={() => {
+          setSearchText('');
+          setSearch('');
+          setOpen(true);
+        }}
+        onKeyDown={onSelectedKeyDown}
+      >
+        <span className={cn('truncate', !selectedLabel && 'text-zinc-500')}>
+          {selectedLabel || (labelPending ? 'Carregando...' : placeholder)}
+        </span>
+        <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
+      </button>
+      {allowClear && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          onClick={clear}
+          aria-label="Limpar seleção"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
+      {createButton}
+    </div>
+  ) : allowCreate ? (
+    <div
+      className={cn(
+        'flex overflow-hidden bg-transparent',
+        controlHeight,
+        framed
+          ? undefined
+          : 'rounded-md border border-input shadow-sm focus-within:ring-1 focus-within:ring-ring',
+      )}
+    >
+      <Search className="pointer-events-none my-auto ml-2.5 h-4 w-4 shrink-0 text-zinc-400" />
+      <Input
+        ref={inputRef}
+        id={fieldId}
+        value={searchText}
+        placeholder={placeholder}
+        className="h-full w-auto min-w-0 flex-1 rounded-none border-0 px-2 shadow-none focus-visible:ring-0"
+        required={required && !value}
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-activedescendant={
+          highlighted >= 0 ? `${listId}-option-${highlighted}` : undefined
+        }
+        autoComplete="off"
+        data-enter-sequence={enterSequence ? '' : undefined}
+        onFocus={() => setOpen(true)}
+        onChange={(e) => {
+          setSearchText(e.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={onSearchKeyDown}
+      />
+      {createButton}
+    </div>
+  ) : (
+    <div className="relative">
+      <Search
+        className={cn(
+          'pointer-events-none absolute left-2.5 h-4 w-4 text-zinc-400',
+          framed ? 'top-1/2 -translate-y-1/2' : 'top-2.5',
+        )}
+      />
+      <Input
+        ref={inputRef}
+        id={fieldId}
+        value={searchText}
+        placeholder={placeholder}
+        className={cn('pl-9', framed && 'h-11 border-0 shadow-none focus-visible:ring-0')}
+        required={required && !value}
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-activedescendant={
+          highlighted >= 0 ? `${listId}-option-${highlighted}` : undefined
+        }
+        autoComplete="off"
+        data-enter-sequence={enterSequence ? '' : undefined}
+        onFocus={() => setOpen(true)}
+        onChange={(e) => {
+          setSearchText(e.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={onSearchKeyDown}
+      />
+    </div>
+  );
+
   return (
-    <div ref={rootRef} className="relative">
-      {value && !open ? (
+    <div
+      ref={rootRef}
+      className={cn('relative', className)}
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      }}
+    >
+      {framed ? (
         <div
           className={cn(
-            'flex h-9 rounded-md border border-input bg-transparent shadow-sm',
-            allowCreate ? 'overflow-hidden' : 'items-center gap-1 px-2',
+            'relative rounded-md border bg-transparent transition-colors',
+            focused ? 'border-primary' : 'border-input',
+            disabled && 'border-zinc-300',
           )}
         >
-          <button
-            type="button"
+          {control}
+          <label
+            htmlFor={fieldId}
             className={cn(
-              'flex min-w-0 flex-1 items-center gap-2 text-left text-sm',
-              allowCreate ? 'h-full px-3' : 'px-1',
+              'absolute top-0 left-2.5 z-10 max-w-[calc(100%-1.25rem)] -translate-y-1/2 truncate bg-white px-1 text-xs leading-none font-medium',
+              focused
+                ? 'text-primary'
+                : disabled
+                  ? 'text-zinc-700'
+                  : 'text-muted-foreground',
             )}
-            data-enter-sequence={enterSequence ? '' : undefined}
-            onClick={() => {
-              setSearchText('');
-              setSearch('');
-              setOpen(true);
-            }}
-            onKeyDown={onSelectedKeyDown}
           >
-            <span className={cn('truncate', !selectedLabel && 'text-zinc-500')}>
-              {selectedLabel || (labelPending ? 'Carregando...' : placeholder)}
-            </span>
-            <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
-          </button>
-          {allowClear && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 shrink-0"
-              onClick={clear}
-              aria-label="Limpar seleção"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-          {createButton}
-        </div>
-      ) : allowCreate ? (
-        <div className="flex h-9 overflow-hidden rounded-md border border-input bg-transparent shadow-sm focus-within:ring-1 focus-within:ring-ring">
-          <Search className="pointer-events-none my-auto ml-2.5 h-4 w-4 shrink-0 text-zinc-400" />
-          <Input
-            ref={inputRef}
-            value={searchText}
-            placeholder={placeholder}
-            className="h-full w-auto min-w-0 flex-1 rounded-none border-0 px-2 shadow-none focus-visible:ring-0"
-            required={required && !value}
-            role="combobox"
-            aria-expanded={open}
-            aria-controls={listId}
-            aria-activedescendant={highlighted >= 0 ? `${listId}-option-${highlighted}` : undefined}
-            autoComplete="off"
-            data-enter-sequence={enterSequence ? '' : undefined}
-            onFocus={() => setOpen(true)}
-            onChange={(e) => {
-              setSearchText(e.target.value);
-              setOpen(true);
-            }}
-            onKeyDown={onSearchKeyDown}
-          />
-          {createButton}
+            {label}
+          </label>
         </div>
       ) : (
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
-          <Input
-            ref={inputRef}
-            value={searchText}
-            placeholder={placeholder}
-            className="pl-9"
-            required={required && !value}
-            role="combobox"
-            aria-expanded={open}
-            aria-controls={listId}
-            aria-activedescendant={highlighted >= 0 ? `${listId}-option-${highlighted}` : undefined}
-            autoComplete="off"
-            data-enter-sequence={enterSequence ? '' : undefined}
-            onFocus={() => setOpen(true)}
-            onChange={(e) => {
-              setSearchText(e.target.value);
-              setOpen(true);
-            }}
-            onKeyDown={onSearchKeyDown}
-          />
-        </div>
+        control
       )}
 
-      {open && (
+      {open && !disabled ? (
         <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-zinc-200 bg-white shadow-md">
-        <div
-          id={listId}
-          role="listbox"
-          className="max-h-56 overflow-auto py-1"
-        >
-          {isFetching ? (
-            <p className="px-3 py-2 text-sm text-zinc-500">Buscando...</p>
-          ) : results.length ? (
-            results.map((person, index) => (
-              <button
-                key={person.id}
-                id={`${listId}-option-${index}`}
-                ref={(node) => {
-                  optionRefs.current[index] = node;
-                }}
-                type="button"
-                role="option"
-                aria-selected={index === highlighted}
-                className={cn(
-                  'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-100',
-                  index === highlighted && 'bg-zinc-100',
-                  person.id === value && index !== highlighted && 'bg-zinc-50',
-                )}
-                onMouseEnter={() => setActiveIndex(index)}
-                onClick={() => pick(person)}
-              >
-                <ChevronRight
+          <div id={listId} role="listbox" className="max-h-56 overflow-auto py-1">
+            {isFetching ? (
+              <p className="px-3 py-2 text-sm text-zinc-500">Buscando...</p>
+            ) : results.length ? (
+              results.map((person, index) => (
+                <button
+                  key={person.id}
+                  id={`${listId}-option-${index}`}
+                  ref={(node) => {
+                    optionRefs.current[index] = node;
+                  }}
+                  type="button"
+                  role="option"
+                  aria-selected={index === highlighted}
                   className={cn(
-                    'h-4 w-4 shrink-0',
-                    index === highlighted ? 'opacity-100' : 'opacity-0',
+                    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-100',
+                    index === highlighted && 'bg-zinc-100',
+                    person.id === value && index !== highlighted && 'bg-zinc-50',
                   )}
-                />
-                <Check
-                  className={cn(
-                    'h-4 w-4 shrink-0',
-                    person.id === value ? 'opacity-100' : 'opacity-0',
-                  )}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{person.name}</span>
-                  {person.taxId ? (
-                    <span className="block truncate text-xs text-zinc-500">
-                      {formatTaxId(parsePersonKind(person.type), person.taxId)}
-                    </span>
-                  ) : null}
-                </span>
-              </button>
-            ))
-          ) : (
-            <p className="px-3 py-2 text-sm text-zinc-500">
-              {search
-                ? 'Nenhum resultado para a busca.'
-                : 'Digite para buscar ou aguarde a lista inicial.'}
-            </p>
-          )}
-        </div>
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => pick(person)}
+                >
+                  <ChevronRight
+                    className={cn(
+                      'h-4 w-4 shrink-0',
+                      index === highlighted ? 'opacity-100' : 'opacity-0',
+                    )}
+                  />
+                  <Check
+                    className={cn(
+                      'h-4 w-4 shrink-0',
+                      person.id === value ? 'opacity-100' : 'opacity-0',
+                    )}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{person.name}</span>
+                    {person.taxId ? (
+                      <span className="block truncate text-xs text-zinc-500">
+                        {formatTaxId(parsePersonKind(person.type), person.taxId)}
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              ))
+            ) : (
+              <p className="px-3 py-2 text-sm text-zinc-500">
+                {search
+                  ? 'Nenhum resultado para a busca.'
+                  : 'Digite para buscar ou aguarde a lista inicial.'}
+              </p>
+            )}
+          </div>
           <div className="border-t border-zinc-100 px-3 py-1.5">
             <p className="text-xs text-zinc-400">↑ ↓ navega · Enter seleciona</p>
           </div>
         </div>
-      )}
+      ) : null}
       <Dialog
         open={creating}
         onOpenChange={(open) => {

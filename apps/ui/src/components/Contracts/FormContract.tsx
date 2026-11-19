@@ -13,8 +13,11 @@ import { toast } from 'sonner';
 import { PersonSearchSelect } from '@/components/Persons/PersonSearchSelect';
 import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+  FloatingInput,
+  FloatingSelect,
+  FloatingTextarea,
+} from '@/components/ui/FloatingField';
 import {
   billingConfirmText,
   billingDoneText,
@@ -29,9 +32,6 @@ import {
 } from '@/services/contracts';
 import { financialService } from '@/services/financials';
 import { paymentMethodsService } from '@/services/paymentMethods';
-
-const selectClass =
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm';
 
 function focusNextField(form: HTMLFormElement, current: HTMLElement) {
   const fields = Array.from(
@@ -224,6 +224,7 @@ export function FormContract() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<Draft | null>(id ? null : emptyDraft());
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [suspending, setSuspending] = useState(false);
   const [reason, setReason] = useState('');
   const [billingPreview, setBillingPreview] = useState<ContractBillingResult | null>(
@@ -264,12 +265,17 @@ export function FormContract() {
       backToList?: boolean;
     }) => {
       if (!draft) throw new Error('O contrato ainda não carregou.');
-      if (!draft.personId) throw new Error('Informe o cliente.');
-      if (!draft.title.trim()) throw new Error('Informe o título.');
-      if (!draft.startedOn) throw new Error('Informe o início da vigência.');
+      const errors: Record<string, string> = {};
+      if (!draft.title.trim()) errors['contract-title'] = 'Informe o título.';
+      if (!draft.startedOn) errors['contract-start'] = 'Informe o início da vigência.';
       if (next.status === 'suspended' && !next.suspensionReason?.trim()) {
-        throw new Error('Informe o motivo da suspensão.');
+        errors['contract-reason'] = 'Informe o motivo da suspensão.';
       }
+      setFieldErrors(errors);
+      if (!draft.personId) throw new Error('Informe o cliente.');
+      const message =
+        errors['contract-title'] ?? errors['contract-start'] ?? errors['contract-reason'];
+      if (message) throw new Error(message);
       const input = toInput(draft);
       let contractId = id;
       let openedId: string | null = null;
@@ -367,6 +373,15 @@ export function FormContract() {
       ? [{ id: draft.planAccountId, label: savedAccountLabel }, ...accountOptions]
       : accountOptions;
 
+  function clearFieldError(key: string) {
+    setFieldErrors((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
+
   function patch(partial: Partial<Draft>) {
     setDraft((current) => (current ? { ...current, ...partial } : current));
   }
@@ -394,175 +409,170 @@ export function FormContract() {
 
       <section className="space-y-4 rounded-lg border bg-white p-6">
         <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 space-y-1.5 md:col-span-8">
-            <Label>Cliente</Label>
-            <PersonSearchSelect
-              value={draft.personId}
-              onChange={(personId) => patch({ personId })}
-              type="cliente"
-              placeholder="Buscar cliente ativo..."
-              disabled={locked || frozen}
-              enterSequence
-            />
-          </div>
-          <div className="col-span-12 space-y-1.5 md:col-span-4">
-            <Label htmlFor="contract-title">Título</Label>
-            <Input
-              id="contract-title"
-              data-enter-sequence=""
-              value={draft.title}
-              disabled={locked}
-              maxLength={120}
-              onChange={(event) => patch({ title: event.target.value })}
-            />
-          </div>
-          <div className="col-span-6 space-y-1.5 md:col-span-3">
-            <Label htmlFor="contract-start">Início</Label>
-            <Input
-              id="contract-start"
-              data-enter-sequence=""
-              type="date"
-              value={draft.startedOn}
-              disabled={locked || frozen}
-              onChange={(event) => patch({ startedOn: event.target.value })}
-            />
-          </div>
-          <div className="col-span-6 space-y-1.5 md:col-span-3">
-            <Label htmlFor="contract-end">Fim</Label>
-            <Input
+          <PersonSearchSelect
+            className="col-span-12 md:col-span-8"
+            label="Cliente"
+            value={draft.personId}
+            onChange={(personId) => patch({ personId })}
+            type="cliente"
+            placeholder="Buscar cliente ativo..."
+            disabled={locked || frozen}
+            enterSequence
+          />
+          <FloatingInput
+            id="contract-title"
+            label="Título"
+            className="col-span-12 md:col-span-4"
+            required
+            error={fieldErrors['contract-title']}
+            data-enter-sequence=""
+            value={draft.title}
+            disabled={locked}
+            maxLength={120}
+            onChange={(event) => {
+              patch({ title: event.target.value });
+              clearFieldError('contract-title');
+            }}
+          />
+          <FloatingInput
+            id="contract-start"
+            label="Início"
+            className="col-span-6 md:col-span-3"
+            type="date"
+            required
+            error={fieldErrors['contract-start']}
+            data-enter-sequence=""
+            value={draft.startedOn}
+            disabled={locked || frozen}
+            onChange={(event) => {
+              patch({ startedOn: event.target.value });
+              clearFieldError('contract-start');
+            }}
+          />
+          <div className="col-span-6 md:col-span-3">
+            <FloatingInput
               id="contract-end"
-              data-enter-sequence=""
+              label="Fim"
               type="date"
+              data-enter-sequence=""
               value={draft.endedOn}
               disabled={locked}
               onChange={(event) => patch({ endedOn: event.target.value })}
             />
-            <p className="text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-zinc-500">
               Em branco, o prazo fica indeterminado.
             </p>
           </div>
-          <div className="col-span-12 space-y-1.5 md:col-span-3">
-            <Label htmlFor="contract-kind">Cobrança</Label>
-            <select
-              id="contract-kind"
-              data-enter-sequence=""
-              className={selectClass}
-              value={draft.billingKind}
-              disabled={locked || frozen}
-              onChange={(event) => {
-                const billingKind = event.target.value as ContractBillingKind;
-                patch({
-                  billingKind,
-                  billingCompetence:
-                    billingKind === 'none' ? '' : draft.billingCompetence,
-                  amount: billingKind === 'none' ? '' : draft.amount,
-                  dueDay: billingKind === 'none' ? '' : draft.dueDay,
-                  paymentMethodId: billingKind === 'none' ? '' : draft.paymentMethodId,
-                  planAccountId: billingKind === 'none' ? '' : draft.planAccountId,
-                });
-              }}
-            >
-              {(Object.keys(billingKindLabels) as ContractBillingKind[]).map((value) => (
-                <option key={value} value={value}>
-                  {billingKindLabels[value]}
-                </option>
-              ))}
-            </select>
-          </div>
+          <FloatingSelect
+            id="contract-kind"
+            label="Cobrança"
+            className="col-span-12 md:col-span-3"
+            data-enter-sequence=""
+            value={draft.billingKind}
+            disabled={locked || frozen}
+            onChange={(event) => {
+              const billingKind = event.target.value as ContractBillingKind;
+              patch({
+                billingKind,
+                billingCompetence: billingKind === 'none' ? '' : draft.billingCompetence,
+                amount: billingKind === 'none' ? '' : draft.amount,
+                dueDay: billingKind === 'none' ? '' : draft.dueDay,
+                paymentMethodId: billingKind === 'none' ? '' : draft.paymentMethodId,
+                planAccountId: billingKind === 'none' ? '' : draft.planAccountId,
+              });
+            }}
+          >
+            {(Object.keys(billingKindLabels) as ContractBillingKind[]).map((value) => (
+              <option key={value} value={value}>
+                {billingKindLabels[value]}
+              </option>
+            ))}
+          </FloatingSelect>
           {recurring ? (
             <>
-              <div className="col-span-6 space-y-1.5 md:col-span-3">
-                <Label htmlFor="contract-competence">Competência</Label>
-                <select
-                  id="contract-competence"
-                  data-enter-sequence=""
-                  className={selectClass}
-                  value={draft.billingCompetence}
-                  disabled={locked || frozen}
-                  onChange={(event) =>
-                    patch({
-                      billingCompetence: event.target.value as
-                        ContractBillingCompetence | '',
-                    })
-                  }
-                >
-                  <option value="">Selecione</option>
-                  <option value="current">Atual</option>
-                  <option value="previous">Anterior</option>
-                </select>
-              </div>
-              <div className="col-span-6 space-y-1.5 md:col-span-3">
-                <Label htmlFor="contract-amount">Valor do período</Label>
-                <Input
-                  id="contract-amount"
-                  data-enter-sequence=""
-                  value={draft.amount}
-                  disabled={locked}
-                  inputMode="numeric"
-                  onChange={(event) =>
-                    patch({ amount: maskCurrencyInput(event.target.value) })
-                  }
-                />
-              </div>
-              <div className="col-span-6 space-y-1.5 md:col-span-2">
-                <Label htmlFor="contract-due-day">Dia</Label>
-                <Input
-                  id="contract-due-day"
-                  data-enter-sequence=""
-                  value={draft.dueDay}
-                  disabled={locked}
-                  inputMode="numeric"
-                  onChange={(event) =>
-                    patch({ dueDay: event.target.value.replace(/\D/g, '').slice(0, 2) })
-                  }
-                />
-              </div>
-              <div className="col-span-12 space-y-1.5 md:col-span-4">
-                <Label htmlFor="contract-method">Forma</Label>
-                <select
-                  id="contract-method"
-                  data-enter-sequence=""
-                  className={selectClass}
-                  value={draft.paymentMethodId}
-                  disabled={locked || frozen}
-                  onChange={(event) => patch({ paymentMethodId: event.target.value })}
-                >
-                  <option value="">Sem forma</option>
-                  {(methods.data?.data ?? []).map((method) => (
-                    <option key={method.id} value={method.id}>
-                      {method.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-span-12 space-y-1.5 md:col-span-8">
-                <Label htmlFor="contract-account">Plano de contas</Label>
-                <CatalogSearchSelect
-                  id="contract-account"
-                  enterSequence
-                  value={draft.planAccountId}
-                  onChange={(planAccountId) => patch({ planAccountId })}
-                  options={planAccountOptions}
-                  placeholder="Buscar conta de receita..."
-                  emptyMessage="Nenhuma conta de receita cadastrada."
-                  allowClear={!locked}
-                  disabled={locked}
-                  isLoading={planAccounts.isLoading}
-                />
-              </div>
+              <FloatingSelect
+                id="contract-competence"
+                label="Competência"
+                className="col-span-6 md:col-span-3"
+                data-enter-sequence=""
+                value={draft.billingCompetence}
+                disabled={locked || frozen}
+                onChange={(event) =>
+                  patch({
+                    billingCompetence: event.target.value as
+                      ContractBillingCompetence | '',
+                  })
+                }
+              >
+                <option value="">Selecione</option>
+                <option value="current">Atual</option>
+                <option value="previous">Anterior</option>
+              </FloatingSelect>
+              <FloatingInput
+                id="contract-amount"
+                label="Valor do período"
+                className="col-span-6 md:col-span-3"
+                data-enter-sequence=""
+                value={draft.amount}
+                disabled={locked}
+                inputMode="numeric"
+                onChange={(event) =>
+                  patch({ amount: maskCurrencyInput(event.target.value) })
+                }
+              />
+              <FloatingInput
+                id="contract-due-day"
+                label="Dia"
+                className="col-span-6 md:col-span-2"
+                data-enter-sequence=""
+                value={draft.dueDay}
+                disabled={locked}
+                inputMode="numeric"
+                onChange={(event) =>
+                  patch({ dueDay: event.target.value.replace(/\D/g, '').slice(0, 2) })
+                }
+              />
+              <FloatingSelect
+                id="contract-method"
+                label="Forma"
+                className="col-span-12 md:col-span-4"
+                data-enter-sequence=""
+                value={draft.paymentMethodId}
+                disabled={locked || frozen}
+                onChange={(event) => patch({ paymentMethodId: event.target.value })}
+              >
+                <option value="">Sem forma</option>
+                {(methods.data?.data ?? []).map((method) => (
+                  <option key={method.id} value={method.id}>
+                    {method.name}
+                  </option>
+                ))}
+              </FloatingSelect>
+              <CatalogSearchSelect
+                id="contract-account"
+                label="Plano de contas"
+                className="col-span-12 md:col-span-8"
+                enterSequence
+                value={draft.planAccountId}
+                onChange={(planAccountId) => patch({ planAccountId })}
+                options={planAccountOptions}
+                placeholder="Buscar conta de receita..."
+                emptyMessage="Nenhuma conta de receita cadastrada."
+                allowClear={!locked}
+                disabled={locked}
+                isLoading={planAccounts.isLoading}
+              />
             </>
           ) : null}
-          <div className="col-span-12 space-y-1.5">
-            <Label htmlFor="contract-notes">Observação</Label>
-            <textarea
-              id="contract-notes"
-              data-enter-sequence=""
-              className="min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
-              value={draft.notes}
-              disabled={locked}
-              onChange={(event) => patch({ notes: event.target.value })}
-            />
-          </div>
+          <FloatingTextarea
+            id="contract-notes"
+            label="Observação"
+            className="col-span-12"
+            data-enter-sequence=""
+            value={draft.notes}
+            disabled={locked}
+            onChange={(event) => patch({ notes: event.target.value })}
+          />
         </div>
 
         <div className="space-y-2">
@@ -618,16 +628,20 @@ export function FormContract() {
 
         {suspending ? (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <div className="w-full space-y-1.5 sm:max-w-md">
-              <Label htmlFor="contract-reason">Motivo da suspensão</Label>
-              <Input
-                id="contract-reason"
-                data-enter-sequence=""
-                value={reason}
-                maxLength={200}
-                onChange={(event) => setReason(event.target.value)}
-              />
-            </div>
+            <FloatingInput
+              id="contract-reason"
+              label="Motivo da suspensão"
+              className="w-full sm:max-w-md"
+              required
+              error={fieldErrors['contract-reason']}
+              data-enter-sequence=""
+              value={reason}
+              maxLength={200}
+              onChange={(event) => {
+                setReason(event.target.value);
+                clearFieldError('contract-reason');
+              }}
+            />
             <Button
               type="button"
               disabled={save.isPending}

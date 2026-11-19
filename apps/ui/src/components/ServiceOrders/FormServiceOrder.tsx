@@ -30,9 +30,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
-import { FloatingInput, FloatingSelect, FloatingTextarea } from '@/components/ui/FloatingField';
+import {
+  FloatingInput,
+  FloatingSelect,
+  FloatingTextarea,
+} from '@/components/ui/FloatingField';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { contractsService } from '@/services/contracts';
 import { type CatalogItem, itemsService } from '@/services/items';
 import { paymentMethodsService } from '@/services/paymentMethods';
@@ -1090,18 +1093,17 @@ export function FormServiceOrder() {
 
       <section className="space-y-4 rounded-lg border bg-white p-6">
         <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 space-y-1.5 md:col-span-12">
-            <Label>Cliente</Label>
-            <PersonSearchSelect
-              value={draft.personId}
-              onChange={(personId) => void choosePerson(personId)}
-              type="cliente"
-              placeholder="Buscar cliente ativo..."
-              disabled={locked}
-              enterSequence
-              allowCreate={!locked}
-            />
-          </div>
+          <PersonSearchSelect
+            className="col-span-12"
+            label="Cliente"
+            value={draft.personId}
+            onChange={(personId) => void choosePerson(personId)}
+            type="cliente"
+            placeholder="Buscar cliente ativo..."
+            disabled={locked}
+            enterSequence
+            allowCreate={!locked}
+          />
         </div>
 
         {draft.personId ? (
@@ -1304,7 +1306,9 @@ export function FormServiceOrder() {
             data-enter-sequence=""
             inputMode="numeric"
             autoComplete="off"
-            onChange={(event) => patch({ freight: maskCurrencyInput(event.target.value) })}
+            onChange={(event) =>
+              patch({ freight: maskCurrencyInput(event.target.value) })
+            }
           />
           <FloatingInput
             label="Desconto (R$)"
@@ -1313,7 +1317,9 @@ export function FormServiceOrder() {
             data-enter-sequence=""
             inputMode="numeric"
             autoComplete="off"
-            onChange={(event) => patch({ discount: maskCurrencyInput(event.target.value) })}
+            onChange={(event) =>
+              patch({ discount: maskCurrencyInput(event.target.value) })
+            }
           />
           <FloatingInput
             label="Acréscimo (R$)"
@@ -1322,7 +1328,9 @@ export function FormServiceOrder() {
             data-enter-sequence=""
             inputMode="numeric"
             autoComplete="off"
-            onChange={(event) => patch({ surcharge: maskCurrencyInput(event.target.value) })}
+            onChange={(event) =>
+              patch({ surcharge: maskCurrencyInput(event.target.value) })
+            }
           />
         </div>
         <p className="text-sm text-zinc-700">
@@ -1519,7 +1527,9 @@ export function FormServiceOrder() {
             data-enter-sequence=""
             value={draft.status}
             disabled={locked}
-            onChange={(event) => patch({ status: event.target.value as ServiceOrderStatus })}
+            onChange={(event) =>
+              patch({ status: event.target.value as ServiceOrderStatus })
+            }
           >
             {destinations.map((value) => (
               <option key={value} value={value}>
