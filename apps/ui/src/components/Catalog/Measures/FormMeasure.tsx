@@ -16,12 +16,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FloatingInput, FloatingSelect } from '@/components/ui/FloatingField';
 import { type Measure, type MeasureInput, measuresService } from '@/services/measures';
-
-const selectClassName =
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
 
 function parseMeasureType(value: unknown): MeasureType | '' {
   return measureTypes.includes(value as MeasureType) ? (value as MeasureType) : '';
@@ -56,6 +52,7 @@ export function FormMeasure({
   const [isActive, setIsActive] = useState(measureToUpdate?.isActive !== false);
   const [openDelete, setOpenDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const { data: loaded } = useQuery({
     queryKey: ['measure', measureId],
@@ -111,7 +108,17 @@ export function FormMeasure({
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (!measureType || (!showOnProduct && !showOnService)) return;
+    const errors: Record<string, string> = {};
+    if (!abbreviation.trim()) errors.abbreviation = 'Informe a sigla.';
+    if (!name.trim()) errors.name = 'Informe o nome.';
+    if (!measureType) errors.measureType = 'Informe o tipo.';
+    setFieldErrors(errors);
+    const message = errors.abbreviation ?? errors.name ?? errors.measureType;
+    if (message || !measureType) {
+      if (message) toast.error(message);
+      return;
+    }
+    if (!showOnProduct && !showOnService) return;
     mutation.mutate({
       name,
       abbreviation,
@@ -122,57 +129,71 @@ export function FormMeasure({
     });
   };
 
+  function clearFieldError(key: string) {
+    setFieldErrors((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="measureAbbreviation">Sigla</Label>
-          <Input
-            id="measureAbbreviation"
-            value={abbreviation}
-            maxLength={6}
-            onChange={(event) => setAbbreviation(event.target.value.toUpperCase())}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="measureType">Tipo</Label>
-          <select
-            id="measureType"
-            value={measureType}
-            onChange={(event) => setMeasureType(parseMeasureType(event.target.value))}
-            className={selectClassName}
-            required
-          >
-            <option value="" disabled>
-              Selecione o tipo
+        <FloatingInput
+          id="measureAbbreviation"
+          label="Sigla"
+          value={abbreviation}
+          maxLength={6}
+          required
+          error={fieldErrors.abbreviation}
+          onChange={(event) => {
+            setAbbreviation(event.target.value.toUpperCase());
+            clearFieldError('abbreviation');
+          }}
+        />
+        <FloatingSelect
+          id="measureType"
+          label="Tipo"
+          value={measureType}
+          required
+          error={fieldErrors.measureType}
+          onChange={(event) => {
+            setMeasureType(parseMeasureType(event.target.value));
+            clearFieldError('measureType');
+          }}
+        >
+          <option value="" disabled>
+            Selecione o tipo
+          </option>
+          {measureTypes.map((type) => (
+            <option key={type} value={type}>
+              {measureTypeLabels[type]}
             </option>
-            {measureTypes.map((type) => (
-              <option key={type} value={type}>
-                {measureTypeLabels[type]}
-              </option>
-            ))}
-          </select>
-        </div>
+          ))}
+        </FloatingSelect>
       </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="measureName">Nome</Label>
-        <Input
-          id="measureName"
-          value={name}
-          maxLength={30}
-          onChange={(event) => setName(event.target.value)}
-          required
-        />
-      </div>
+      <FloatingInput
+        id="measureName"
+        label="Nome"
+        value={name}
+        maxLength={30}
+        required
+        error={fieldErrors.name}
+        onChange={(event) => {
+          setName(event.target.value);
+          clearFieldError('name');
+        }}
+      />
 
       <p className="text-sm text-zinc-500">
         A sigla vai para a NF-e e tem no máximo 6 caracteres.
       </p>
 
       <div className="space-y-2">
-        <Label>Exibir em</Label>
+        <p className="text-sm font-medium text-zinc-900">Exibir em</p>
         <div className="flex gap-6">
           <div className="flex items-center space-x-2">
             <Checkbox

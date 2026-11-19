@@ -47,19 +47,21 @@ export function MeasurePage() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-2xl font-bold text-zinc-900">
+        <h2 className="text-2xl font-bold text-[#172337]">
           {id ? 'Editar medida' : 'Nova medida'}
         </h2>
         {measure.data ? (
-          <p className="text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-[#64748b]">
             {measure.data.abbreviation} · {measure.data.name} ·{' '}
             {measureTypeLabels[measure.data.measureType]}
           </p>
         ) : (
-          <p className="text-sm text-zinc-500">Sigla, tipo e onde a medida aparece.</p>
+          <p className="mt-1 text-sm text-[#64748b]">
+            Sigla, tipo e onde a medida aparece.
+          </p>
         )}
       </div>
-      <div className="rounded-lg border border-zinc-200 bg-white p-4 md:p-6">
+      <div className="rounded-lg border bg-white p-6">
         <FormMeasure
           key={id ?? 'new'}
           measureToUpdate={measure.data ?? null}
