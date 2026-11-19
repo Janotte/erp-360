@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
+import { FloatingInput, FloatingSelect, FloatingTextarea } from '@/components/ui/FloatingField';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { contractsService } from '@/services/contracts';
@@ -97,9 +98,6 @@ const transitions: Record<ServiceOrderStatus, readonly ServiceOrderStatus[]> = {
   delivered: [],
   cancelled: [],
 };
-
-const selectClass =
-  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm';
 
 type DraftField = {
   slot: string;
@@ -606,6 +604,7 @@ export function FormServiceOrder() {
   const [allocationInstallments, setAllocationInstallments] = useState('');
   const [allocationAmount, setAllocationAmount] = useState('');
   const [reverseOpen, setReverseOpen] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const amountTouched = useRef(false);
 
   const settings = useQuery({
@@ -783,6 +782,15 @@ export function FormServiceOrder() {
   const allocatedAmount = allocatedPayments(draft);
   const remainingAmount = totalAmount - allocatedAmount;
 
+  function clearFieldError(key: string) {
+    setFieldErrors((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
+
   function patch(partial: Partial<Draft>) {
     setDraft((current) => (current ? { ...current, ...partial } : current));
   }
@@ -798,6 +806,7 @@ export function FormServiceOrder() {
           }
         : current,
     );
+    clearFieldError(slot);
   }
 
   function patchLine(index: number, partial: Partial<DraftLine>) {
@@ -957,22 +966,32 @@ export function FormServiceOrder() {
 
   function canSubmit(status: ServiceOrderStatus) {
     if (!draft) return false;
+    const next: Record<string, string> = {};
+    if (!draft.customerName.trim()) {
+      next['service-order-customer-name'] = 'Informe o nome do cliente.';
+    }
+    if (status !== 'cancelled') {
+      for (const field of draft.fields) {
+        if (field.isActive && field.isRequired && !field.value.trim()) {
+          next[field.slot] = `Informe ${field.label}.`;
+        }
+      }
+    }
+    setFieldErrors(next);
     if (!draft.personId) {
       toast.error('Informe um cliente ativo.');
       return false;
     }
-    if (!draft.customerName.trim()) {
-      toast.error('Informe o nome do cliente.');
+    if (next['service-order-customer-name']) {
+      toast.error(next['service-order-customer-name']);
       return false;
     }
-    if (status !== 'cancelled') {
-      const missing = draft.fields.some(
-        (field) => field.isActive && field.isRequired && !field.value.trim(),
-      );
-      if (missing) {
-        toast.error('Preencha os campos obrigatórios.');
-        return false;
-      }
+    if (
+      status !== 'cancelled' &&
+      Object.keys(next).some((key) => key !== 'service-order-customer-name')
+    ) {
+      toast.error('Preencha os campos obrigatórios.');
+      return false;
     }
     if (draft.payments.some((row) => !/^\d{4}-\d{2}-\d{2}$/.test(row.dueOn))) {
       toast.error('Informe o vencimento de cada parcela.');
@@ -1091,8 +1110,13 @@ export function FormServiceOrder() {
               id="service-order-customer-name"
               label="Nome"
               value={draft.customerName}
+              required
+              error={fieldErrors['service-order-customer-name']}
               disabled={locked}
-              onChange={(customerName) => patch({ customerName })}
+              onChange={(customerName) => {
+                patch({ customerName });
+                clearFieldError('service-order-customer-name');
+              }}
             />
             <CopyField
               id="service-order-customer-tax-id"
@@ -1210,24 +1234,25 @@ export function FormServiceOrder() {
           {draft.fields
             .filter((field) => field.isActive)
             .map((field) => (
-              <div key={field.slot} className={`space-y-1.5 ${spanClass(field.width)}`}>
-                <Label htmlFor={field.slot}>
-                  {field.label}
-                  {field.isRequired ? ' *' : ''}
-                </Label>
+              <div key={field.slot} className={spanClass(field.width)}>
                 {longField(field.slot) ? (
-                  <textarea
+                  <FloatingTextarea
                     id={field.slot}
+                    label={field.label}
+                    required={field.isRequired}
+                    error={fieldErrors[field.slot]}
                     data-enter-sequence=""
-                    className="min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm disabled:bg-zinc-50"
                     maxLength={2000}
                     value={field.value}
                     disabled={locked}
                     onChange={(event) => patchField(field.slot, event.target.value)}
                   />
                 ) : (
-                  <Input
+                  <FloatingInput
                     id={field.slot}
+                    label={field.label}
+                    required={field.isRequired}
+                    error={fieldErrors[field.slot]}
                     data-enter-sequence=""
                     value={field.value}
                     maxLength={120}
@@ -1272,23 +1297,32 @@ export function FormServiceOrder() {
       <section className="space-y-4 rounded-lg border bg-white p-6">
         <h3 className="text-lg font-semibold text-zinc-900">Totais e pagamento</h3>
         <div className="grid gap-4 md:grid-cols-3">
-          <MoneyField
+          <FloatingInput
             label="Frete (R$)"
             value={draft.freight}
             disabled={locked}
-            onChange={(freight) => patch({ freight })}
+            data-enter-sequence=""
+            inputMode="numeric"
+            autoComplete="off"
+            onChange={(event) => patch({ freight: maskCurrencyInput(event.target.value) })}
           />
-          <MoneyField
+          <FloatingInput
             label="Desconto (R$)"
             value={draft.discount}
             disabled={locked}
-            onChange={(discount) => patch({ discount })}
+            data-enter-sequence=""
+            inputMode="numeric"
+            autoComplete="off"
+            onChange={(event) => patch({ discount: maskCurrencyInput(event.target.value) })}
           />
-          <MoneyField
+          <FloatingInput
             label="Acréscimo (R$)"
             value={draft.surcharge}
             disabled={locked}
-            onChange={(surcharge) => patch({ surcharge })}
+            data-enter-sequence=""
+            inputMode="numeric"
+            autoComplete="off"
+            onChange={(event) => patch({ surcharge: maskCurrencyInput(event.target.value) })}
           />
         </div>
         <p className="text-sm text-zinc-700">
@@ -1303,66 +1337,60 @@ export function FormServiceOrder() {
         </p>
         {locked ? null : (
           <div className="grid items-end gap-4 md:grid-cols-12">
-            <div className="space-y-1.5 md:col-span-4">
-              <Label htmlFor="service-order-method">Forma de pagamento</Label>
-              <select
-                id="service-order-method"
-                className={selectClass}
-                data-enter-sequence=""
-                value={allocationMethodId}
-                onChange={(event) => {
-                  const nextId = event.target.value;
-                  const method = paymentMethods.find((item) => item.id === nextId);
-                  const stillValid = method?.terms.some(
-                    (term) => String(term.installmentCount) === allocationInstallments,
-                  );
-                  setAllocationMethodId(nextId);
-                  if (!stillValid) setAllocationInstallments('');
-                }}
-              >
-                <option value="">Selecione</option>
-                {paymentMethods.map((method) => (
-                  <option key={method.id} value={method.id}>
-                    {method.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5 md:col-span-3">
-              <Label htmlFor="service-order-installments">Condição</Label>
-              <select
-                id="service-order-installments"
-                className={selectClass}
-                data-enter-sequence=""
-                value={allocationInstallments}
-                disabled={!allocationMethodId}
-                onChange={(event) => setAllocationInstallments(event.target.value)}
-              >
-                <option value="">Selecione</option>
-                {allocationTerms.map((term) => (
-                  <option key={term.installmentCount} value={term.installmentCount}>
-                    {term.installmentCount === 1 && term.firstDueDays === 0
-                      ? 'À vista'
-                      : `${term.installmentCount}x`}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5 md:col-span-3">
-              <Label htmlFor="service-order-allocation">Valor</Label>
-              <Input
-                id="service-order-allocation"
-                data-enter-sequence=""
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder="0,00"
-                value={allocationAmount}
-                onChange={(event) => {
-                  amountTouched.current = true;
-                  setAllocationAmount(maskCurrencyInput(event.target.value));
-                }}
-              />
-            </div>
+            <FloatingSelect
+              id="service-order-method"
+              label="Forma de pagamento"
+              className="md:col-span-4"
+              data-enter-sequence=""
+              value={allocationMethodId}
+              onChange={(event) => {
+                const nextId = event.target.value;
+                const method = paymentMethods.find((item) => item.id === nextId);
+                const stillValid = method?.terms.some(
+                  (term) => String(term.installmentCount) === allocationInstallments,
+                );
+                setAllocationMethodId(nextId);
+                if (!stillValid) setAllocationInstallments('');
+              }}
+            >
+              <option value="">Selecione</option>
+              {paymentMethods.map((method) => (
+                <option key={method.id} value={method.id}>
+                  {method.name}
+                </option>
+              ))}
+            </FloatingSelect>
+            <FloatingSelect
+              id="service-order-installments"
+              label="Condição"
+              className="md:col-span-3"
+              data-enter-sequence=""
+              value={allocationInstallments}
+              disabled={!allocationMethodId}
+              onChange={(event) => setAllocationInstallments(event.target.value)}
+            >
+              <option value="">Selecione</option>
+              {allocationTerms.map((term) => (
+                <option key={term.installmentCount} value={term.installmentCount}>
+                  {term.installmentCount === 1 && term.firstDueDays === 0
+                    ? 'À vista'
+                    : `${term.installmentCount}x`}
+                </option>
+              ))}
+            </FloatingSelect>
+            <FloatingInput
+              id="service-order-allocation"
+              label="Valor"
+              className="md:col-span-3"
+              data-enter-sequence=""
+              inputMode="numeric"
+              autoComplete="off"
+              value={allocationAmount}
+              onChange={(event) => {
+                amountTouched.current = true;
+                setAllocationAmount(maskCurrencyInput(event.target.value));
+              }}
+            />
             <div className="md:col-span-2">
               <Button
                 type="button"
@@ -1468,122 +1496,108 @@ export function FormServiceOrder() {
       <section className="space-y-4 rounded-lg border bg-white p-6">
         <h3 className="text-lg font-semibold text-zinc-900">Informações adicionais</h3>
         <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 space-y-1.5 md:col-span-6">
-            <Label htmlFor="service-order-promised">Previsão</Label>
-            <Input
-              id="service-order-promised"
-              type="datetime-local"
-              data-enter-sequence=""
-              value={toLocalInput(draft.promisedAt)}
-              disabled={locked}
-              onChange={(event) =>
-                patch({
-                  promisedAt: event.target.value
-                    ? new Date(event.target.value).toISOString()
-                    : null,
-                })
-              }
-            />
-          </div>
-          <div className="col-span-12 space-y-1.5 md:col-span-6">
-            <Label htmlFor="service-order-status">Situação</Label>
-            <select
-              id="service-order-status"
-              className={selectClass}
-              data-enter-sequence=""
-              value={draft.status}
-              disabled={locked}
-              onChange={(event) =>
-                patch({ status: event.target.value as ServiceOrderStatus })
-              }
-            >
-              {destinations.map((value) => (
-                <option key={value} value={value}>
-                  {statusLabels[value]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="col-span-6 space-y-1.5 md:col-span-6">
-            <Label htmlFor="service-order-location">Local de atendimento</Label>
-            <select
-              id="service-order-location"
-              className={selectClass}
-              data-enter-sequence=""
-              value={draft.location}
-              disabled={locked}
-              onChange={(event) =>
-                patch({ location: event.target.value as ServiceOrderLocation })
-              }
-            >
-              {(Object.keys(locationLabels) as ServiceOrderLocation[]).map((value) => (
-                <option key={value} value={value}>
-                  {locationLabels[value]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="col-span-6 space-y-1.5 md:col-span-6">
-            <Label htmlFor="service-order-attendance">Tipo de atendimento</Label>
-            <select
-              id="service-order-attendance"
-              className={selectClass}
-              data-enter-sequence=""
-              value={draft.attendance}
-              disabled={locked}
-              onChange={(event) => {
-                const attendance = event.target.value as ServiceOrderAttendance;
-                patch({
-                  attendance,
-                  originOrderId:
-                    attendance === 'contract'
-                      ? ''
-                      : needsOrigin(attendance)
-                        ? draft.originOrderId
-                        : '',
-                  contractId: attendance === 'contract' ? draft.contractId : '',
-                });
-              }}
-            >
-              {(Object.keys(attendanceLabels) as ServiceOrderAttendance[]).map(
-                (value) => (
-                  <option key={value} value={value}>
-                    {attendanceLabels[value]}
-                  </option>
-                ),
-              )}
-            </select>
-          </div>
+          <FloatingInput
+            id="service-order-promised"
+            label="Previsão"
+            className="col-span-12 md:col-span-6"
+            type="datetime-local"
+            data-enter-sequence=""
+            value={toLocalInput(draft.promisedAt)}
+            disabled={locked}
+            onChange={(event) =>
+              patch({
+                promisedAt: event.target.value
+                  ? new Date(event.target.value).toISOString()
+                  : null,
+              })
+            }
+          />
+          <FloatingSelect
+            id="service-order-status"
+            label="Situação"
+            className="col-span-12 md:col-span-6"
+            data-enter-sequence=""
+            value={draft.status}
+            disabled={locked}
+            onChange={(event) => patch({ status: event.target.value as ServiceOrderStatus })}
+          >
+            {destinations.map((value) => (
+              <option key={value} value={value}>
+                {statusLabels[value]}
+              </option>
+            ))}
+          </FloatingSelect>
+          <FloatingSelect
+            id="service-order-location"
+            label="Local de atendimento"
+            className="col-span-6 md:col-span-6"
+            data-enter-sequence=""
+            value={draft.location}
+            disabled={locked}
+            onChange={(event) =>
+              patch({ location: event.target.value as ServiceOrderLocation })
+            }
+          >
+            {(Object.keys(locationLabels) as ServiceOrderLocation[]).map((value) => (
+              <option key={value} value={value}>
+                {locationLabels[value]}
+              </option>
+            ))}
+          </FloatingSelect>
+          <FloatingSelect
+            id="service-order-attendance"
+            label="Tipo de atendimento"
+            className="col-span-6 md:col-span-6"
+            data-enter-sequence=""
+            value={draft.attendance}
+            disabled={locked}
+            onChange={(event) => {
+              const attendance = event.target.value as ServiceOrderAttendance;
+              patch({
+                attendance,
+                originOrderId:
+                  attendance === 'contract'
+                    ? ''
+                    : needsOrigin(attendance)
+                      ? draft.originOrderId
+                      : '',
+                contractId: attendance === 'contract' ? draft.contractId : '',
+              });
+            }}
+          >
+            {(Object.keys(attendanceLabels) as ServiceOrderAttendance[]).map((value) => (
+              <option key={value} value={value}>
+                {attendanceLabels[value]}
+              </option>
+            ))}
+          </FloatingSelect>
         </div>
         <div className="grid grid-cols-12 gap-4">
           {needsOrigin(draft.attendance) ? (
-            <div className="col-span-12 space-y-1.5 md:col-span-4">
-              <Label htmlFor="service-order-origin">Ordem de origem</Label>
-              <select
-                id="service-order-origin"
-                className={selectClass}
-                data-enter-sequence=""
-                value={draft.originOrderId}
-                disabled={locked}
-                onChange={(event) => patch({ originOrderId: event.target.value })}
-              >
-                <option value="">Sem origem</option>
-                {(origins.data?.data ?? [])
-                  .filter((item) => item.id !== (id ?? createdId.current))
-                  .map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.numberLabel} — {item.customerName}
-                    </option>
-                  ))}
-              </select>
-            </div>
+            <FloatingSelect
+              id="service-order-origin"
+              label="Ordem de origem"
+              className="col-span-12 md:col-span-4"
+              data-enter-sequence=""
+              value={draft.originOrderId}
+              disabled={locked}
+              onChange={(event) => patch({ originOrderId: event.target.value })}
+            >
+              <option value="">Sem origem</option>
+              {(origins.data?.data ?? [])
+                .filter((item) => item.id !== (id ?? createdId.current))
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.numberLabel} — {item.customerName}
+                  </option>
+                ))}
+            </FloatingSelect>
           ) : null}
           {draft.attendance === 'contract' ? (
-            <div className="col-span-12 space-y-1.5 md:col-span-6">
-              <Label htmlFor="service-order-contract">Contrato</Label>
-              <select
+            <div className="col-span-12 md:col-span-6">
+              <FloatingSelect
                 id="service-order-contract"
-                className={selectClass}
+                label="Contrato"
                 value={draft.contractId}
                 disabled={locked || !draft.personId}
                 onChange={(event) => patch({ contractId: event.target.value })}
@@ -1596,8 +1610,8 @@ export function FormServiceOrder() {
                       : item.numberLabel}
                   </option>
                 ))}
-              </select>
-              <p className="text-sm text-zinc-500">
+              </FloatingSelect>
+              <p className="mt-1 text-sm text-zinc-500">
                 A cobrança do período não abate os itens desta ordem.
               </p>
             </div>
@@ -1615,16 +1629,15 @@ export function FormServiceOrder() {
             ))}
           </div>
         ) : null}
-        <div className="space-y-1.5">
-          <Label htmlFor="service-order-internal">Nota interna</Label>
-          <textarea
+        <div>
+          <FloatingTextarea
             id="service-order-internal"
+            label="Nota interna"
             data-enter-sequence=""
-            className="min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
             value={draft.internalNotes}
             onChange={(event) => patch({ internalNotes: event.target.value })}
           />
-          <p className="text-xs text-zinc-500">Não entra no comprovante.</p>
+          <p className="mt-1 text-xs text-zinc-500">Não entra no comprovante.</p>
         </div>
       </section>
 
@@ -1702,6 +1715,8 @@ function CopyField({
   className,
   inputMode,
   maxLength,
+  required,
+  error,
 }: {
   id: string;
   label: string;
@@ -1711,48 +1726,24 @@ function CopyField({
   className?: string;
   inputMode?: 'numeric' | 'text';
   maxLength?: number;
+  required?: boolean;
+  error?: string;
 }) {
   return (
-    <div className={className ? `space-y-1.5 ${className}` : 'space-y-1.5'}>
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        data-enter-sequence=""
-        value={value}
-        disabled={disabled}
-        inputMode={inputMode}
-        maxLength={maxLength}
-        autoComplete="off"
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </div>
-  );
-}
-
-function MoneyField({
-  label,
-  value,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  disabled: boolean;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <Input
-        data-enter-sequence=""
-        inputMode="numeric"
-        autoComplete="off"
-        placeholder="0,00"
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(maskCurrencyInput(event.target.value))}
-      />
-    </div>
+    <FloatingInput
+      id={id}
+      label={label}
+      value={value}
+      disabled={disabled}
+      className={className}
+      inputMode={inputMode}
+      maxLength={maxLength}
+      required={required}
+      error={error}
+      data-enter-sequence=""
+      autoComplete="off"
+      onChange={(event) => onChange(event.target.value)}
+    />
   );
 }
 
