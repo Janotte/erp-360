@@ -93,6 +93,12 @@ const itensMenu: ItemMenu[] = [
 ];
 
 function rotaDoFilho(url: string, path: string) {
+  if (url === '/inbound') {
+    return (
+      path === '/inbound' ||
+      (path.startsWith('/inbound/') && !path.startsWith('/inbound/setup'))
+    );
+  }
   if (
     url === '/categories' ||
     url === '/items' ||

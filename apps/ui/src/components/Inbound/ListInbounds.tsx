@@ -54,15 +54,15 @@ import {
 const scrollPrefix = 'inbound-list-scroll';
 
 const columns =
-  'grid grid-cols-[150px_100px_minmax(180px,1.5fr)_120px_110px_110px_minmax(140px,1fr)_150px_110px_168px]';
+  'grid grid-cols-[168px_100px_minmax(180px,1.5fr)_120px_110px_110px_150px_minmax(140px,1fr)_150px_110px]';
 
 const sortable = [
-  ['status', 'Situação'],
   ['number', 'Número'],
   ['supplier', 'Fornecedor'],
   ['totalAmount', 'Total'],
   ['inboundOn', 'Entrada'],
   ['issueOn', 'Emissão'],
+  ['status', 'Situação'],
   ['nature', 'Natureza'],
   ['manifestation', 'Manifesto'],
 ] as const;
@@ -531,8 +531,9 @@ export function ListInbounds() {
         </div>
 
         <div className="overflow-x-auto">
-          <div className="min-w-[1360px]">
+          <div className="min-w-max">
             <StatusListHeader columns={columns}>
+              <span>Ações</span>
               {sortable.map(([key, label]) => (
                 <button
                   key={key}
@@ -545,7 +546,6 @@ export function ListInbounds() {
                 </button>
               ))}
               <span>Chave</span>
-              <span />
             </StatusListHeader>
 
             {list.isLoading ? (
@@ -649,42 +649,7 @@ function NoteRow({
       }}
       onContextMenu={onContextMenu}
     >
-      <span className="min-w-0">
-        <span className="block font-bold text-[var(--status-text)]">
-          {inboundStatusLabel[row.status]}
-        </span>
-        {detail ? (
-          <span className="mt-1 block text-xs text-[var(--status-text)]">{detail}</span>
-        ) : null}
-      </span>
-      <span className="min-w-0 truncate text-[var(--status-text)]">
-        {row.number}/{row.series}
-      </span>
-      <span className="min-w-0 truncate text-[var(--status-text)]">{supplier}</span>
-      <span className="text-right tabular-nums text-[var(--status-text)]">
-        {formatCurrency(row.totalAmount)}
-      </span>
-      <span className="text-[var(--status-text)]">
-        {row.inboundOn ? formatRawDate(row.inboundOn) : '—'}
-      </span>
-      <span className="text-[var(--status-text)]">{formatRawDate(row.issueOn)}</span>
-      <span className="min-w-0 truncate text-[var(--status-text)]">
-        {row.natureName || '—'}
-      </span>
-      <span className="min-w-0 truncate text-[var(--status-text)]">
-        {recipientManifestationLabel[row.recipientManifestation]}
-      </span>
-      <span data-row-ignore>
-        <button
-          type="button"
-          className="font-mono text-xs text-[var(--status-text)] underline-offset-2 hover:underline"
-          title={row.accessKey ?? undefined}
-          onClick={onCopyKey}
-        >
-          {shortKey(row.accessKey)}
-        </button>
-      </span>
-      <span data-row-ignore className="flex justify-end gap-1">
+      <span data-row-ignore className="flex gap-1">
         {row.status === 'discovered' ? (
           <Button type="button" size="sm" variant="outline" onClick={onDiscover}>
             Consultar
@@ -712,6 +677,41 @@ function NoteRow({
         >
           <MoreHorizontal />
         </Button>
+      </span>
+      <span className="min-w-0 truncate text-[var(--status-text)]">
+        {row.number}/{row.series}
+      </span>
+      <span className="min-w-0 truncate text-[var(--status-text)]">{supplier}</span>
+      <span className="text-right tabular-nums text-[var(--status-text)]">
+        {formatCurrency(row.totalAmount)}
+      </span>
+      <span className="text-[var(--status-text)]">
+        {row.inboundOn ? formatRawDate(row.inboundOn) : '—'}
+      </span>
+      <span className="text-[var(--status-text)]">{formatRawDate(row.issueOn)}</span>
+      <span className="min-w-0">
+        <span className="block font-bold text-[var(--status-text)]">
+          {inboundStatusLabel[row.status]}
+        </span>
+        {detail ? (
+          <span className="mt-1 block text-xs text-[var(--status-text)]">{detail}</span>
+        ) : null}
+      </span>
+      <span className="min-w-0 truncate text-[var(--status-text)]">
+        {row.natureName || '—'}
+      </span>
+      <span className="min-w-0 truncate text-[var(--status-text)]">
+        {recipientManifestationLabel[row.recipientManifestation]}
+      </span>
+      <span data-row-ignore>
+        <button
+          type="button"
+          className="font-mono text-xs text-[var(--status-text)] underline-offset-2 hover:underline"
+          title={row.accessKey ?? undefined}
+          onClick={onCopyKey}
+        >
+          {shortKey(row.accessKey)}
+        </button>
       </span>
     </div>
   );

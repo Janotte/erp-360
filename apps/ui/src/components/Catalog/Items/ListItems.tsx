@@ -200,7 +200,7 @@ export function ListItems() {
         }
       >
         <div className="overflow-x-auto">
-          <div className="min-w-[1240px]">
+          <div className="min-w-max">
             <StatusListHeader columns={columns}>
               <button
                 type="button"
