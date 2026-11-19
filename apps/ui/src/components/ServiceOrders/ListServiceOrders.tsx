@@ -216,7 +216,10 @@ export function ListServiceOrders() {
                   </span>
                   <span className="whitespace-nowrap">{formatWhen(row.openedAt)}</span>
                   <span>
-                    <StatusBadge label={statusLabels[row.status]} />
+                    <StatusBadge
+                      label={statusLabels[row.status]}
+                      tone={statusTone[row.status]}
+                    />
                   </span>
                 </StatusListRow>
               ))

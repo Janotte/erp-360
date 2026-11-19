@@ -3,11 +3,20 @@ import { type MouseEvent, type ReactNode } from 'react';
 import { type StatusTone, statusToneStyle } from '@/components/ui/statusTone';
 import { cn } from '@/lib/utils';
 
-export function StatusBadge({ label, pressed }: { label: string; pressed?: boolean }) {
+export function StatusBadge({
+  label,
+  pressed,
+  tone,
+}: {
+  label: string;
+  pressed?: boolean;
+  tone?: StatusTone;
+}) {
   return (
     <span
+      style={tone ? statusToneStyle(tone) : undefined}
       className={cn(
-        'inline-flex max-w-full items-center rounded-[7px] border border-[var(--status-accent)] bg-[var(--status-bg)] px-2 py-[5px] text-xs leading-snug font-bold text-[var(--status-text)] group-hover:bg-[var(--status-hover)]',
+        'inline-flex max-w-full items-center rounded-[7px] border border-[var(--status-accent)] bg-[var(--status-hover)] px-2 py-[5px] text-xs leading-snug font-bold whitespace-nowrap text-[var(--status-text)]',
         pressed && 'shadow-[inset_0_0_0_1px_var(--status-accent)]',
       )}
     >

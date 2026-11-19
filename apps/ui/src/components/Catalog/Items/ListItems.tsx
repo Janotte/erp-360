@@ -22,7 +22,7 @@ import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { itemsService } from '@/services/items';
 
 const columns =
-  'grid grid-cols-[96px_110px_minmax(160px,1.4fr)_110px_72px_96px_128px_128px_88px_120px_120px]';
+  'grid grid-cols-[96px_110px_minmax(160px,1.4fr)_110px_72px_96px_128px_128px_88px_120px_132px]';
 
 const productTone: StatusTone = {
   background: '#EFF6FF',
@@ -266,8 +266,11 @@ export function ListItems() {
                     <span className="whitespace-nowrap">
                       {formatRawDate(item.lastInboundOn) || '—'}
                     </span>
-                    <span>
-                      <StatusBadge label={status} />
+                    <span className="whitespace-nowrap">
+                      <StatusBadge
+                        label={status}
+                        tone={item.isActive ? productTone : inactiveTone}
+                      />
                     </span>
                   </StatusListRow>
                 );
