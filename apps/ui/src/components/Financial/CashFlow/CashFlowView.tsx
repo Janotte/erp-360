@@ -1,23 +1,12 @@
 import { formatCurrency, formatRawDate } from '@erp-360/shared';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { titleRowTone } from '@/components/Financial/titleRowTone';
+import { ListMessage, ListPageHeader, ListPanel } from '@/components/ui/ListShell';
+import { StatusListHeader, StatusListRow } from '@/components/ui/StatusList';
+import { type StatusTone } from '@/components/ui/statusTone';
 import {
   type CashFlowDay,
   type CashFlowMovement,
@@ -41,18 +30,47 @@ const months = [
   'Dezembro',
 ] as const;
 
-function moneyClass(value: number): string {
-  if (value < 0) return 'text-red-600';
-  if (value > 0) return 'text-emerald-700';
-  return 'text-zinc-500';
-}
+const positionColumns = 'grid grid-cols-[minmax(0,1fr)_auto]';
+const dayColumns = 'grid grid-cols-[104px_64px_120px_120px_120px_130px]';
+const receivableColumns =
+  'grid grid-cols-[110px_minmax(140px,1fr)_minmax(160px,1.2fr)_120px_120px_110px]';
+const payableColumns =
+  'grid grid-cols-[110px_minmax(140px,1fr)_minmax(180px,1.4fr)_120px_110px]';
+
+const inflowTone: StatusTone = {
+  background: '#ECFDF5',
+  hover: '#D1FAE5',
+  border: '#059669',
+  text: '#047857',
+};
+
+const outflowTone: StatusTone = {
+  background: '#FEF2F2',
+  hover: '#FEE2E2',
+  border: '#DC2626',
+  text: '#B91C1C',
+};
+
+const todayTone: StatusTone = {
+  background: '#EFF6FF',
+  hover: '#DBEAFE',
+  border: '#2563EB',
+  text: '#1D4ED8',
+};
+
+const plainTone: StatusTone = {
+  background: '#FFFFFF',
+  hover: '#F8FAFC',
+  border: '#94A3B8',
+  text: '#172337',
+};
 
 function weekendClass(weekday: number): string {
-  return weekday === 0 || weekday === 6 ? 'text-red-600' : '';
+  return weekday === 0 || weekday === 6 ? 'text-red-600' : 'text-[#64748b]';
 }
 
-function monthOf(isoDate: string, offset: number): { year: number; month: number } {
-  const [year, month] = isoDate.split('-').map(Number);
+function monthOf(iso: string, offset: number): { year: number; month: number } {
+  const [year, month] = iso.split('-').map(Number);
   const date = new Date(Date.UTC(year, month - 1 + offset, 1));
   return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1 };
 }
@@ -74,7 +92,48 @@ function isoDate(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+function previousDay(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function readDay(params: URLSearchParams, from: string, to: string) {
+  const value = params.get('dia') ?? '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  if (value < from || value > to) return null;
+  return value;
+}
+
+function balanceTone(value: number): StatusTone {
+  if (value > 0) return inflowTone;
+  if (value < 0) return outflowTone;
+  return plainTone;
+}
+
+function dayTone(day: CashFlowDay, today: string): StatusTone {
+  if (day.date === today) return todayTone;
+  if (day.difference < 0) return outflowTone;
+  if (day.difference > 0) return inflowTone;
+  return plainTone;
+}
+
+function daySituation(day: CashFlowDay, today: string) {
+  if (day.date === today) return 'hoje';
+  if (day.difference < 0) return 'mais saídas';
+  if (day.difference > 0) return 'mais entradas';
+  return 'zerado';
+}
+
+function movementSituation(dueOn: string, today: string) {
+  if (dueOn < today) return 'atrasado';
+  if (dueOn === today) return 'vence hoje';
+  return 'pendente';
+}
+
 function CashFlowChart({ days }: { days: CashFlowDay[] }) {
+  if (days.length === 0) return null;
   const width = 760;
   const height = 280;
   const pad = { left: 64, right: 12, top: 16, bottom: 32 };
@@ -153,61 +212,75 @@ function CashFlowChart({ days }: { days: CashFlowDay[] }) {
   );
 }
 
-function MovementTable({
-  personHeader,
+function MovementList({
   rows,
+  personHeader,
   showBearer,
+  dueOn,
+  today,
+  onOpen,
 }: {
-  personHeader: string;
   rows: CashFlowMovement[];
+  personHeader: string;
   showBearer: boolean;
+  dueOn: string;
+  today: string;
+  onOpen: (id: string) => void;
 }) {
+  const columns = showBearer ? receivableColumns : payableColumns;
+  const tone = titleRowTone('pendente', dueOn, today);
+  const situation = movementSituation(dueOn, today);
   const total = rows.reduce((sum, row) => sum + row.amount, 0);
+
+  if (rows.length === 0) {
+    return <ListMessage>Nenhum título.</ListMessage>;
+  }
+
   return (
-    <div className="overflow-x-auto rounded-md border border-zinc-200 bg-white">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Documento</TableHead>
-            <TableHead className="text-right">Valor</TableHead>
-            <TableHead>{personHeader}</TableHead>
-            <TableHead>Histórico</TableHead>
-            <TableHead>Telefone</TableHead>
-            {showBearer ? <TableHead>Portador</TableHead> : null}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length === 0 ? (
-            <TableRow>
-              <TableCell
-                colSpan={showBearer ? 6 : 5}
-                className="py-6 text-center text-zinc-500"
-              >
-                Nenhum título neste dia.
-              </TableCell>
-            </TableRow>
-          ) : null}
-          {rows.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell>{row.documentNumber || '-'}</TableCell>
-              <TableCell className="text-right tabular-nums">
-                {formatCurrency(row.amount)}
-              </TableCell>
-              <TableCell>{row.personName}</TableCell>
-              <TableCell>{row.description}</TableCell>
-              <TableCell>{row.phone || '-'}</TableCell>
-              {showBearer ? <TableCell>{row.bearerName || '-'}</TableCell> : null}
-            </TableRow>
-          ))}
-          <TableRow className="bg-zinc-50 font-semibold">
-            <TableCell />
-            <TableCell className="text-right tabular-nums">
-              {formatCurrency(total)}
-            </TableCell>
-            <TableCell colSpan={showBearer ? 4 : 3} />
-          </TableRow>
-        </TableBody>
-      </Table>
+    <div className="overflow-x-auto">
+      <div className={showBearer ? 'min-w-[860px]' : 'min-w-[720px]'}>
+        <StatusListHeader columns={columns}>
+          <span>Documento</span>
+          <span>{personHeader}</span>
+          <span>Histórico</span>
+          <span>Telefone</span>
+          {showBearer ? <span>Portador</span> : null}
+          <span className="text-right">Valor</span>
+        </StatusListHeader>
+        {rows.map((row) => (
+          <StatusListRow
+            key={row.id}
+            columns={columns}
+            tone={tone}
+            label={`${row.documentNumber || 'sem documento'}, ${row.personName}, ${situation}`}
+            onOpen={() => onOpen(row.id)}
+          >
+            <span className="min-w-0 truncate text-[var(--status-text)]">
+              {row.documentNumber || '—'}
+            </span>
+            <span className="min-w-0 truncate text-[var(--status-text)]">
+              {row.personName}
+            </span>
+            <span className="min-w-0 truncate font-bold text-[var(--status-text)]">
+              {row.description}
+            </span>
+            <span className="min-w-0 truncate text-[var(--status-text)]">
+              {row.phone || '—'}
+            </span>
+            {showBearer ? (
+              <span className="min-w-0 truncate text-[var(--status-text)]">
+                {row.bearerName || '—'}
+              </span>
+            ) : null}
+            <span className="text-right tabular-nums text-[var(--status-text)]">
+              {formatCurrency(row.amount)}
+            </span>
+          </StatusListRow>
+        ))}
+        <p className="px-3.5 pt-3 text-right text-sm font-semibold text-[#172337]">
+          Total {formatCurrency(total)}
+        </p>
+      </div>
     </div>
   );
 }
@@ -229,17 +302,14 @@ function MonthCalendar({
 }) {
   return (
     <div>
-      <p className="mb-2 text-sm font-semibold text-zinc-900">
+      <p className="mb-2 text-sm font-semibold text-[#172337]">
         {months[month - 1]} de {year}
       </p>
       <table className="w-full border-collapse text-center text-xs">
         <thead>
-          <tr className="bg-zinc-100">
+          <tr>
             {weekdays.map((label, index) => (
-              <th
-                key={label}
-                className={`px-1 py-1 font-medium ${weekendClass(index) || 'text-zinc-600'}`}
-              >
+              <th key={label} className={`px-1 py-1 font-medium ${weekendClass(index)}`}>
                 {label}
               </th>
             ))}
@@ -261,14 +331,14 @@ function MonthCalendar({
                         onClick={() => onSelect(date)}
                         className={`h-7 w-full rounded ${
                           isSelected
-                            ? 'bg-zinc-900 text-white'
-                            : 'hover:bg-zinc-100 text-zinc-900'
+                            ? 'bg-[#2563eb] text-white'
+                            : 'text-[#172337] hover:bg-[#EFF6FF]'
                         }`}
                       >
                         {day}
                       </button>
                     ) : (
-                      <span className="inline-flex h-7 w-full items-center justify-center text-zinc-300">
+                      <span className="inline-flex h-7 w-full items-center justify-center text-[#cbd5e1]">
                         {day}
                       </span>
                     )}
@@ -284,226 +354,273 @@ function MonthCalendar({
 }
 
 export function CashFlowView() {
-  const { data, isLoading, isError, error } = useQuery({
+  const flow = useQuery({
     queryKey: ['treasury', 'cash-flow'],
     queryFn: treasuryService.cashFlow,
   });
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const selected = data?.days.find((day) => day.date === selectedDate);
 
-  const chooseDay = (date: string) => {
-    setSelectedDate(date);
-  };
-
-  if (isLoading) {
-    return <p className="text-sm text-zinc-500">Carregando fluxo de caixa...</p>;
-  }
-  if (isError || !data) {
+  if (flow.isLoading) {
     return (
-      <p className="text-sm text-red-600">
-        {error instanceof Error ? error.message : 'Falha ao carregar o fluxo de caixa.'}
-      </p>
+      <div className="space-y-4">
+        <ListPageHeader
+          title="Fluxo de caixa"
+          description="Posição de caixa e contas correntes, com a projeção dos títulos pendentes."
+        />
+        <ListMessage>Carregando o fluxo de caixa...</ListMessage>
+      </div>
     );
   }
 
-  return (
-    <CashFlowReportView
-      report={data}
-      selected={selected}
-      onSelect={chooseDay}
-      onClose={() => setSelectedDate(null)}
-    />
-  );
+  if (flow.isError || !flow.data) {
+    return (
+      <div className="space-y-4">
+        <ListPageHeader
+          title="Fluxo de caixa"
+          description="Posição de caixa e contas correntes, com a projeção dos títulos pendentes."
+        />
+        <ListMessage tone="error">
+          {flow.error instanceof Error
+            ? flow.error.message
+            : 'Não foi possível carregar o fluxo de caixa.'}
+        </ListMessage>
+      </div>
+    );
+  }
+
+  return <CashFlowReportView report={flow.data} />;
 }
 
-function CashFlowReportView({
-  report,
-  selected,
-  onSelect,
-  onClose,
-}: {
-  report: CashFlowReport;
-  selected: CashFlowDay | undefined;
-  onSelect: (date: string) => void;
-  onClose: () => void;
-}) {
-  const overdueIn = report.overdueReceivables.reduce((sum, item) => sum + item.amount, 0);
-  const overdueOut = report.overduePayables.reduce((sum, item) => sum + item.amount, 0);
+function CashFlowReportView({ report }: { report: CashFlowReport }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  const detailRef = useRef<HTMLDivElement>(null);
+  const selectedDate = readDay(params, report.from, report.to);
+  const selected = report.days.find((day) => day.date === selectedDate);
+  const listUrl = `/cash-flow${location.search}`;
+  const overdueDue = previousDay(report.today);
+
+  useEffect(() => {
+    if (!selected) return;
+    detailRef.current?.scrollIntoView({ block: 'start' });
+  }, [selected]);
+
+  const selectDay = (date: string) => {
+    const next = new URLSearchParams(params);
+    if (next.get('dia') === date) return;
+    next.set('dia', date);
+    setParams(next, { replace: true });
+  };
+
+  const openReceivable = (id: string) => {
+    navigate(`/receivables/${id}`, { state: { from: listUrl } });
+  };
+
+  const openPayable = (id: string) => {
+    navigate(`/payables/${id}`, { state: { from: listUrl } });
+  };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-bold text-zinc-900">Fluxo de caixa</h3>
-        <p className="text-sm text-zinc-500">
-          Posição de caixa e contas correntes, com a projeção dos títulos pendentes de{' '}
-          {formatRawDate(report.from)} até {formatRawDate(report.to)}.
-        </p>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <div className="rounded-md border border-zinc-200 bg-white">
-          <Table>
-            <TableBody>
-              {report.banks.map((account) => (
-                <TableRow key={account.name}>
-                  <TableCell>{account.name}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatCurrency(account.balance)}
-                  </TableCell>
-                </TableRow>
-              ))}
-              <TableRow>
-                <TableCell>Caixa em {formatRawDate(report.today)}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatCurrency(report.cashBalance)}
-                </TableCell>
-              </TableRow>
-              <TableRow className="bg-zinc-50 font-semibold">
-                <TableCell>Total</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatCurrency(report.openingBalance)}
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+    <div className="space-y-4">
+      <ListPageHeader
+        title="Fluxo de caixa"
+        description={`Posição de caixa e contas correntes, com a projeção dos títulos pendentes de ${formatRawDate(report.from)} até ${formatRawDate(report.to)}.`}
+      >
+        <div className="rounded-[10px] border border-[#dfe5ee] bg-white px-4 py-2 text-right">
+          <p className="text-xs text-[#64748b]">Posição</p>
+          <p className="text-lg font-semibold tabular-nums text-[#172337]">
+            {formatCurrency(report.openingBalance)}
+          </p>
         </div>
-        <div className="rounded-md border border-zinc-200 bg-white p-3">
-          <p className="mb-2 text-sm font-semibold text-zinc-900">Saldo projetado</p>
+      </ListPageHeader>
+
+      <div className="grid items-start gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <ListPanel
+          title="Posição"
+          description="Caixa e contas correntes que entram no fluxo. A cor indica o saldo."
+        >
+          {report.banks.map((account) => (
+            <StatusListRow
+              key={account.name}
+              columns={positionColumns}
+              tone={balanceTone(account.balance)}
+              label={`${account.name}, saldo ${formatCurrency(account.balance)}`}
+            >
+              <span className="min-w-0 truncate font-bold text-[var(--status-text)]">
+                {account.name}
+              </span>
+              <span className="tabular-nums text-[var(--status-text)]">
+                {formatCurrency(account.balance)}
+              </span>
+            </StatusListRow>
+          ))}
+          <StatusListRow
+            columns={positionColumns}
+            tone={balanceTone(report.cashBalance)}
+            label={`Caixa em ${formatRawDate(report.today)}, saldo ${formatCurrency(report.cashBalance)}`}
+          >
+            <span className="min-w-0 truncate font-bold text-[var(--status-text)]">
+              Caixa em {formatRawDate(report.today)}
+            </span>
+            <span className="tabular-nums text-[var(--status-text)]">
+              {formatCurrency(report.cashBalance)}
+            </span>
+          </StatusListRow>
+        </ListPanel>
+
+        <ListPanel
+          title="Saldo projetado"
+          description="O saldo parte da posição de hoje e soma a diferença de cada dia."
+        >
           <CashFlowChart days={report.days} />
-        </div>
+        </ListPanel>
       </div>
 
-      {overdueIn || overdueOut ? (
-        <p className="text-sm text-zinc-600">
-          Títulos atrasados ficam fora da projeção do dia: receber{' '}
-          {formatCurrency(overdueIn)} e pagar {formatCurrency(overdueOut)}.
-        </p>
+      {report.overdueReceivables.length || report.overduePayables.length ? (
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          {report.overdueReceivables.length ? (
+            <ListPanel
+              title="Receber atrasado"
+              description="Ficam fora da projeção do dia. O clique abre o título."
+            >
+              <MovementList
+                rows={report.overdueReceivables}
+                personHeader="Cliente"
+                showBearer
+                dueOn={overdueDue}
+                today={report.today}
+                onOpen={openReceivable}
+              />
+            </ListPanel>
+          ) : null}
+          {report.overduePayables.length ? (
+            <ListPanel
+              title="Pagar atrasado"
+              description="Ficam fora da projeção do dia. O clique abre o título."
+            >
+              <MovementList
+                rows={report.overduePayables}
+                personHeader="Fornecedor"
+                showBearer={false}
+                dueOn={overdueDue}
+                today={report.today}
+                onOpen={openPayable}
+              />
+            </ListPanel>
+          ) : null}
+        </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {[0, 1, 2].map((offset) => {
-          const { year, month } = monthOf(report.today, offset);
-          return (
-            <div
-              key={`${year}-${month}`}
-              className="rounded-md border border-zinc-200 bg-white p-3"
-            >
+      <ListPanel
+        title="Calendário"
+        description="Clique no dia para ver os títulos pendentes."
+      >
+        <div className="grid gap-4 md:grid-cols-3">
+          {[0, 1, 2].map((offset) => {
+            const { year, month } = monthOf(report.today, offset);
+            return (
               <MonthCalendar
+                key={`${year}-${month}`}
                 year={year}
                 month={month}
                 from={report.from}
                 to={report.to}
                 selected={selected?.date ?? ''}
-                onSelect={onSelect}
+                onSelect={selectDay}
               />
+            );
+          })}
+        </div>
+      </ListPanel>
+
+      {selected ? (
+        <div ref={detailRef}>
+          <ListPanel
+            title={formatRawDate(selected.date)}
+            description={`${weekdays[selected.weekday]} · Receber ${formatCurrency(selected.inflows)} · Pagar ${formatCurrency(selected.outflows)}. O clique abre o título.`}
+          >
+            <div className="space-y-6">
+              <section className="space-y-2">
+                <h4 className="text-sm font-semibold text-[#172337]">
+                  Receber ({selected.receivables.length})
+                </h4>
+                <MovementList
+                  rows={selected.receivables}
+                  personHeader="Cliente"
+                  showBearer
+                  dueOn={selected.date}
+                  today={report.today}
+                  onOpen={openReceivable}
+                />
+              </section>
+              <section className="space-y-2">
+                <h4 className="text-sm font-semibold text-[#172337]">
+                  Pagar ({selected.payables.length})
+                </h4>
+                <MovementList
+                  rows={selected.payables}
+                  personHeader="Fornecedor"
+                  showBearer={false}
+                  dueOn={selected.date}
+                  today={report.today}
+                  onOpen={openPayable}
+                />
+              </section>
             </div>
-          );
-        })}
-      </div>
+          </ListPanel>
+        </div>
+      ) : null}
 
-      <div className="overflow-x-auto rounded-md border border-zinc-200 bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Data</TableHead>
-              <TableHead>Dia</TableHead>
-              <TableHead className="text-right">Receber</TableHead>
-              <TableHead className="text-right">Pagar</TableHead>
-              <TableHead className="text-right">Diferença</TableHead>
-              <TableHead className="text-right">Saldo</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+      <ListPanel
+        title="Projeção"
+        description="Verde é dia com mais entradas, vermelho com mais saídas, branco zerado e azul é hoje."
+      >
+        <div className="overflow-x-auto">
+          <div className="min-w-[760px]">
+            <StatusListHeader columns={dayColumns}>
+              <span>Data</span>
+              <span>Dia</span>
+              <span className="text-right">Receber</span>
+              <span className="text-right">Pagar</span>
+              <span className="text-right">Diferença</span>
+              <span className="text-right">Saldo</span>
+            </StatusListHeader>
             {report.days.map((day) => (
-              <TableRow
+              <StatusListRow
                 key={day.date}
-                className={day.date === selected?.date ? 'bg-zinc-100' : undefined}
+                columns={dayColumns}
+                tone={dayTone(day, report.today)}
+                label={`${formatRawDate(day.date)}, ${weekdays[day.weekday]}, ${daySituation(day, report.today)}`}
+                onOpen={() => selectDay(day.date)}
               >
-                <TableCell>
-                  <button
-                    type="button"
-                    className="text-left underline-offset-2 hover:underline"
-                    onClick={() => onSelect(day.date)}
-                  >
-                    {formatRawDate(day.date)}
-                  </button>
-                </TableCell>
-                <TableCell className={weekendClass(day.weekday)}>
-                  {weekdays[day.weekday]}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
+                <span className="text-[var(--status-text)]">
+                  {formatRawDate(day.date)}
+                </span>
+                <span className="text-[var(--status-text)]">{weekdays[day.weekday]}</span>
+                <span className="text-right tabular-nums text-[var(--status-text)]">
                   {formatCurrency(day.inflows)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
+                </span>
+                <span className="text-right tabular-nums text-[var(--status-text)]">
                   {formatCurrency(day.outflows)}
-                </TableCell>
-                <TableCell
-                  className={`text-right tabular-nums ${moneyClass(day.difference)}`}
-                >
+                </span>
+                <span className="text-right tabular-nums text-[var(--status-text)]">
                   {formatCurrency(day.difference)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums font-medium">
+                </span>
+                <span className="text-right font-semibold tabular-nums text-[var(--status-text)]">
                   {formatCurrency(day.balance)}
-                </TableCell>
-              </TableRow>
+                </span>
+              </StatusListRow>
             ))}
-            <TableRow className="bg-zinc-50 font-semibold">
-              <TableCell colSpan={2} />
-              <TableCell className="text-right tabular-nums">
-                {formatCurrency(report.totals.inflows)}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {formatCurrency(report.totals.outflows)}
-              </TableCell>
-              <TableCell
-                className={`text-right tabular-nums ${moneyClass(report.totals.difference)}`}
-              >
+            <p className="px-3.5 pt-3 text-right text-sm text-[#64748b]">
+              Receber {formatCurrency(report.totals.inflows)} · Pagar{' '}
+              {formatCurrency(report.totals.outflows)} · Diferença{' '}
+              <span className="font-semibold text-[#172337]">
                 {formatCurrency(report.totals.difference)}
-              </TableCell>
-              <TableCell />
-            </TableRow>
-          </TableBody>
-        </Table>
-      </div>
-
-      <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="max-h-[85vh] max-w-5xl overflow-y-auto">
-          {selected ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>{formatRawDate(selected.date)}</DialogTitle>
-                <DialogDescription>
-                  Títulos pendentes com vencimento nesta data.
-                </DialogDescription>
-              </DialogHeader>
-              <Tabs key={selected.date} defaultValue="receivable">
-                <TabsList>
-                  <TabsTrigger value="receivable">
-                    Receber ({selected.receivables.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="payable">
-                    Pagar ({selected.payables.length})
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="receivable">
-                  <MovementTable
-                    personHeader="Cliente"
-                    rows={selected.receivables}
-                    showBearer
-                  />
-                </TabsContent>
-                <TabsContent value="payable">
-                  <MovementTable
-                    personHeader="Fornecedor"
-                    rows={selected.payables}
-                    showBearer={false}
-                  />
-                </TabsContent>
-              </Tabs>
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+              </span>
+            </p>
+          </div>
+        </div>
+      </ListPanel>
     </div>
   );
 }
