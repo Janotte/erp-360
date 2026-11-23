@@ -98,7 +98,7 @@ export function PayablePage() {
             <PayModal
               tipo="payable"
               account={loaded}
-              onSuccess={() => setPaying(false)}
+              onSuccess={leave}
             />
           ) : null}
         </DialogContent>

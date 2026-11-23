@@ -25,6 +25,8 @@ export function ReplicatePayablePage() {
   const backTo = listReturn(location.state);
   const accountTo = `/payables/${id ?? ''}`;
   const leaveAccount = () => navigate(accountTo, { state: { from: backTo } });
+  const openCreated = (createdId: string) =>
+    navigate(`/payables/${createdId}`, { state: { from: backTo } });
 
   const account = useQuery({
     queryKey: ['financial', 'payable', id],
@@ -69,7 +71,7 @@ export function ReplicatePayablePage() {
         <ReplicatePayableDialog
           source={loaded}
           onCancel={leaveAccount}
-          onSuccess={leaveAccount}
+          onSuccess={openCreated}
         />
       </div>
     </div>

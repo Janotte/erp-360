@@ -25,7 +25,7 @@ import {
 
 interface ReplicatePayableDialogProps {
   source: FinancialAccount;
-  onSuccess: () => void;
+  onSuccess: (createdId: string) => void;
   onCancel: () => void;
 }
 
@@ -112,20 +112,21 @@ export function ReplicatePayableDialog({
         });
       }
 
+      const created: FinancialAccount[] = [];
       for (const payload of payloads) {
-        await financialService.create('payable', payload);
+        created.push(await financialService.create('payable', payload));
       }
-      return payloads.length;
+      return created;
     },
-    onSuccess: (count) => {
+    onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['financial', 'payable'] });
       queryClient.invalidateQueries({ queryKey: ['company-cards'] });
       toast.success(
-        count === 1
+        created.length === 1
           ? 'Conta a pagar replicada com sucesso!'
-          : `${count} contas a pagar replicadas com sucesso!`,
+          : `${created.length} contas a pagar replicadas com sucesso!`,
       );
-      onSuccess();
+      onSuccess(created[0].id);
     },
     onError: (err: Error) => toast.error(`Erro: ${err.message}`),
   });
