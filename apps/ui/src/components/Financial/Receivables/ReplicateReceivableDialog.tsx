@@ -25,7 +25,7 @@ import {
 
 interface ReplicateReceivableDialogProps {
   source: FinancialAccount;
-  onSuccess: () => void;
+  onSuccess: (createdId: string) => void;
   onCancel: () => void;
 }
 
@@ -120,19 +120,20 @@ export function ReplicateReceivableDialog({
         });
       }
 
+      const created: FinancialAccount[] = [];
       for (const payload of payloads) {
-        await financialService.create('receivable', payload);
+        created.push(await financialService.create('receivable', payload));
       }
-      return payloads.length;
+      return created;
     },
-    onSuccess: (count) => {
+    onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['financial', 'receivable'] });
       toast.success(
-        count === 1
+        created.length === 1
           ? 'Conta a receber replicada com sucesso!'
-          : `${count} contas a receber replicadas com sucesso!`,
+          : `${created.length} contas a receber replicadas com sucesso!`,
       );
-      onSuccess();
+      onSuccess(created[0].id);
     },
     onError: (err: Error) => toast.error(`Erro: ${err.message}`),
   });

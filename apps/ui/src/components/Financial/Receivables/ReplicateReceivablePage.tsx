@@ -25,6 +25,8 @@ export function ReplicateReceivablePage() {
   const backTo = listReturn(location.state);
   const accountTo = `/receivables/${id ?? ''}`;
   const leaveAccount = () => navigate(accountTo, { state: { from: backTo } });
+  const openCreated = (createdId: string) =>
+    navigate(`/receivables/${createdId}`, { state: { from: backTo } });
 
   const account = useQuery({
     queryKey: ['financial', 'receivable', id],
@@ -69,7 +71,7 @@ export function ReplicateReceivablePage() {
         <ReplicateReceivableDialog
           source={loaded}
           onCancel={leaveAccount}
-          onSuccess={leaveAccount}
+          onSuccess={openCreated}
         />
       </div>
     </div>

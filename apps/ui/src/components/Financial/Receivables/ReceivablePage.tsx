@@ -98,7 +98,7 @@ export function ReceivablePage() {
             <PayModal
               tipo="receivable"
               account={loaded}
-              onSuccess={() => setReceiving(false)}
+              onSuccess={leave}
             />
           ) : null}
         </DialogContent>

@@ -30,6 +30,7 @@ import {
   type FinancialAccount,
   financialService,
 } from '@/services/financials';
+import { onEnterSequence } from '@/lib/enterSequence';
 import { type PaymentMethod, paymentMethodsService } from '@/services/paymentMethods';
 import { type BankAccount, treasuryService } from '@/services/treasury';
 
@@ -419,7 +420,11 @@ export function ReceivableForm({
         : 'Nº do documento';
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form
+      onSubmit={handleSubmit}
+      onKeyDown={onEnterSequence}
+      className="space-y-4"
+    >
       {showSettlement && accountToUpdate ? (
         <div className="space-y-1 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
           <p className="font-medium text-emerald-800">Liquidação</p>
@@ -444,11 +449,13 @@ export function ReceivableForm({
         placeholder="Buscar cliente por nome ou documento..."
         required={!readOnly}
         disabled={readOnly}
+        enterSequence
       />
 
       <div className="grid grid-cols-2 gap-4">
         <FloatingInput
           id="documentNumber"
+          data-enter-sequence=""
           label={documentLabel}
           value={documentNumber}
           maxLength={44}
@@ -457,6 +464,7 @@ export function ReceivableForm({
         />
         <FloatingInput
           id="invoiceNumber"
+          data-enter-sequence=""
           label="Nº da fatura"
           value={invoiceNumber}
           maxLength={44}
@@ -467,6 +475,7 @@ export function ReceivableForm({
 
       <FloatingInput
         id="description"
+        data-enter-sequence=""
         label="Descrição da venda ou serviço"
         value={description}
         maxLength={255}
@@ -478,6 +487,7 @@ export function ReceivableForm({
       <div className="grid grid-cols-2 gap-4">
         <FloatingInput
           id="issueOn"
+          data-enter-sequence=""
           label="Emissão"
           type="date"
           value={issueOn}
@@ -487,6 +497,7 @@ export function ReceivableForm({
         />
         <FloatingInput
           id="dueOn"
+          data-enter-sequence=""
           label="Vencimento"
           type="date"
           value={dueOn}
@@ -498,6 +509,7 @@ export function ReceivableForm({
 
       <FloatingInput
         id="amount"
+        data-enter-sequence=""
         label="Valor"
         type="text"
         inputMode="numeric"
@@ -510,6 +522,7 @@ export function ReceivableForm({
 
       <CatalogSearchSelect
         label="Plano de contas"
+        enterSequence
         value={planAccountId}
         onChange={setPlanAccountId}
         options={planAccounts}
@@ -522,6 +535,7 @@ export function ReceivableForm({
       <div className="space-y-2">
         <CatalogSearchSelect
           label="Forma de pagamento"
+          enterSequence
           value={paymentMethodId}
           onChange={applyMethod}
           options={methodChoices}
@@ -547,6 +561,7 @@ export function ReceivableForm({
       <div className="space-y-2">
         <CatalogSearchSelect
           label="Meio de pagamento"
+          enterSequence
           value={meansOfPaymentId}
           onChange={applyMeans}
           options={meansOfPayment}
@@ -563,6 +578,7 @@ export function ReceivableForm({
       {show('financialInstitution') ? (
         <PersonSearchSelect
           label="Instituição financeira"
+          enterSequence
           value={financialInstitutionId}
           onChange={setFinancialInstitutionId}
           type="instituicao"
@@ -577,6 +593,7 @@ export function ReceivableForm({
           {show('cardBrand') ? (
             <CatalogSearchSelect
               label="Bandeira do cartão"
+              enterSequence
               value={cardBrandId}
               onChange={setCardBrandId}
               options={cardBrands}
@@ -590,6 +607,7 @@ export function ReceivableForm({
           {show('transactionAuthorization') ? (
             <FloatingInput
               id="transactionAuthorization"
+              data-enter-sequence=""
               label="Autorização da transação"
               value={transactionAuthorization}
               maxLength={128}
@@ -605,6 +623,7 @@ export function ReceivableForm({
           {show('bearerName') ? (
             <FloatingInput
               id="bearerName"
+              data-enter-sequence=""
               label="Portador do boleto"
               value={bearerName}
               maxLength={60}
@@ -615,6 +634,7 @@ export function ReceivableForm({
           {show('bankSlipOurNumber') ? (
             <FloatingInput
               id="bankSlipOurNumber"
+              data-enter-sequence=""
               label="Nosso número"
               value={bankSlipOurNumber}
               maxLength={20}
@@ -628,6 +648,7 @@ export function ReceivableForm({
       {show('barcode') ? (
         <FloatingInput
           id="barcode"
+          data-enter-sequence=""
           label="Código de barras"
           value={barcode}
           maxLength={50}
@@ -685,7 +706,7 @@ export function ReceivableForm({
           </Button>
         ) : null}
         {readOnly ? null : (
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" data-enter-sequence="" disabled={busy}>
             {mutation.isPending
               ? 'Salvando...'
               : accountToUpdate
