@@ -49,6 +49,8 @@ interface PersonSearchSelectProps {
   enterSequence?: boolean;
   /** Abre o cadastro de pessoa e seleciona quem for gravado. */
   allowCreate?: boolean;
+  /** Destino citado ao voltar do cadastro rápido. */
+  createReturnTo?: string;
   /** Rótulo fixo sobre a borda, no mesmo desenho dos campos flutuantes. */
   label?: string;
   className?: string;
@@ -64,6 +66,7 @@ export function PersonSearchSelect({
   disabled = false,
   enterSequence = false,
   allowCreate = false,
+  createReturnTo = 'a ordem',
   label,
   className,
 }: PersonSearchSelectProps) {
@@ -494,8 +497,8 @@ export function PersonSearchSelect({
             </DialogTitle>
             <DialogDescription>
               {createdPerson
-                ? 'Inclua endereço e contato. Depois volte para a ordem.'
-                : 'Salve a pessoa para liberar endereço e contato antes de voltar à ordem.'}
+                ? `Inclua endereço e contato. Depois volte para ${createReturnTo}.`
+                : `Salve a pessoa para liberar endereço e contato antes de voltar para ${createReturnTo}.`}
             </DialogDescription>
           </DialogHeader>
           <FormPerson
@@ -516,7 +519,7 @@ export function PersonSearchSelect({
           {createdPerson ? (
             <div className="sticky bottom-0 flex justify-end border-t border-zinc-200 bg-background pt-4">
               <Button type="button" onClick={() => closeCreate(createdPerson)}>
-                Voltar para a ordem
+                {`Voltar para ${createReturnTo}`}
               </Button>
             </div>
           ) : null}

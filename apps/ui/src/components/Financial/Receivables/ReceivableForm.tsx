@@ -450,6 +450,8 @@ export function ReceivableForm({
         required={!readOnly}
         disabled={readOnly}
         enterSequence
+        allowCreate={!readOnly}
+        createReturnTo="o lançamento"
       />
 
       <div className="grid grid-cols-2 gap-4">
