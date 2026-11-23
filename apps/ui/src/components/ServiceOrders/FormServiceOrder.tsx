@@ -8,7 +8,6 @@ import {
   installmentDueDates,
   maskCurrencyInput,
   onlyDigits,
-  parseCurrencyToCents,
   splitInstallmentAmounts,
 } from '@erp-360/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +17,13 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 
 import { PersonSearchSelect } from '@/components/Persons/PersonSearchSelect';
+import {
+  decimalInputHandlers,
+  decimalToApi,
+  decimalToCents,
+  formatApiDecimal,
+  scale4,
+} from '@/components/ServiceOrders/serviceOrderDecimal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -178,45 +184,6 @@ function toLocalInput(iso: string | null) {
   if (Number.isNaN(date.getTime())) return '';
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function scale4(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const normalized = trimmed.includes(',')
-    ? trimmed.replace(/\./g, '').replace(',', '.')
-    : trimmed;
-  const match = /^(\d+)(?:\.(\d{1,4}))?$/.exec(normalized);
-  if (!match) return null;
-  return BigInt(match[1]) * 10_000n + BigInt((match[2] ?? '').padEnd(4, '0'));
-}
-
-function maskUnitPrice(value: string) {
-  const digits = value.replace(/\D/g, '').slice(0, 15);
-  if (!digits) return '';
-  const padded = digits.padStart(5, '0');
-  const fraction = padded.slice(-4);
-  const integers = padded.slice(0, -4).replace(/^0+(?=\d)/, '') || '0';
-  const grouped = integers.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return `${grouped},${fraction}`;
-}
-
-function formatUnitPrice(value: string | null | undefined) {
-  const trimmed = value?.trim() ?? '';
-  if (!trimmed) return '';
-  const normalized = trimmed.includes(',')
-    ? trimmed.replace(/\./g, '').replace(',', '.')
-    : trimmed;
-  const [integers, fraction = ''] = normalized.split('.');
-  const intDigits = integers.replace(/\D/g, '').replace(/^0+(?=\d)/, '') || '0';
-  const fractionDigits = fraction.replace(/\D/g, '').padEnd(4, '0').slice(0, 4);
-  return maskUnitPrice(`${intDigits}${fractionDigits}`);
-}
-
-function unitPriceForApi(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return '0.0000';
-  return trimmed.replace(/\./g, '').replace(',', '.');
 }
 
 function lineAmountCents(quantity: string, unitPrice: string) {
@@ -420,15 +387,15 @@ function draftFromOrder(order: ServiceOrderDetail): Draft {
       itemId: line.itemId,
       code: line.code,
       description: line.description,
-      quantity: line.quantity,
-      unitPrice: formatUnitPrice(line.unitPrice),
+      quantity: formatApiDecimal(line.quantity, 4),
+      unitPrice: formatApiDecimal(line.unitPrice, 4),
       technicianPersonId: line.technicianPersonId,
     })),
   };
 }
 
 function allocatedPayments(draft: Draft) {
-  return draft.payments.reduce((sum, row) => sum + parseCurrencyToCents(row.amount), 0);
+  return draft.payments.reduce((sum, row) => sum + decimalToCents(row.amount), 0);
 }
 
 function formatInput(cents: number) {
@@ -442,9 +409,9 @@ function orderTotal(draft: Draft) {
   const serviceAmount = draft.lines
     .filter((line) => line.kind === 'service')
     .reduce((sum, line) => sum + lineAmountCents(line.quantity, line.unitPrice), 0);
-  const freightAmount = parseCurrencyToCents(draft.freight);
-  const discountAmount = parseCurrencyToCents(draft.discount);
-  const surchargeAmount = parseCurrencyToCents(draft.surcharge);
+  const freightAmount = decimalToCents(draft.freight);
+  const discountAmount = decimalToCents(draft.discount);
+  const surchargeAmount = decimalToCents(draft.surcharge);
   return {
     productAmount,
     serviceAmount,
@@ -487,9 +454,9 @@ function toWrite(draft: Draft, status: ServiceOrderStatus): ServiceOrderWrite {
     ),
     customerNeighborhood: emptyToNull(draft.customerNeighborhood),
     customerCityLine: emptyToNull(draft.customerCityLine),
-    freightAmount: parseCurrencyToCents(draft.freight),
-    discountAmount: parseCurrencyToCents(draft.discount),
-    surchargeAmount: parseCurrencyToCents(draft.surcharge),
+    freightAmount: decimalToCents(draft.freight),
+    discountAmount: decimalToCents(draft.discount),
+    surchargeAmount: decimalToCents(draft.surcharge),
     paymentMethodId: usesPlan ? null : draft.paymentMethodId || null,
     paymentInstallments: usesPlan
       ? null
@@ -500,7 +467,7 @@ function toWrite(draft: Draft, status: ServiceOrderStatus): ServiceOrderWrite {
       paymentMethodId: line.paymentMethodId,
       installmentCount: line.installmentCount,
       dueOn: line.dueOn,
-      amount: parseCurrencyToCents(line.amount),
+      amount: decimalToCents(line.amount),
     })),
     fields: draft.fields.map((field) => ({
       slot: field.slot,
@@ -511,8 +478,8 @@ function toWrite(draft: Draft, status: ServiceOrderStatus): ServiceOrderWrite {
       kind: line.kind,
       itemId: line.itemId,
       description: line.description,
-      quantity: line.quantity.trim(),
-      unitPrice: unitPriceForApi(line.unitPrice),
+      quantity: decimalToApi(line.quantity, 4),
+      unitPrice: decimalToApi(line.unitPrice, 4),
       technicianPersonId: line.kind === 'service' ? line.technicianPersonId : null,
     })),
   };
@@ -837,8 +804,8 @@ export function FormServiceOrder() {
                 itemId: item.id,
                 code: item.code,
                 description: item.name,
-                quantity: '1.0000',
-                unitPrice: formatUnitPrice(item.listPrice ?? '0'),
+                quantity: '1,0000',
+                unitPrice: formatApiDecimal(item.listPrice ?? '0', 4),
                 technicianPersonId: null,
               },
             ],
@@ -874,7 +841,7 @@ export function FormServiceOrder() {
     const term = method?.terms.find(
       (item) => String(item.installmentCount) === allocationInstallments,
     );
-    const amount = parseCurrencyToCents(allocationAmount);
+    const amount = decimalToCents(allocationAmount);
     if (!method || !term) {
       toast.error('Informe a forma e a condição.');
       return;
@@ -994,6 +961,10 @@ export function FormServiceOrder() {
       Object.keys(next).some((key) => key !== 'service-order-customer-name')
     ) {
       toast.error('Preencha os campos obrigatórios.');
+      return false;
+    }
+    if (draft.lines.some((line) => (scale4(line.quantity) ?? 0n) <= 0n)) {
+      toast.error('Informe a quantidade de cada item.');
       return false;
     }
     if (draft.payments.some((row) => !/^\d{4}-\d{2}-\d{2}$/.test(row.dueOn))) {
@@ -1304,33 +1275,21 @@ export function FormServiceOrder() {
             value={draft.freight}
             disabled={locked}
             data-enter-sequence=""
-            inputMode="numeric"
-            autoComplete="off"
-            onChange={(event) =>
-              patch({ freight: maskCurrencyInput(event.target.value) })
-            }
+            {...decimalInputHandlers(2, (value) => patch({ freight: value }))}
           />
           <FloatingInput
             label="Desconto (R$)"
             value={draft.discount}
             disabled={locked}
             data-enter-sequence=""
-            inputMode="numeric"
-            autoComplete="off"
-            onChange={(event) =>
-              patch({ discount: maskCurrencyInput(event.target.value) })
-            }
+            {...decimalInputHandlers(2, (value) => patch({ discount: value }))}
           />
           <FloatingInput
             label="Acréscimo (R$)"
             value={draft.surcharge}
             disabled={locked}
             data-enter-sequence=""
-            inputMode="numeric"
-            autoComplete="off"
-            onChange={(event) =>
-              patch({ surcharge: maskCurrencyInput(event.target.value) })
-            }
+            {...decimalInputHandlers(2, (value) => patch({ surcharge: value }))}
           />
         </div>
         <p className="text-sm text-zinc-700">
@@ -1348,6 +1307,7 @@ export function FormServiceOrder() {
             <FloatingSelect
               id="service-order-method"
               label="Forma de pagamento"
+              pinned
               className="md:col-span-4"
               data-enter-sequence=""
               value={allocationMethodId}
@@ -1371,6 +1331,7 @@ export function FormServiceOrder() {
             <FloatingSelect
               id="service-order-installments"
               label="Condição"
+              pinned
               className="md:col-span-3"
               data-enter-sequence=""
               value={allocationInstallments}
@@ -1391,13 +1352,15 @@ export function FormServiceOrder() {
               label="Valor"
               className="md:col-span-3"
               data-enter-sequence=""
-              inputMode="numeric"
-              autoComplete="off"
               value={allocationAmount}
-              onChange={(event) => {
-                amountTouched.current = true;
-                setAllocationAmount(maskCurrencyInput(event.target.value));
-              }}
+              {...decimalInputHandlers(
+                2,
+                (value) => {
+                  amountTouched.current = true;
+                  setAllocationAmount(value);
+                },
+                setAllocationAmount,
+              )}
             />
             <div className="md:col-span-2">
               <Button
@@ -1440,15 +1403,11 @@ export function FormServiceOrder() {
                     <td className="py-2 pr-2">
                       <Input
                         aria-label={`Valor de ${row.methodName}`}
-                        inputMode="numeric"
-                        autoComplete="off"
                         value={row.amount}
                         disabled={locked}
-                        onChange={(event) =>
-                          patchPayment(row.key, {
-                            amount: maskCurrencyInput(event.target.value),
-                          })
-                        }
+                        {...decimalInputHandlers(2, (value) =>
+                          patchPayment(row.key, { amount: value }),
+                        )}
                       />
                     </td>
                     <td className="py-2">
@@ -1919,9 +1878,9 @@ function LineTable({
                       data-enter-sequence=""
                       value={line.quantity}
                       disabled={locked}
-                      onChange={(event) =>
-                        onPatch(index, { quantity: event.target.value })
-                      }
+                      {...decimalInputHandlers(4, (value) =>
+                        onPatch(index, { quantity: value }),
+                      )}
                     />
                   </td>
                   <td className="px-2 py-2">
@@ -1929,14 +1888,12 @@ function LineTable({
                       aria-label="Unitário"
                       className="w-full px-2"
                       data-enter-sequence=""
-                      inputMode="numeric"
-                      autoComplete="off"
                       placeholder="0,0000"
                       value={line.unitPrice}
                       disabled={locked}
-                      onChange={(event) =>
-                        onPatch(index, { unitPrice: maskUnitPrice(event.target.value) })
-                      }
+                      {...decimalInputHandlers(4, (value) =>
+                        onPatch(index, { unitPrice: value }),
+                      )}
                     />
                   </td>
                   <td className="px-2 py-2 whitespace-nowrap">

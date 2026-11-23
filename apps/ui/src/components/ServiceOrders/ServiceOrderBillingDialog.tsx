@@ -2,7 +2,6 @@ import {
   formatCurrency,
   installmentDueDates,
   maskCurrencyInput,
-  parseCurrencyToCents,
   splitInstallmentAmounts,
 } from '@erp-360/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,6 +9,10 @@ import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+  decimalInputHandlers,
+  decimalToCents,
+} from '@/components/ServiceOrders/serviceOrderDecimal';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -138,7 +141,7 @@ export function ServiceOrderBillingDialog({
     (left, right) => left.installmentCount - right.installmentCount,
   );
   const totalAmount = order.data?.totalAmount ?? 0;
-  const allocated = rows.reduce((sum, row) => sum + parseCurrencyToCents(row.amount), 0);
+  const allocated = rows.reduce((sum, row) => sum + decimalToCents(row.amount), 0);
   const remaining = totalAmount - allocated;
   const existing = lockedBillings ?? (order.data?.billings.length ? order.data.billings : null);
   const existingMessage =
@@ -153,7 +156,7 @@ export function ServiceOrderBillingDialog({
     const term = method?.terms.find(
       (item) => String(item.installmentCount) === installments,
     );
-    const cents = parseCurrencyToCents(amount);
+    const cents = decimalToCents(amount);
     if (!method || !term) {
       toast.error('Informe a forma e a condição.');
       return;
@@ -199,7 +202,7 @@ export function ServiceOrderBillingDialog({
           paymentMethodId: row.paymentMethodId,
           installmentCount: row.installmentCount,
           dueOn: row.dueOn,
-          amount: parseCurrencyToCents(row.amount),
+          amount: decimalToCents(row.amount),
         })),
       );
       if (result.status === 409) {
@@ -293,11 +296,9 @@ export function ServiceOrderBillingDialog({
                 <Label htmlFor="billing-amount">Valor</Label>
                 <Input
                   id="billing-amount"
-                  inputMode="numeric"
-                  autoComplete="off"
                   placeholder="0,00"
                   value={amount}
-                  onChange={(event) => setAmount(maskCurrencyInput(event.target.value))}
+                  {...decimalInputHandlers(2, setAmount)}
                 />
               </div>
               <div className="md:col-span-2">
@@ -345,21 +346,14 @@ export function ServiceOrderBillingDialog({
                         <td className="py-2 pr-2">
                           <Input
                             aria-label={`Valor de ${row.methodName}`}
-                            inputMode="numeric"
-                            autoComplete="off"
                             value={row.amount}
-                            onChange={(event) =>
+                            {...decimalInputHandlers(2, (value) =>
                               setRows((current) =>
                                 current.map((item) =>
-                                  item.key === row.key
-                                    ? {
-                                        ...item,
-                                        amount: maskCurrencyInput(event.target.value),
-                                      }
-                                    : item,
+                                  item.key === row.key ? { ...item, amount: value } : item,
                                 ),
-                              )
-                            }
+                              ),
+                            )}
                           />
                         </td>
                         <td className="py-2">
