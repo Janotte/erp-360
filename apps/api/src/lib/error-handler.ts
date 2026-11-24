@@ -142,6 +142,15 @@ function checkMessage(error: unknown): string | null {
   if (name.includes('catalog_items_service_description')) {
     return 'A discriminação do serviço aceita até 2000 caracteres.';
   }
+  if (name.includes('billing_documents_number')) {
+    return 'Não foi possível numerar o documento.';
+  }
+  if (name.includes('billing_documents_total_formula')) {
+    return 'O total do documento não fecha com os valores da ordem.';
+  }
+  if (name.includes('billing_documents_')) {
+    return 'O documento de faturamento está incompleto.';
+  }
   if (name.includes('catalog_items_name')) return 'Informe o nome.';
   if (name.includes('cfop_entry_rules_digits')) return 'O CFOP precisa ter 4 dígitos.';
   if (name.includes('payment_methods_code_format')) {

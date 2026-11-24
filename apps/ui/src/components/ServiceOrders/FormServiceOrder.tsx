@@ -17,6 +17,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 
 import { PersonSearchSelect } from '@/components/Persons/PersonSearchSelect';
+import { BillingDocumentNote } from '@/components/ServiceOrders/BillingDocumentNote';
 import {
   decimalInputHandlers,
   decimalToApi,
@@ -1435,6 +1436,9 @@ export function FormServiceOrder() {
       {order.data && order.data.billings.length > 0 ? (
         <section className="space-y-4 rounded-lg border bg-white p-6">
           <h3 className="text-lg font-semibold text-zinc-900">Financeiro</h3>
+          {order.data.billingDocument ? (
+            <BillingDocumentNote document={order.data.billingDocument} />
+          ) : null}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

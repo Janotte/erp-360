@@ -1,0 +1,2 @@
+ALTER TABLE "billing_documents" DROP CONSTRAINT "billing_documents_tenant_order_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "billing_documents_tenant_issued_order_unique" ON "billing_documents" USING btree ("tenant_id","service_order_id") WHERE "billing_documents"."commercial_status" = 'issued';

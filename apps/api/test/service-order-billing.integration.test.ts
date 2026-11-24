@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
+import { billingDocuments } from '@erp-360/mod-billing';
 import { catalogItems, measures } from '@erp-360/mod-catalog';
 import { meansOfPayment, paymentMethods, paymentMethodTerms, paymentPlanLines, paymentPlans, receivables } from '@erp-360/mod-financial';
 import { serviceOrderBillings, serviceOrders } from '@erp-360/mod-service-orders';
@@ -43,6 +44,12 @@ type OrderDetail = {
     documentNumber: string | null;
     description: string;
   }[];
+  billingDocument: {
+    numberLabel: string;
+    commercialStatus: string;
+    fiscalStatus: string;
+    totalAmount: number;
+  } | null;
   today: string;
 };
 
@@ -188,6 +195,7 @@ describe('cobrança da ordem de serviço', { concurrency: false }, () => {
   after(async () => {
     if (tenantId) {
       await db.delete(serviceOrderBillings).where(eq(serviceOrderBillings.tenantId, tenantId));
+      await db.delete(billingDocuments).where(eq(billingDocuments.tenantId, tenantId));
       await db.delete(receivables).where(eq(receivables.tenantId, tenantId));
       await db.delete(serviceOrders).where(eq(serviceOrders.tenantId, tenantId));
       await db.delete(paymentPlans).where(eq(paymentPlans.tenantId, tenantId));
@@ -331,8 +339,29 @@ describe('cobrança da ordem de serviço', { concurrency: false }, () => {
       assert.ok(title.meansOfPaymentId);
       assert.equal(String(title.issueOn).slice(0, 10), today);
       assert.equal(title.planAccountId, null);
-      assert.equal(title.invoiceNumber, null);
+      assert.equal(title.invoiceNumber, '000.001');
     }
+    const documents = await db
+      .select({
+        personId: billingDocuments.personId,
+        totalAmount: billingDocuments.totalAmount,
+        commercialStatus: billingDocuments.commercialStatus,
+        fiscalStatus: billingDocuments.fiscalStatus,
+        issuedOn: billingDocuments.issuedOn,
+      })
+      .from(billingDocuments)
+      .where(
+        and(
+          eq(billingDocuments.tenantId, tenantId),
+          eq(billingDocuments.serviceOrderId, billed.id),
+        ),
+      );
+    assert.equal(documents.length, 1);
+    assert.equal(documents[0]?.personId, personId);
+    assert.equal(documents[0]?.totalAmount, billed.totalAmount);
+    assert.equal(documents[0]?.commercialStatus, 'issued');
+    assert.equal(documents[0]?.fiscalStatus, 'not_requested');
+    assert.equal(String(documents[0]?.issuedOn).slice(0, 10), today);
     const read = await app.inject({
       method: 'GET',
       url: `/service-orders/${billed.id}`,
@@ -341,6 +370,8 @@ describe('cobrança da ordem de serviço', { concurrency: false }, () => {
     const loaded = read.json() as OrderDetail;
     assert.equal(loaded.status, 'delivered');
     assert.equal(loaded.today, await todayForTenant(tenantId));
+    assert.equal(loaded.billingDocument?.numberLabel, '000.001');
+    assert.equal(loaded.billingDocument?.fiscalStatus, 'not_requested');
     assert.equal(loaded.billings.length, 2);
     assert.equal(loaded.billings[0]?.documentNumber, '000001-01');
     assert.equal(loaded.billings[0]?.description, 'Ordem 000.001 · parcela 1');
@@ -367,6 +398,7 @@ describe('cobrança da ordem de serviço', { concurrency: false }, () => {
     const titles = await titlesOf(detail.id);
     assert.equal(titles.length, 2);
     assert.ok(titles.every((title) => title.paymentMethodId === pixMethodId));
+    assert.ok(titles.every((title) => title.invoiceNumber === '000.002'));
     const lines = await db
       .select({ name: paymentPlanLines.methodName, amount: paymentPlanLines.amount })
       .from(paymentPlanLines)
@@ -390,7 +422,19 @@ describe('cobrança da ordem de serviço', { concurrency: false }, () => {
     const body = again.json() as { message: string; billings: BillingLine[] };
     assert.equal(body.message, 'O financeiro desta ordem já foi gerado.');
     assert.equal(body.billings[0]?.documentNumber, '000001-01');
-    assert.equal((await titlesOf(billed.id)).length, 2);
+    const titles = await titlesOf(billed.id);
+    assert.equal(titles.length, 2);
+    assert.ok(titles.every((title) => title.invoiceNumber === '000.001'));
+    const documents = await db
+      .select({ id: billingDocuments.id })
+      .from(billingDocuments)
+      .where(
+        and(
+          eq(billingDocuments.tenantId, tenantId),
+          eq(billingDocuments.serviceOrderId, billed.id),
+        ),
+      );
+    assert.equal(documents.length, 1);
     const read = await app.inject({
       method: 'GET',
       url: `/service-orders/${billed.id}`,
@@ -447,6 +491,7 @@ describe('cobrança da ordem de serviço', { concurrency: false }, () => {
     });
     const loaded = pending.json() as OrderDetail;
     assert.deepEqual(loaded.billings, []);
+    assert.equal(loaded.billingDocument, null);
     assert.equal(loaded.today, await todayForTenant(tenantId));
   });
 
@@ -566,7 +611,7 @@ describe('cobrança da ordem de serviço', { concurrency: false }, () => {
     const again = await bill(delivered.id, payments);
     assert.equal(again.statusCode, 200, again.body);
     const titles = await db
-      .select({ status: receivables.status })
+      .select({ status: receivables.status, invoiceNumber: receivables.invoiceNumber })
       .from(receivables)
       .where(
         and(eq(receivables.tenantId, tenantId), eq(receivables.documentNumber, documentNumber)),
@@ -575,6 +620,11 @@ describe('cobrança da ordem de serviço', { concurrency: false }, () => {
       titles.map((row) => row.status).sort(),
       ['cancelado', 'pendente'],
     );
+    const canceledTitle = titles.find((row) => row.status === 'cancelado');
+    const pendingTitle = titles.find((row) => row.status === 'pendente');
+    assert.ok(canceledTitle?.invoiceNumber);
+    assert.ok(pendingTitle?.invoiceNumber);
+    assert.notEqual(canceledTitle.invoiceNumber, pendingTitle.invoiceNumber);
   });
 
   it('recusa o estorno quando já existe recebimento', async () => {

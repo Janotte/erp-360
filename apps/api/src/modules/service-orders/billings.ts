@@ -1,5 +1,6 @@
 import '../../types/fastify.ts';
 
+import { billingDocumentCounters, billingDocuments } from '@erp-360/mod-billing';
 import {
   paymentMethods,
   paymentMethodTerms,
@@ -8,13 +9,14 @@ import {
   receivables,
 } from '@erp-360/mod-financial';
 import { serviceOrderBillings, serviceOrders } from '@erp-360/mod-service-orders';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
 import { todayForTenant } from '../contracts/clock.ts';
 import {
+  formatBillingDocumentNumber,
   serviceOrderBillingDescription,
   serviceOrderBillingDocumentNumber,
 } from './billing-labels.ts';
@@ -54,6 +56,14 @@ export type ServiceOrderBillingLine = {
   description: string;
   status: 'pendente' | 'recebido' | 'cancelado';
   receivableId: string;
+};
+
+export type OrderBillingDocument = {
+  number: number;
+  numberLabel: string;
+  commercialStatus: 'issued' | 'canceled';
+  fiscalStatus: 'not_requested' | 'pending' | 'authorized' | 'rejected' | 'canceled';
+  totalAmount: number;
 };
 
 function httpError(message: string, status: number): never {
@@ -192,6 +202,36 @@ export async function listServiceOrderBillings(
   }));
 }
 
+export async function loadOrderBillingDocument(
+  tenantId: string,
+  orderId: string,
+): Promise<OrderBillingDocument | null> {
+  const [row] = await db
+    .select({
+      number: billingDocuments.number,
+      commercialStatus: billingDocuments.commercialStatus,
+      fiscalStatus: billingDocuments.fiscalStatus,
+      totalAmount: billingDocuments.totalAmount,
+    })
+    .from(billingDocuments)
+    .where(
+      and(
+        eq(billingDocuments.tenantId, tenantId),
+        eq(billingDocuments.serviceOrderId, orderId),
+        eq(billingDocuments.commercialStatus, 'issued'),
+      ),
+    )
+    .limit(1);
+  if (!row) return null;
+  return {
+    number: row.number,
+    numberLabel: formatBillingDocumentNumber(row.number),
+    commercialStatus: row.commercialStatus,
+    fiscalStatus: row.fiscalStatus,
+    totalAmount: row.totalAmount,
+  };
+}
+
 const emptyPaymentSnapshot = {
   paymentMethodId: null,
   paymentInstallments: null,
@@ -218,9 +258,14 @@ export async function generateServiceOrderBillings(
       id: serviceOrders.id,
       number: serviceOrders.number,
       status: serviceOrders.status,
-      totalAmount: serviceOrders.totalAmount,
       personId: serviceOrders.personId,
       paymentPlanId: serviceOrders.paymentPlanId,
+      productsAmount: serviceOrders.productsAmount,
+      servicesAmount: serviceOrders.servicesAmount,
+      freightAmount: serviceOrders.freightAmount,
+      discountAmount: serviceOrders.discountAmount,
+      surchargeAmount: serviceOrders.surchargeAmount,
+      totalAmount: serviceOrders.totalAmount,
     })
     .from(serviceOrders)
     .where(and(eq(serviceOrders.id, orderId), eq(serviceOrders.tenantId, tenantId)))
@@ -280,6 +325,33 @@ export async function generateServiceOrderBillings(
         .set({ paymentPlanId: planId, ...emptyPaymentSnapshot })
         .where(and(eq(serviceOrders.id, orderId), eq(serviceOrders.tenantId, tenantId)));
 
+      await tx
+        .insert(billingDocumentCounters)
+        .values({ tenantId, lastNumber: 0 })
+        .onConflictDoNothing();
+      const [counter] = await tx
+        .update(billingDocumentCounters)
+        .set({ lastNumber: sql`${billingDocumentCounters.lastNumber} + 1` })
+        .where(eq(billingDocumentCounters.tenantId, tenantId))
+        .returning({ lastNumber: billingDocumentCounters.lastNumber });
+      if (!counter) throw new Error('Não foi possível numerar o documento.');
+      const invoiceNumber = formatBillingDocumentNumber(counter.lastNumber);
+      await tx.insert(billingDocuments).values({
+        tenantId,
+        number: counter.lastNumber,
+        personId: order.personId,
+        serviceOrderId: orderId,
+        productsAmount: order.productsAmount,
+        servicesAmount: order.servicesAmount,
+        freightAmount: order.freightAmount,
+        discountAmount: order.discountAmount,
+        surchargeAmount: order.surchargeAmount,
+        totalAmount: order.totalAmount,
+        commercialStatus: 'issued',
+        fiscalStatus: 'not_requested',
+        issuedOn: today,
+      });
+
       for (const [index, line] of lines.entries()) {
         const lineNumber = index + 1;
         const [title] = await tx
@@ -288,6 +360,7 @@ export async function generateServiceOrderBillings(
             tenantId,
             debtorId: order.personId,
             documentNumber: serviceOrderBillingDocumentNumber(order.number, lineNumber),
+            invoiceNumber,
             description: serviceOrderBillingDescription(numberLabel, lineNumber),
             issueOn: today,
             installmentAmount: line.amount,

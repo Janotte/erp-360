@@ -9,6 +9,7 @@ import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { BillingDocumentNote } from '@/components/ServiceOrders/BillingDocumentNote';
 import {
   decimalInputHandlers,
   decimalToCents,
@@ -234,6 +235,9 @@ export function ServiceOrderBillingDialog({
         {existing && existingMessage ? (
           <div className="space-y-3">
             <p className="text-sm text-zinc-700">{existingMessage}</p>
+            {order.data?.billingDocument ? (
+              <BillingDocumentNote document={order.data.billingDocument} />
+            ) : null}
             <BillingTable rows={existing} />
           </div>
         ) : null}

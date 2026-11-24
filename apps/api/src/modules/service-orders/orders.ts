@@ -1,5 +1,6 @@
 import '../../types/fastify.ts';
 
+import { billingDocuments } from '@erp-360/mod-billing';
 import { catalogItems } from '@erp-360/mod-catalog';
 import { contracts } from '@erp-360/mod-contracts';
 import {
@@ -29,10 +30,14 @@ import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
 import { listPageQuery } from '../../lib/list-page.ts';
-import { listServiceOrderBillings, serviceOrderBillingRoutes } from './billings.ts';
 import { todayForTenant } from '../contracts/clock.ts';
-import { buildServiceOrderPrint } from './print-model.ts';
 import { formatContractNumber } from '../contracts/rules.ts';
+import {
+  listServiceOrderBillings,
+  loadOrderBillingDocument,
+  serviceOrderBillingRoutes,
+} from './billings.ts';
+import { buildServiceOrderPrint } from './print-model.ts';
 import {
   assertContractLink,
   assertLine,
@@ -240,6 +245,7 @@ type LoadedOrder = {
   paymentPlanId: string | null;
   payments: LoadedPayment[];
   today: string;
+  billingDocument: Awaited<ReturnType<typeof loadOrderBillingDocument>>;
   billings: Awaited<ReturnType<typeof listServiceOrderBillings>>;
   customer: CustomerCopy;
   fields: LoadedField[];
@@ -719,6 +725,7 @@ async function loadOrder(tenantId: string, id: string): Promise<LoadedOrder | nu
       amount: line.amount,
     })),
     today: await todayForTenant(tenantId),
+    billingDocument: await loadOrderBillingDocument(tenantId, id),
     billings: await listServiceOrderBillings(tenantId, id),
     customer: {
       customerName: order.customerName,
@@ -766,6 +773,7 @@ function present(order: LoadedOrder) {
     paymentInstallments: order.paymentInstallments,
     ...(order.payments.length > 0 ? { payments: order.payments } : {}),
     today: order.today,
+    billingDocument: order.billingDocument,
     billings: order.billings,
     fields: order.fields,
     notes: order.notes,
@@ -1156,6 +1164,17 @@ async function reverseServiceOrder(tenantId: string, id: string) {
           ),
         );
     }
+
+    await tx
+      .update(billingDocuments)
+      .set({ commercialStatus: 'canceled' })
+      .where(
+        and(
+          eq(billingDocuments.tenantId, tenantId),
+          eq(billingDocuments.serviceOrderId, id),
+          eq(billingDocuments.commercialStatus, 'issued'),
+        ),
+      );
 
     await tx
       .delete(serviceOrderBillings)

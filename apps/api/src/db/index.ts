@@ -1,3 +1,4 @@
+import * as billingSchema from '@erp-360/mod-billing';
 import * as catalogSchema from '@erp-360/mod-catalog';
 import * as contractSchema from '@erp-360/mod-contracts';
 import * as coreSchema from '@erp-360/mod-core';
@@ -17,6 +18,7 @@ types.setTypeParser(21, (value) => (value == null ? null : Number.parseInt(value
 const schema = {
   ...coreSchema,
   ...personsSchema,
+  ...billingSchema,
   ...financialSchema,
   ...catalogSchema,
   ...contractSchema,

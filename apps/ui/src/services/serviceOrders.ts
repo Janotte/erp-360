@@ -117,6 +117,14 @@ export interface ServiceOrderBilling {
   receivableId: string;
 }
 
+export interface ServiceOrderBillingDocument {
+  number: number;
+  numberLabel: string;
+  commercialStatus: 'issued' | 'canceled';
+  fiscalStatus: 'not_requested' | 'pending' | 'authorized' | 'rejected' | 'canceled';
+  totalAmount: number;
+}
+
 export interface ServiceOrderPayment {
   paymentMethodId: string;
   methodName: string;
@@ -168,6 +176,7 @@ export interface ServiceOrderDetail {
   paymentInstallments: number | null;
   payments?: ServiceOrderPayment[];
   today: string;
+  billingDocument: ServiceOrderBillingDocument | null;
   billings: ServiceOrderBilling[];
   fields: ServiceOrderFieldValue[];
   notes: ServiceOrderNoteValue[];
