@@ -127,6 +127,21 @@ function checkMessage(error: unknown): string | null {
   if (name.includes('catalog_items_name_uppercase')) {
     return 'O nome do item deve estar em maiúsculas.';
   }
+  if (name.includes('catalog_items_service_fields')) {
+    return 'Produto não grava código de serviço.';
+  }
+  if (name.includes('catalog_items_national_service_code')) {
+    return 'O código de tributação nacional precisa ter 6 dígitos.';
+  }
+  if (name.includes('catalog_items_municipal_service_code')) {
+    return 'O código tributário municipal precisa ter 3 dígitos.';
+  }
+  if (name.includes('catalog_items_iss_rate')) {
+    return 'Informe a alíquota do ISS entre 0 e 9,99.';
+  }
+  if (name.includes('catalog_items_service_description')) {
+    return 'A discriminação do serviço aceita até 2000 caracteres.';
+  }
   if (name.includes('catalog_items_name')) return 'Informe o nome.';
   if (name.includes('cfop_entry_rules_digits')) return 'O CFOP precisa ter 4 dígitos.';
   if (name.includes('payment_methods_code_format')) {

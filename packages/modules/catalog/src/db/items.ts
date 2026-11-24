@@ -74,6 +74,14 @@ export const catalogItems = pgTable(
     lengthCm: numeric('length_cm', { precision: 8, scale: 2 }),
     widthCm: numeric('width_cm', { precision: 8, scale: 2 }),
     heightCm: numeric('height_cm', { precision: 8, scale: 2 }),
+    /** cTribNac. Seis dígitos do código de tributação nacional. Só serviço. */
+    nationalServiceCode: varchar('national_service_code', { length: 6 }),
+    /** cTribMun. Três dígitos, quando o município exige. Só serviço. */
+    municipalServiceCode: varchar('municipal_service_code', { length: 3 }),
+    /** pAliq. Percentual de 0 a 9,99. Só serviço. */
+    issRate: numeric('iss_rate', { precision: 3, scale: 2 }),
+    /** xDescServ. Texto da NFS-e. Em branco, a nota usa o nome. Só serviço. */
+    serviceDescription: text('service_description'),
     isActive: boolean('is_active').default(true).notNull(),
     /**
      * Percentual sobre o custo. O lançamento sugere o preço de tabela
@@ -115,10 +123,7 @@ export const catalogItems = pgTable(
       sql`${table.sku} is null or length(trim(${table.sku})) > 0`,
     ),
     check('catalog_items_name_not_blank', sql`length(trim(${table.name})) > 0`),
-    check(
-      'catalog_items_name_uppercase',
-      sql`${table.name} = upper(${table.name})`,
-    ),
+    check('catalog_items_name_uppercase', sql`${table.name} = upper(${table.name})`),
     check(
       'catalog_items_barcode_check',
       sql`${table.barcode} is null or ${table.barcode} ~ '^[0-9]{8}$|^[0-9]{12,14}$'`,
@@ -134,6 +139,41 @@ export const catalogItems = pgTable(
     check(
       'catalog_items_gross_margin_check',
       sql`${table.grossMargin} is null or (${table.grossMargin} >= 0 and ${table.grossMargin} < 100)`,
+    ),
+    check(
+      'catalog_items_service_fields_check',
+      sql`(
+        ${table.type} = 'service'
+        or (
+          ${table.nationalServiceCode} is null
+          and ${table.municipalServiceCode} is null
+          and ${table.issRate} is null
+          and ${table.serviceDescription} is null
+        )
+      )`,
+    ),
+    check(
+      'catalog_items_national_service_code_check',
+      sql`${table.nationalServiceCode} is null or ${table.nationalServiceCode} ~ '^[0-9]{6}$'`,
+    ),
+    check(
+      'catalog_items_municipal_service_code_check',
+      sql`${table.municipalServiceCode} is null or ${table.municipalServiceCode} ~ '^[0-9]{3}$'`,
+    ),
+    check(
+      'catalog_items_iss_rate_check',
+      sql`${table.issRate} is null or (${table.issRate} >= 0 and ${table.issRate} < 10)`,
+    ),
+    check(
+      'catalog_items_service_description_check',
+      sql`(
+        ${table.serviceDescription} is null
+        or (
+          length(trim(${table.serviceDescription})) > 0
+          and length(${table.serviceDescription}) <= 2000
+          and ${table.serviceDescription} = upper(${table.serviceDescription})
+        )
+      )`,
     ),
     check(
       'catalog_items_measures_check',

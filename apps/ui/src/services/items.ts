@@ -29,6 +29,10 @@ export interface CatalogItem {
   lengthCm: string | null;
   widthCm: string | null;
   heightCm: string | null;
+  nationalServiceCode: string | null;
+  municipalServiceCode: string | null;
+  issRate: string | null;
+  serviceDescription: string | null;
   isActive: boolean;
   lastInboundOn: string | null;
 }
@@ -52,6 +56,10 @@ export interface CatalogItemInput {
   lengthCm?: string | null;
   widthCm?: string | null;
   heightCm?: string | null;
+  nationalServiceCode?: string | null;
+  municipalServiceCode?: string | null;
+  issRate?: string | null;
+  serviceDescription?: string | null;
   isActive?: boolean;
 }
 

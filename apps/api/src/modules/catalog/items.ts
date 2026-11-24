@@ -42,6 +42,10 @@ const itemBodySchema = z
     lengthCm: z.string().max(20).nullable().optional(),
     widthCm: z.string().max(20).nullable().optional(),
     heightCm: z.string().max(20).nullable().optional(),
+    nationalServiceCode: z.string().max(20).nullable().optional(),
+    municipalServiceCode: z.string().max(10).nullable().optional(),
+    issRate: z.string().max(20).nullable().optional(),
+    serviceDescription: z.string().max(2000).nullable().optional(),
     isActive: z.boolean().optional().default(true),
   })
   .superRefine((data, ctx) => {
@@ -126,6 +130,57 @@ async function nextItemCode(
   return formatItemCode(updated.lastNumber);
 }
 
+export function normalizeServiceItem(input: {
+  type: CatalogItemType;
+  nationalServiceCode?: string | null;
+  municipalServiceCode?: string | null;
+  issRate?: string | null;
+  serviceDescription?: string | null;
+}) {
+  if (input.type !== 'service') {
+    return {
+      nationalServiceCode: null,
+      municipalServiceCode: null,
+      issRate: null,
+      serviceDescription: null,
+    };
+  }
+
+  const national = (input.nationalServiceCode ?? '').replace(/\D/g, '');
+  if (national && national.length !== 6) {
+    return { message: 'O código de tributação nacional precisa ter 6 dígitos.' };
+  }
+  const municipal = (input.municipalServiceCode ?? '').replace(/\D/g, '');
+  if (municipal && municipal.length !== 3) {
+    return { message: 'O código tributário municipal precisa ter 3 dígitos.' };
+  }
+
+  const rateText = (input.issRate ?? '').trim();
+  let issRate: string | null = null;
+  if (rateText) {
+    const parsed = parseDecimal(rateText, 2, 3);
+    const rate = parsed.ok && parsed.value != null ? Number(parsed.value) : Number.NaN;
+    if (!parsed.ok || !Number.isFinite(rate) || rate < 0 || rate >= 10) {
+      return { message: 'Informe a alíquota do ISS entre 0 e 9,99.' };
+    }
+    issRate = parsed.value;
+  }
+
+  const serviceDescription = (input.serviceDescription ?? '')
+    .trim()
+    .toLocaleUpperCase('pt-BR');
+  if (serviceDescription.length > 2000) {
+    return { message: 'A discriminação do serviço aceita até 2000 caracteres.' };
+  }
+
+  return {
+    nationalServiceCode: national || null,
+    municipalServiceCode: municipal || null,
+    issRate,
+    serviceDescription: serviceDescription || null,
+  };
+}
+
 export function grossMarginRangeMessage(value: string | null | undefined) {
   const trimmed = value?.trim() ?? '';
   if (!trimmed) return null;
@@ -190,6 +245,8 @@ function buildItemValues(
   if (!heightCm.ok) return { message: 'Informe a altura com até 2 casas decimais.' };
 
   const description = (data.description?.trim() ?? '').toLocaleUpperCase('pt-BR');
+  const service = normalizeServiceItem(data);
+  if ('message' in service) return service;
   return {
     values: itemValues({
       sku: sku || null,
@@ -213,6 +270,10 @@ function buildItemValues(
       lengthCm: lengthCm.value,
       widthCm: widthCm.value,
       heightCm: heightCm.value,
+      nationalServiceCode: service.nationalServiceCode,
+      municipalServiceCode: service.municipalServiceCode,
+      issRate: service.issRate,
+      serviceDescription: service.serviceDescription,
       isActive: data.isActive ?? true,
     }),
   };
@@ -237,6 +298,10 @@ function itemValues(values: {
   lengthCm: string | null;
   widthCm: string | null;
   heightCm: string | null;
+  nationalServiceCode: string | null;
+  municipalServiceCode: string | null;
+  issRate: string | null;
+  serviceDescription: string | null;
   isActive: boolean;
 }) {
   return values;
@@ -245,7 +310,11 @@ function itemValues(values: {
 async function relationProblem(
   tenantId: string,
   values: ReturnType<typeof itemValues>,
-  current: { categoryId: string | null; measureId: string; ncmCode: string | null } | null,
+  current: {
+    categoryId: string | null;
+    measureId: string;
+    ncmCode: string | null;
+  } | null,
 ) {
   if (values.categoryId) {
     const [category] = await db
@@ -334,6 +403,10 @@ const itemColumns = {
   lengthCm: catalogItems.lengthCm,
   widthCm: catalogItems.widthCm,
   heightCm: catalogItems.heightCm,
+  nationalServiceCode: catalogItems.nationalServiceCode,
+  municipalServiceCode: catalogItems.municipalServiceCode,
+  issRate: catalogItems.issRate,
+  serviceDescription: catalogItems.serviceDescription,
   isActive: catalogItems.isActive,
   lastInboundOn: catalogItems.lastInboundOn,
 };

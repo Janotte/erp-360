@@ -435,6 +435,13 @@
       "when": 1795560535605,
       "tag": "0061_nfse_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1795561638665,
+      "tag": "0062_item_service_code",
+      "breakpoints": true
     }
   ]
 }

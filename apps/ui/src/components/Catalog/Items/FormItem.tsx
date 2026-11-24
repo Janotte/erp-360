@@ -32,6 +32,7 @@ import {
   FloatingSelect,
   FloatingTextarea,
 } from '@/components/ui/FloatingField';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { categoriesService } from '@/services/categories';
 import { type CatalogItem, type CatalogItemInput, itemsService } from '@/services/items';
 import { measuresService } from '@/services/measures';
@@ -86,6 +87,32 @@ function listPriceForApi(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return '';
   return trimmed.replace(/\./g, '').replace(',', '.');
+}
+
+function maskNationalServiceCode(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 6);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
+}
+
+function maskIssRate(value: string) {
+  const raw = value.replace(/\D/g, '');
+  if (!raw) return '';
+  // Os zeros à esquerda são o preenchimento de "0,05". Sem descartá-los, o
+  // limite de três dígitos engole o próximo número digitado.
+  const digits = raw.replace(/^0+/, '').slice(0, 3);
+  if (!digits) return '0,00';
+  const padded = digits.padStart(3, '0');
+  return `${padded.slice(0, -2)},${padded.slice(-2)}`;
+}
+
+function formatIssRate(value: string | null | undefined) {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return '';
+  const number = Number(trimmed);
+  if (!Number.isFinite(number)) return '';
+  return maskIssRate(String(Math.round(number * 100)));
 }
 
 function maskPercent(value: string) {
@@ -186,6 +213,16 @@ export function FormItem({
   const [lengthCm, setLengthCm] = useState(itemToUpdate?.lengthCm ?? '');
   const [widthCm, setWidthCm] = useState(itemToUpdate?.widthCm ?? '');
   const [heightCm, setHeightCm] = useState(itemToUpdate?.heightCm ?? '');
+  const [nationalServiceCode, setNationalServiceCode] = useState(
+    maskNationalServiceCode(itemToUpdate?.nationalServiceCode ?? ''),
+  );
+  const [municipalServiceCode, setMunicipalServiceCode] = useState(
+    itemToUpdate?.municipalServiceCode ?? '',
+  );
+  const [issRate, setIssRate] = useState(formatIssRate(itemToUpdate?.issRate));
+  const [serviceDescription, setServiceDescription] = useState(
+    (itemToUpdate?.serviceDescription ?? '').toLocaleUpperCase('pt-BR'),
+  );
   const [isActive, setIsActive] = useState(itemToUpdate?.isActive !== false);
   const [ncmSearch, setNcmSearch] = useState('');
   const [openDelete, setOpenDelete] = useState(false);
@@ -267,6 +304,10 @@ export function FormItem({
     setLengthCm(item.lengthCm ?? '');
     setWidthCm(item.widthCm ?? '');
     setHeightCm(item.heightCm ?? '');
+    setNationalServiceCode(maskNationalServiceCode(item.nationalServiceCode ?? ''));
+    setMunicipalServiceCode(item.municipalServiceCode ?? '');
+    setIssRate(formatIssRate(item.issRate));
+    setServiceDescription((item.serviceDescription ?? '').toLocaleUpperCase('pt-BR'));
     setIsActive(item.isActive !== false);
   }, [loaded, itemToUpdate]);
 
@@ -397,8 +438,29 @@ export function FormItem({
     const errors: Record<string, string> = {};
     if (!name.trim()) errors.name = 'Informe o nome.';
     if (!measureId) errors.measure = 'Informe a medida.';
+    if (type === 'service') {
+      const national = nationalServiceCode.replace(/\D/g, '');
+      if (national && national.length !== 6) {
+        errors.nationalServiceCode =
+          'O código de tributação nacional precisa ter 6 dígitos.';
+      }
+      const municipal = municipalServiceCode.replace(/\D/g, '');
+      if (municipal && municipal.length !== 3) {
+        errors.municipalServiceCode =
+          'O código tributário municipal precisa ter 3 dígitos.';
+      }
+      if (serviceDescription.trim().length > 2000) {
+        errors.serviceDescription =
+          'A discriminação do serviço aceita até 2000 caracteres.';
+      }
+    }
     setFieldErrors(errors);
-    const message = errors.name ?? errors.measure;
+    const message =
+      errors.name ??
+      errors.measure ??
+      errors.nationalServiceCode ??
+      errors.municipalServiceCode ??
+      errors.serviceDescription;
     if (message || !measureId) {
       if (message) toast.error(message);
       return;
@@ -423,6 +485,10 @@ export function FormItem({
       lengthCm,
       widthCm,
       heightCm,
+      nationalServiceCode: type === 'service' ? nationalServiceCode : '',
+      municipalServiceCode: type === 'service' ? municipalServiceCode : '',
+      issRate: type === 'service' ? listPriceForApi(issRate) : '',
+      serviceDescription: type === 'service' ? serviceDescription : '',
       isActive,
     });
   };
@@ -762,6 +828,84 @@ export function FormItem({
         <p className="text-sm text-zinc-500">
           Serviço e ativo imobilizado não controlam estoque.
         </p>
+      ) : null}
+
+      {type === 'service' ? (
+        <Tabs value="service">
+          <TabsList>
+            <TabsTrigger value="service" type="button">
+              Serviço
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="service" className="space-y-4">
+            <p className="text-sm text-[#64748b]">
+              Código do serviço no padrão nacional. A nota copia estes dados. Em branco, a
+              discriminação usa o nome do item.
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <FloatingInput
+                  id="itemNationalServiceCode"
+                  label="Código de tributação nacional"
+                  data-item-field=""
+                  value={nationalServiceCode}
+                  inputMode="numeric"
+                  error={fieldErrors.nationalServiceCode}
+                  onChange={(event) => {
+                    setNationalServiceCode(maskNationalServiceCode(event.target.value));
+                    clearFieldError('nationalServiceCode');
+                  }}
+                />
+                <p className="mt-1 text-sm text-zinc-500">
+                  Item, subitem e desdobro: 00.00.00.
+                </p>
+              </div>
+              <div>
+                <FloatingInput
+                  id="itemMunicipalServiceCode"
+                  label="Código tributário municipal"
+                  data-item-field=""
+                  value={municipalServiceCode}
+                  inputMode="numeric"
+                  maxLength={3}
+                  error={fieldErrors.municipalServiceCode}
+                  onChange={(event) => {
+                    setMunicipalServiceCode(
+                      event.target.value.replace(/\D/g, '').slice(0, 3),
+                    );
+                    clearFieldError('municipalServiceCode');
+                  }}
+                />
+                <p className="mt-1 text-sm text-zinc-500">
+                  Três dígitos, só quando o município exige.
+                </p>
+              </div>
+            </div>
+            <div className="max-w-xs">
+              <FloatingInput
+                id="itemIssRate"
+                label="Alíquota do ISS (%)"
+                data-item-field=""
+                value={issRate}
+                inputMode="decimal"
+                onChange={(event) => setIssRate(maskIssRate(event.target.value))}
+              />
+              <p className="mt-1 text-sm text-zinc-500">De 0 a 9,99.</p>
+            </div>
+            <FloatingTextarea
+              id="itemServiceDescription"
+              label="Discriminação na NFS-e"
+              data-item-field=""
+              value={serviceDescription}
+              maxLength={2000}
+              error={fieldErrors.serviceDescription}
+              onChange={(event) => {
+                setServiceDescription(event.target.value.toLocaleUpperCase('pt-BR'));
+                clearFieldError('serviceDescription');
+              }}
+            />
+          </TabsContent>
+        </Tabs>
       ) : null}
 
       {mutation.isError ? (
