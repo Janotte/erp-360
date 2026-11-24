@@ -24,6 +24,7 @@ import { dfeSyncRoutes } from './modules/inbound/dfe-sync.ts';
 import { inboundRoutes } from './modules/inbound/inbound.ts';
 import { inboundMaintenanceRoutes } from './modules/inbound/maintenance.ts';
 import { nfeSettingsRoutes } from './modules/inbound/nfe-settings.ts';
+import { nfseSettingsRoutes } from './modules/nfse/settings.ts';
 import { paymentMethodRoutes } from './modules/payment-methods/payment-methods.ts';
 import { locationsRoutes } from './modules/persons/locations.ts';
 import { personsRoutes } from './modules/persons/persons.ts';
@@ -34,8 +35,8 @@ import { serviceOrderSettingsRoutes } from './modules/service-orders/settings.ts
 import { emitterRoutes } from './modules/tenants/emitter.ts';
 import { payablesRoutes } from './modules/titles/payables.ts';
 import { receivablesRoutes } from './modules/titles/receivables.ts';
-import { treasuryRoutes } from './modules/treasury/treasury.ts';
 import { companyCardRoutes } from './modules/treasury/company-cards.ts';
+import { treasuryRoutes } from './modules/treasury/treasury.ts';
 
 export function buildApp(options?: { logger?: boolean }) {
   const fastify = Fastify({
@@ -86,6 +87,7 @@ export function buildApp(options?: { logger?: boolean }) {
   fastify.register(companyCardRoutes, { prefix: '/financial' });
   fastify.register(emitterRoutes, { prefix: '/settings' });
   fastify.register(nfeSettingsRoutes, { prefix: '/settings' });
+  fastify.register(nfseSettingsRoutes, { prefix: '/settings' });
   fastify.register(serviceOrderSettingsRoutes, { prefix: '/settings' });
   fastify.register(serviceOrderRoutes, { prefix: '/service-orders' });
   fastify.register(contractRoutes, { prefix: '/contracts' });

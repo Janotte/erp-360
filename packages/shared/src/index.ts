@@ -157,13 +157,14 @@ export {
   toTitleCasePtBr,
 };
 export * from './catalogContracts.ts';
-export * from './listPage.ts';
 export * from './certificateContracts.ts';
 export * from './financialContracts.ts';
+export * from './listPage.ts';
+export * from './nfseContracts.ts';
 export * from './utils/civilDate.ts';
 export * from './utils/contractBilling.ts';
 export * from './utils/FormatCurrency.ts';
-export * from './utils/paymentPlan.ts';
-export * from './utils/inboundPricing.ts';
-export * from './utils/pricing.ts';
 export * from './utils/FormatRawDate.ts';
+export * from './utils/inboundPricing.ts';
+export * from './utils/paymentPlan.ts';
+export * from './utils/pricing.ts';

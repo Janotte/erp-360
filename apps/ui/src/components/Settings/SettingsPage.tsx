@@ -7,8 +7,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CertificateSettings } from './CertificateSettings';
 import { EmitterForm } from './EmitterForm';
 import { NfeSettingsForm } from './NfeSettingsForm';
+import { NfseSettingsForm } from './NfseSettingsForm';
 
-const tabs = ['emitter', 'certificate', 'nfe', 'financial', 'service-order'] as const;
+const tabs = [
+  'emitter',
+  'certificate',
+  'nfe',
+  'nfse',
+  'financial',
+  'service-order',
+] as const;
 type SettingsTab = (typeof tabs)[number];
 
 function readTab(value: string | null): SettingsTab {
@@ -31,8 +39,8 @@ export function SettingsPage() {
       <div>
         <h2 className="text-2xl font-bold text-[#172337]">Configurações</h2>
         <p className="mt-1 text-sm text-[#64748b]">
-          Dados da empresa, certificado digital, NF-e, parâmetros financeiros e ordem de
-          serviço.
+          Dados da empresa, certificado digital, NF-e, NFS-e, parâmetros financeiros e
+          ordem de serviço.
         </p>
       </div>
       <Tabs value={tab} onValueChange={setTab}>
@@ -40,6 +48,7 @@ export function SettingsPage() {
           <TabsTrigger value="emitter">Emitente</TabsTrigger>
           <TabsTrigger value="certificate">Certificado</TabsTrigger>
           <TabsTrigger value="nfe">NF-e</TabsTrigger>
+          <TabsTrigger value="nfse">NFS-e</TabsTrigger>
           <TabsTrigger value="financial">Financeiro</TabsTrigger>
           <TabsTrigger value="service-order">Ordem de serviço</TabsTrigger>
         </TabsList>
@@ -51,6 +60,9 @@ export function SettingsPage() {
         </TabsContent>
         <TabsContent value="nfe">
           <NfeSettingsForm />
+        </TabsContent>
+        <TabsContent value="nfse">
+          <NfseSettingsForm />
         </TabsContent>
         <TabsContent value="financial">
           <FinancialSettingsForm />

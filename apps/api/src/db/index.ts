@@ -3,6 +3,7 @@ import * as contractSchema from '@erp-360/mod-contracts';
 import * as coreSchema from '@erp-360/mod-core';
 import * as financialSchema from '@erp-360/mod-financial';
 import * as inboundSchema from '@erp-360/mod-inbound';
+import * as nfseSchema from '@erp-360/mod-nfse';
 import * as personsSchema from '@erp-360/mod-persons';
 import * as serviceOrderSchema from '@erp-360/mod-service-orders';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -20,6 +21,7 @@ const schema = {
   ...catalogSchema,
   ...contractSchema,
   ...inboundSchema,
+  ...nfseSchema,
   ...serviceOrderSchema,
 };
 

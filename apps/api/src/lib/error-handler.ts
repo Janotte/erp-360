@@ -151,6 +151,15 @@ function checkMessage(error: unknown): string | null {
   if (name.includes('payment_method_terms_interest')) {
     return 'A taxa de juros não confere com o tipo de juros.';
   }
+  if (name.includes('nfse_settings_simples_assessment')) {
+    return 'O regime de apuração dos tributos federais e do ISS não confere com o Simples Nacional.';
+  }
+  if (name.includes('nfse_settings_ibs_cbs_assessment')) {
+    return 'O regime de apuração do IBS e da CBS não confere com o Simples Nacional.';
+  }
+  if (name.includes('nfse_settings_special_regime')) {
+    return 'O regime especial de tributação não confere com o enquadramento.';
+  }
   return null;
 }
 

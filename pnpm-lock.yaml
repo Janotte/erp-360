@@ -208,6 +208,9 @@ importers:
       '@erp-360/mod-inbound':
         specifier: workspace:*
         version: link:../../packages/modules/inbound
+      '@erp-360/mod-nfse':
+        specifier: workspace:*
+        version: link:../../packages/modules/nfse
       '@erp-360/mod-persons':
         specifier: workspace:*
         version: link:../../packages/modules/persons
@@ -520,6 +523,25 @@ importers:
       '@erp-360/mod-persons':
         specifier: workspace:*
         version: link:../persons
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)
+    devDependencies:
+      '@erp-360/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      eslint:
+        specifier: ^10.10.0
+        version: 10.10.0(jiti@2.7.0)(supports-color@5.5.0)
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
+
+  packages/modules/nfse:
+    dependencies:
+      '@erp-360/mod-core':
+        specifier: workspace:*
+        version: link:../core
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)

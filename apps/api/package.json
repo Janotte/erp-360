@@ -25,6 +25,7 @@
     "@erp-360/mod-core": "workspace:*",
     "@erp-360/mod-financial": "workspace:*",
     "@erp-360/mod-inbound": "workspace:*",
+    "@erp-360/mod-nfse": "workspace:*",
     "@erp-360/mod-persons": "workspace:*",
     "@erp-360/mod-service-orders": "workspace:*",
     "@erp-360/shared": "workspace:*",
