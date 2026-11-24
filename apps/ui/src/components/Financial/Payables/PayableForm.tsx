@@ -25,6 +25,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { CatalogSearchSelect } from '@/components/ui/CatalogSearchSelect';
 import { FloatingInput } from '@/components/ui/FloatingField';
+import { onEnterSequence } from '@/lib/enterSequence';
 import { companyCardService } from '@/services/companyCards';
 import {
   type CreatePayableInput,
@@ -185,7 +186,7 @@ export function PayableForm({
     mutation.isPending || deleteMutation.isPending || reverseMutation.isPending;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} onKeyDown={onEnterSequence} className="space-y-4">
       {showSettlement ? (
         <div className="space-y-1 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
           <p className="font-medium text-emerald-800">Liquidação</p>
@@ -204,6 +205,7 @@ export function PayableForm({
       <div className="space-y-2">
         <CatalogSearchSelect
           label="Cartão"
+          enterSequence
           value={companyCardId}
           onChange={selectCard}
           options={(cards.data ?? [])
@@ -225,6 +227,7 @@ export function PayableForm({
 
       <PersonSearchSelect
         label="Credor"
+        enterSequence
         value={personId}
         onChange={setPersonId}
         type={['fornecedor', 'colaborador', 'instituicao']}
@@ -235,6 +238,7 @@ export function PayableForm({
 
       <FloatingInput
         id="documentNumber"
+        data-enter-sequence=""
         label="Nº do documento"
         value={documentNumber}
         maxLength={44}
@@ -244,6 +248,7 @@ export function PayableForm({
 
       <FloatingInput
         id="description"
+        data-enter-sequence=""
         label="Descrição"
         value={description}
         maxLength={255}
@@ -254,6 +259,7 @@ export function PayableForm({
 
       <CatalogSearchSelect
         label="Plano de contas"
+        enterSequence
         value={planAccountId}
         onChange={setPlanAccountId}
         options={planAccounts}
@@ -266,6 +272,7 @@ export function PayableForm({
       <div className="grid grid-cols-2 gap-4">
         <FloatingInput
           id="issueOn"
+          data-enter-sequence=""
           label="Emissão"
           type="date"
           value={issueOn}
@@ -275,6 +282,7 @@ export function PayableForm({
         />
         <FloatingInput
           id="dueOn"
+          data-enter-sequence=""
           label="Vencimento"
           type="date"
           value={dueOn}
@@ -286,6 +294,7 @@ export function PayableForm({
 
       <FloatingInput
         id="amount"
+        data-enter-sequence=""
         label="Valor"
         type="text"
         inputMode="numeric"
@@ -345,7 +354,7 @@ export function PayableForm({
           </Button>
         ) : null}
         {readOnly ? null : (
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" data-enter-sequence="" disabled={busy}>
             {mutation.isPending
               ? 'Salvando...'
               : accountToUpdate
