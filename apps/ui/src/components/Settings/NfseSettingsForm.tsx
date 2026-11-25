@@ -27,11 +27,12 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { FloatingSelect } from '@/components/ui/FloatingField';
+import { FloatingInput, FloatingSelect } from '@/components/ui/FloatingField';
 import { nfseSettingsService } from '@/services/nfseSettings';
 
 const emptySettings: NfseSettings = {
   environment: 'homologation',
+  series: null,
   simplesNacional: 'non_optant',
   simplesAssessment: null,
   ibsCbsAssessment: null,
@@ -102,7 +103,8 @@ export function NfseSettingsForm() {
         <h3 className="text-lg font-bold text-[#172337]">NFS-e</h3>
         <p className="mt-1 text-sm text-[#64748b]">
           Regime do prestador no padrão nacional. A tributação do ISSQN é o padrão copiado
-          para a nota. Homologação não vale como nota oficial.
+          para a nota. Homologação não vale como nota oficial. A série de 00001 a 49999 é a
+          faixa dos aplicativos; escolha uma que a outra aplicação não use.
         </p>
       </div>
       <FloatingSelect
@@ -116,6 +118,18 @@ export function NfseSettingsForm() {
       >
         {optionsOf(nfseEnvironments, nfseEnvironmentLabels)}
       </FloatingSelect>
+      <FloatingInput
+        id="nfseSeries"
+        label="Série da NFS-e"
+        inputMode="numeric"
+        maxLength={5}
+        value={settings.series ?? ''}
+        pinned
+        onChange={(event) => {
+          const digits = event.target.value.replace(/\D/g, '').slice(0, 5);
+          patch({ series: digits || null });
+        }}
+      />
       <FloatingSelect
         id="nfseSimplesNacional"
         label="Simples Nacional"

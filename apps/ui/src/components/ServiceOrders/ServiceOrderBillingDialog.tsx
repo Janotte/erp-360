@@ -239,6 +239,9 @@ export function ServiceOrderBillingDialog({
               <BillingDocumentNote
                 document={order.data.billingDocument}
                 lines={order.data.nfseRequest?.lines}
+                environment={order.data.nfseRequest?.environment}
+                accessKey={order.data.nfseRequest?.accessKey}
+                statusMessage={order.data.nfseRequest?.statusMessage}
               />
             ) : null}
             <BillingTable rows={existing} />

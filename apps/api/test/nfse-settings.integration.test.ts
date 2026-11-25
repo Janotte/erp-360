@@ -48,6 +48,7 @@ describe('configuração da NFS-e', { concurrency: false }, () => {
     assert.equal(response.statusCode, 200, response.body);
     assert.deepEqual(response.json(), {
       environment: 'homologation',
+      series: null,
       simplesNacional: 'non_optant',
       simplesAssessment: null,
       ibsCbsAssessment: null,
@@ -59,6 +60,7 @@ describe('configuração da NFS-e', { concurrency: false }, () => {
   it('grava ME/EPP com os dois regimes e devolve a mesma linha na segunda leitura', async () => {
     const saved = await call('PUT', {
       environment: 'production',
+      series: '49001',
       simplesNacional: 'me_epp',
       simplesAssessment: 'federal_by_simples',
       ibsCbsAssessment: 'cbs_by_simples',
@@ -73,6 +75,7 @@ describe('configuração da NFS-e', { concurrency: false }, () => {
   it('recusa MEI com regime especial e mantém a configuração anterior', async () => {
     const refused = await call('PUT', {
       environment: 'homologation',
+      series: null,
       simplesNacional: 'mei',
       simplesAssessment: null,
       ibsCbsAssessment: null,
@@ -85,5 +88,6 @@ describe('configuração da NFS-e', { concurrency: false }, () => {
     const current = await call('GET');
     assert.equal(current.json().simplesNacional, 'me_epp');
     assert.equal(current.json().environment, 'production');
+    assert.equal(current.json().series, '49001');
   });
 });

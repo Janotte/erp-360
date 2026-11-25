@@ -70,6 +70,8 @@ const child = spawn(
     'test/service-order.integration.test.ts',
     'test/service-order-billing.integration.test.ts',
     'test/nfse-request.integration.test.ts',
+    'test/nfse-dps.test.ts',
+    'test/nfse-send.integration.test.ts',
     '../ui/src/components/ServiceOrders/serviceOrderDocument.test.ts',
     '../ui/src/components/ServiceOrders/serviceOrderDecimal.test.ts',
     'test/settlement.integration.test.ts',

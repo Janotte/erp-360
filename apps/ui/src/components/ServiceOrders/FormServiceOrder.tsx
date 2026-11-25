@@ -45,6 +45,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { contractsService } from '@/services/contracts';
 import { type CatalogItem, itemsService } from '@/services/items';
+import { nfseSettingsService } from '@/services/nfseSettings';
 import { paymentMethodsService } from '@/services/paymentMethods';
 import { personsService } from '@/services/persons';
 import {
@@ -576,6 +577,7 @@ export function FormServiceOrder() {
   const [allocationAmount, setAllocationAmount] = useState('');
   const [reverseOpen, setReverseOpen] = useState(false);
   const [requestingNfse, setRequestingNfse] = useState(false);
+  const [sendingNfse, setSendingNfse] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const amountTouched = useRef(false);
 
@@ -587,6 +589,11 @@ export function FormServiceOrder() {
     queryKey: ['service-order', id],
     queryFn: () => serviceOrdersService.get(id ?? ''),
     enabled: Boolean(id),
+  });
+  const nfseSettings = useQuery({
+    queryKey: ['settings', 'nfse'],
+    queryFn: nfseSettingsService.get,
+    enabled: Boolean(order.data?.nfseRequest),
   });
   const methods = useQuery({
     queryKey: ['payment-methods', 'service-order'],
@@ -774,6 +781,26 @@ export function FormServiceOrder() {
       toast.error(error instanceof Error ? error.message : 'Não foi possível pedir a NFS-e.');
     } finally {
       setRequestingNfse(false);
+    }
+  }
+
+  async function sendNfse() {
+    if (!id) return;
+    setSendingNfse(true);
+    try {
+      const result = await serviceOrdersService.sendNfse(id);
+      if (result.status === 200 && result.body.request.status === 'authorized') {
+        toast.success(result.body.message);
+      } else if (result.body.request.status === 'rejected') {
+        toast.error(result.body.message);
+      } else {
+        toast.success(result.body.message);
+      }
+      await queryClient.invalidateQueries({ queryKey: ['service-order', id] });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível enviar a NFS-e.');
+    } finally {
+      setSendingNfse(false);
     }
   }
 
@@ -1455,12 +1482,31 @@ export function FormServiceOrder() {
             <BillingDocumentNote
               document={order.data.billingDocument}
               lines={order.data.nfseRequest?.lines}
+              environment={order.data.nfseRequest?.environment ?? nfseSettings.data?.environment}
+              accessKey={order.data.nfseRequest?.accessKey}
+              statusMessage={order.data.nfseRequest?.statusMessage}
               requesting={requestingNfse}
+              sending={sendingNfse}
+              sendLabel={
+                order.data.nfseRequest?.status === 'rejected'
+                  ? 'Enviar de novo'
+                  : (order.data.nfseRequest?.environment ?? nfseSettings.data?.environment) ===
+                      'production'
+                    ? 'Enviar à produção'
+                    : 'Enviar à homologação'
+              }
               onRequest={
                 order.data.billingDocument.commercialStatus === 'issued' &&
                 order.data.billingDocument.fiscalStatus === 'not_requested' &&
                 order.data.billingDocument.servicesAmount > 0
                   ? () => void requestNfse()
+                  : undefined
+              }
+              onSend={
+                order.data.nfseRequest &&
+                (order.data.nfseRequest.status === 'pending' ||
+                  order.data.nfseRequest.status === 'rejected')
+                  ? () => void sendNfse()
                   : undefined
               }
             />

@@ -4,11 +4,12 @@ import { billingDocuments } from '@erp-360/mod-billing';
 import { catalogItems } from '@erp-360/mod-catalog';
 import { nfseRequestLines, nfseRequests } from '@erp-360/mod-nfse';
 import { serviceOrderLines, serviceOrders } from '@erp-360/mod-service-orders';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, ne } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { db } from '../../db/index.ts';
+import { sendServiceOrderNfse } from './send.ts';
 
 const messages = {
   missingOrder: 'Ordem não encontrada.',
@@ -32,6 +33,11 @@ export type NfseRequestView = {
   id: string;
   status: 'pending' | 'authorized' | 'rejected' | 'canceled';
   serviceAmount: number;
+  series: string | null;
+  dpsNumber: number | null;
+  accessKey: string | null;
+  environment: 'homologation' | 'production' | null;
+  statusMessage: string | null;
   lines: NfseRequestLineView[];
 };
 
@@ -75,13 +81,18 @@ export async function loadIssuedNfseRequest(
       id: nfseRequests.id,
       status: nfseRequests.status,
       serviceAmount: nfseRequests.serviceAmount,
+      series: nfseRequests.series,
+      dpsNumber: nfseRequests.dpsNumber,
+      accessKey: nfseRequests.accessKey,
+      environment: nfseRequests.environment,
+      statusMessage: nfseRequests.statusMessage,
     })
     .from(nfseRequests)
     .where(
       and(
         eq(nfseRequests.tenantId, tenantId),
         eq(nfseRequests.billingDocumentId, billingDocumentId),
-        eq(nfseRequests.status, 'pending'),
+        ne(nfseRequests.status, 'canceled'),
       ),
     )
     .limit(1);
@@ -231,6 +242,11 @@ async function viewOf(tenantId: string, requestId: string): Promise<NfseRequestV
       id: nfseRequests.id,
       status: nfseRequests.status,
       serviceAmount: nfseRequests.serviceAmount,
+      series: nfseRequests.series,
+      dpsNumber: nfseRequests.dpsNumber,
+      accessKey: nfseRequests.accessKey,
+      environment: nfseRequests.environment,
+      statusMessage: nfseRequests.statusMessage,
     })
     .from(nfseRequests)
     .where(and(eq(nfseRequests.id, requestId), eq(nfseRequests.tenantId, tenantId)))
@@ -251,6 +267,18 @@ export const serviceOrderNfseRoutes: FastifyPluginAsyncZod = async (fastify) => 
       };
       if (!result.created) return reply.status(409).send(body);
       return body;
+    },
+  );
+
+  fastify.post(
+    '/:id/nfse/send',
+    { schema: { params: z.object({ id: z.string().uuid() }) } },
+    async (request) => {
+      const result = await sendServiceOrderNfse(request.user.tenantId, request.params.id);
+      return {
+        message: result.message,
+        request: await viewOf(request.user.tenantId, result.requestId),
+      };
     },
   );
 };

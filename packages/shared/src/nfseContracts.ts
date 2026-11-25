@@ -92,8 +92,19 @@ export const nfseIssqnTaxationLabels: Record<NfseIssqnTaxation, string> = {
   non_incidence: 'Não incidência',
 };
 
+/** Série da DPS na faixa de aplicativo próprio. 00001 a 49999. */
+export function normalizeNfseSeries(value: string | null | undefined): string | null {
+  const raw = (value ?? '').trim();
+  if (!raw) return null;
+  if (!/^[0-9]{1,5}$/.test(raw)) return null;
+  const number = Number(raw);
+  if (!Number.isInteger(number) || number < 1 || number > 49999) return null;
+  return String(number).padStart(5, '0');
+}
+
 export const nfseSettingsSchema = z.object({
   environment: z.enum(nfseEnvironments),
+  series: z.string().max(5).nullable(),
   simplesNacional: z.enum(nfseSimplesNacionalOptions),
   simplesAssessment: z.enum(nfseSimplesAssessments).nullable(),
   ibsCbsAssessment: z.enum(nfseIbsCbsAssessments).nullable(),
@@ -128,6 +139,10 @@ const ibsCbsAssessmentRequired = 'Informe o regime de apuração do IBS e da CBS
 
 /** Recusa a combinação que o padrão nacional rejeita na DPS. */
 export function nfseSettingsMessage(settings: NfseSettings): string | null {
+  const series = settings.series?.trim() ?? '';
+  if (series && normalizeNfseSeries(series) == null) {
+    return 'A série da NFS-e vai de 00001 a 49999.';
+  }
   const applies = nfseAssessmentApplies(settings.simplesNacional);
   if (applies && settings.simplesAssessment == null) return federalAssessmentRequired;
   if (!applies && settings.simplesAssessment != null) return federalAssessmentMessage;

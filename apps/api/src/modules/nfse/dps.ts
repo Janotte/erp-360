@@ -1,0 +1,288 @@
+import { createHash, createSign } from 'node:crypto';
+import { gunzipSync, gzipSync } from 'node:zlib';
+
+import type { NfseEnvironment } from '@erp-360/shared';
+
+const nfseNs = 'http://www.sped.fazenda.gov.br/nfse';
+const xmldsig = 'http://www.w3.org/2000/09/xmldsig#';
+const excC14n = 'http://www.w3.org/2001/10/xml-exc-c14n#';
+const rsaSha256 = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
+const sha256Digest = 'http://www.w3.org/2001/04/xmlenc#sha256';
+const enveloped = `${xmldsig}enveloped-signature`;
+
+const endpoints: Record<NfseEnvironment, string> = {
+  homologation: 'https://sefin.producaorestrita.nfse.gov.br/SefinNacional/nfse',
+  production: 'https://sefin.nfse.gov.br/SefinNacional/nfse',
+};
+
+export function nfseSubmissionEndpoint(environment: NfseEnvironment) {
+  return endpoints[environment];
+}
+
+export function nfseDpsId(input: {
+  cityCode: string;
+  cnpj: string;
+  series: string;
+  dpsNumber: number;
+}) {
+  const number = String(input.dpsNumber).padStart(15, '0');
+  return `DPS${input.cityCode}2${input.cnpj}${input.series}${number}`;
+}
+
+export interface NfseDpsDraft {
+  environment: NfseEnvironment;
+  emittedAt: string;
+  series: string;
+  dpsNumber: number;
+  cityCode: string;
+  cnpj: string;
+  municipalRegistration: string | null;
+  simplesNacional: '1' | '2' | '3' | '4';
+  simplesAssessment: '1' | '2' | '3' | null;
+  specialTaxRegime: '0' | '1' | '2' | '3' | '4' | '5' | '6' | '9';
+  issqnTaxation: '1' | '2' | '3' | '4';
+  tomador: { kind: 'cpf' | 'cnpj'; taxId: string; name: string };
+  nationalServiceCode: string;
+  municipalServiceCode: string | null;
+  description: string;
+  issRate: string | null;
+  serviceAmountCents: number;
+  privateKeyPem: string;
+  certificatePem: string;
+}
+
+function escapeXml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
+
+function certificateBody(pem: string) {
+  const block = pem.match(/-----BEGIN CERTIFICATE-----([\s\S]*?)-----END CERTIFICATE-----/);
+  if (!block?.[1]) throw new Error('O certificado A1 da NFS-e é inválido.');
+  return block[1].replace(/\s/g, '');
+}
+
+function money(cents: number) {
+  const whole = Math.trunc(cents / 100);
+  const fraction = String(Math.abs(cents % 100)).padStart(2, '0');
+  return `${whole}.${fraction}`;
+}
+
+function rate(value: string) {
+  const [whole, fraction = ''] = value.split('.');
+  return `${Number(whole)}.${fraction.padEnd(2, '0').slice(0, 2)}`;
+}
+
+export function buildSignedDps(draft: NfseDpsDraft) {
+  const dpsId = nfseDpsId(draft);
+  const competence = draft.emittedAt.slice(0, 10);
+  const includeRate =
+    draft.issRate != null && draft.simplesNacional !== '2' && draft.issqnTaxation === '1';
+  const municipalRegistration = draft.municipalRegistration
+    ? `<IM>${escapeXml(draft.municipalRegistration)}</IM>`
+    : '';
+  const assessment = draft.simplesAssessment
+    ? `<regApTribSN>${draft.simplesAssessment}</regApTribSN>`
+    : '';
+  const municipalCode = draft.municipalServiceCode
+    ? `<cTribMun>${draft.municipalServiceCode}</cTribMun>`
+    : '';
+  const aliq = includeRate && draft.issRate ? `<pAliq>${rate(draft.issRate)}</pAliq>` : '';
+  const documentTag = draft.tomador.kind === 'cpf' ? 'CPF' : 'CNPJ';
+  const infDps = [
+    `<infDPS xmlns="${nfseNs}" Id="${dpsId}">`,
+    `<tpAmb>${draft.environment === 'production' ? '1' : '2'}</tpAmb>`,
+    `<dhEmi>${draft.emittedAt}</dhEmi>`,
+    '<verAplic>ERP360</verAplic>',
+    `<serie>${draft.series}</serie>`,
+    `<nDPS>${draft.dpsNumber}</nDPS>`,
+    `<dCompet>${competence}</dCompet>`,
+    '<tpEmit>1</tpEmit>',
+    `<cLocEmi>${draft.cityCode}</cLocEmi>`,
+    '<prest>',
+    `<CNPJ>${draft.cnpj}</CNPJ>`,
+    municipalRegistration,
+    '<regTrib>',
+    `<opSimpNac>${draft.simplesNacional}</opSimpNac>`,
+    assessment,
+    `<regEspTrib>${draft.specialTaxRegime}</regEspTrib>`,
+    '</regTrib>',
+    '</prest>',
+    '<toma>',
+    `<${documentTag}>${draft.tomador.taxId}</${documentTag}>`,
+    `<xNome>${escapeXml(draft.tomador.name)}</xNome>`,
+    '</toma>',
+    '<serv>',
+    '<locPrest>',
+    `<cLocPrestacao>${draft.cityCode}</cLocPrestacao>`,
+    '</locPrest>',
+    '<cServ>',
+    `<cTribNac>${draft.nationalServiceCode}</cTribNac>`,
+    municipalCode,
+    `<xDescServ>${escapeXml(draft.description)}</xDescServ>`,
+    '</cServ>',
+    '</serv>',
+    '<valores>',
+    '<vServPrest>',
+    `<vServ>${money(draft.serviceAmountCents)}</vServ>`,
+    '</vServPrest>',
+    '<trib>',
+    '<tribMun>',
+    `<tribISSQN>${draft.issqnTaxation}</tribISSQN>`,
+    aliq,
+    '<tpRetISSQN>1</tpRetISSQN>',
+    '</tribMun>',
+    '<totTrib><indTotTrib>0</indTotTrib></totTrib>',
+    '</trib>',
+    '</valores>',
+    '</infDPS>',
+  ]
+    .filter(Boolean)
+    .join('');
+
+  const digest = createHash('sha256').update(infDps).digest('base64');
+  const signedInfoBody = [
+    `<CanonicalizationMethod Algorithm="${excC14n}"></CanonicalizationMethod>`,
+    `<SignatureMethod Algorithm="${rsaSha256}"></SignatureMethod>`,
+    `<Reference URI="#${dpsId}">`,
+    '<Transforms>',
+    `<Transform Algorithm="${enveloped}"></Transform>`,
+    `<Transform Algorithm="${excC14n}"></Transform>`,
+    '</Transforms>',
+    `<DigestMethod Algorithm="${sha256Digest}"></DigestMethod>`,
+    `<DigestValue>${digest}</DigestValue>`,
+    '</Reference>',
+  ].join('');
+  const signedInfo = `<SignedInfo xmlns="${xmldsig}">${signedInfoBody}</SignedInfo>`;
+  const signature = createSign('RSA-SHA256')
+    .update(signedInfo, 'utf8')
+    .sign(draft.privateKeyPem, 'base64');
+  const xml = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<DPS xmlns="${nfseNs}" versao="1.01">`,
+    infDps,
+    `<Signature xmlns="${xmldsig}">`,
+    `<SignedInfo>${signedInfoBody}</SignedInfo>`,
+    `<SignatureValue>${signature}</SignatureValue>`,
+    '<KeyInfo><X509Data>',
+    `<X509Certificate>${certificateBody(draft.certificatePem)}</X509Certificate>`,
+    '</X509Data></KeyInfo>',
+    '</Signature>',
+    '</DPS>',
+  ].join('');
+  const dpsXmlGZipB64 = gzipSync(Buffer.from(xml, 'utf8')).toString('base64');
+  return { dpsId, xml, body: JSON.stringify({ dpsXmlGZipB64 }) };
+}
+
+export interface NfseSubmissionResult {
+  outcome: 'authorized' | 'rejected' | 'unreachable';
+  accessKey: string | null;
+  xml: string | null;
+  message: string;
+}
+
+function textOf(value: unknown, names: string[]) {
+  if (!value || typeof value !== 'object') return [] as string[];
+  const found: string[] = [];
+  const visit = (current: unknown) => {
+    if (!current || typeof current !== 'object') return;
+    if (Array.isArray(current)) {
+      for (const item of current) visit(item);
+      return;
+    }
+    for (const [key, item] of Object.entries(current)) {
+      if (typeof item === 'string' && names.includes(key)) {
+        const text = item.trim();
+        if (text && !found.includes(text)) found.push(text);
+      } else if (item && typeof item === 'object') {
+        visit(item);
+      }
+    }
+  };
+  visit(value);
+  return found;
+}
+
+function authorizedXml(encoded: unknown) {
+  if (typeof encoded !== 'string' || !encoded) return null;
+  try {
+    const xml = gunzipSync(Buffer.from(encoded, 'base64')).toString('utf8');
+    if (!xml.startsWith('<') || xml.length > 500_000) return null;
+    return xml;
+  } catch {
+    return null;
+  }
+}
+
+function stringField(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function refusalLines(parsed: unknown) {
+  if (!parsed || typeof parsed !== 'object') return [] as string[];
+  const record = parsed as Record<string, unknown>;
+  const errors = record.erros ?? record.Erros;
+  if (Array.isArray(errors)) {
+    return errors.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const error = item as Record<string, unknown>;
+      const line = [
+        stringField(error.Codigo ?? error.codigo),
+        stringField(error.Descricao ?? error.descricao),
+        stringField(error.Complemento ?? error.complemento),
+      ]
+        .filter(Boolean)
+        .join(' ');
+      return line ? [line] : [];
+    });
+  }
+  return textOf(parsed, [
+    'Descricao',
+    'descricao',
+    'Mensagem',
+    'mensagem',
+    'message',
+    'xMotivo',
+    'motivo',
+  ]);
+}
+
+export function readNfseSubmission(statusCode: number, body: string): NfseSubmissionResult {
+  let parsed: unknown = null;
+  try {
+    parsed = body ? JSON.parse(body) : null;
+  } catch {
+    parsed = null;
+  }
+  const record = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+  const accessKey = [record.chaveAcesso, record.chaveDeAcesso].find(
+    (value) => typeof value === 'string' && /^[0-9]{50}$/.test(value),
+  );
+  if ((statusCode === 200 || statusCode === 201) && typeof accessKey === 'string') {
+    return {
+      outcome: 'authorized',
+      accessKey,
+      xml: authorizedXml(record.nfseXmlGZipB64),
+      message: '',
+    };
+  }
+  const refused = refusalLines(parsed);
+  if (refused.length > 0 || Array.isArray(record.erros) || Array.isArray(record.Erros)) {
+    return {
+      outcome: 'rejected',
+      accessKey: null,
+      xml: null,
+      message: refused.join(' ').slice(0, 2000).trim() || 'A NFS-e foi recusada.',
+    };
+  }
+  return {
+    outcome: 'unreachable',
+    accessKey: null,
+    xml: null,
+    message: '',
+  };
+}

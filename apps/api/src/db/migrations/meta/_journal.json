@@ -463,6 +463,13 @@
       "when": 1795565307457,
       "tag": "0065_nfse_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1795568877994,
+      "tag": "0066_nfse_send",
+      "breakpoints": true
     }
   ]
 }

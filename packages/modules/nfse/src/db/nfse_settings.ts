@@ -1,6 +1,6 @@
 import { tenants } from '@erp-360/mod-core';
 import { sql } from 'drizzle-orm';
-import { check, pgEnum, pgTable, uuid } from 'drizzle-orm/pg-core';
+import { check, pgEnum, pgTable, uuid, varchar } from 'drizzle-orm/pg-core';
 
 /** Ambiente da NFS-e nacional. Independente do ambiente da NF-e. */
 export const nfseEnvironmentEnum = pgEnum('nfse_environment', [
@@ -57,6 +57,8 @@ export const nfseSettings = pgTable(
       .primaryKey()
       .references(() => tenants.id, { onDelete: 'cascade' }),
     environment: nfseEnvironmentEnum('environment').default('homologation').notNull(),
+    /** Série da DPS, 00001 a 49999. Nula até a empresa escolher uma faixa própria. */
+    series: varchar('series', { length: 5 }),
     simplesNacional: nfseSimplesNacionalEnum('simples_nacional')
       .default('non_optant')
       .notNull(),
@@ -70,6 +72,13 @@ export const nfseSettings = pgTable(
     issqnTaxation: nfseIssqnTaxationEnum('issqn_taxation').default('taxable').notNull(),
   },
   (table) => [
+    check(
+      'nfse_settings_series_check',
+      sql`${table.series} is null or (
+        ${table.series} ~ '^[0-9]{5}$'
+        and ${table.series}::integer between 1 and 49999
+      )`,
+    ),
     check(
       'nfse_settings_simples_assessment_check',
       sql`(

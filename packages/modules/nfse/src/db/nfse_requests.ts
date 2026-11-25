@@ -1,5 +1,5 @@
 import { billingDocuments } from '@erp-360/mod-billing';
-import { tenantColumns } from '@erp-360/mod-core';
+import { tenantColumns, tenants } from '@erp-360/mod-core';
 import { sql } from 'drizzle-orm';
 import {
   check,
@@ -8,12 +8,16 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+
+import { nfseEnvironmentEnum } from './nfse_settings.ts';
 
 /** Pedido local da NFS-e. pending ainda não saiu da empresa. */
 export const nfseRequestStatusEnum = pgEnum('nfse_request_status', [
@@ -23,7 +27,27 @@ export const nfseRequestStatusEnum = pgEnum('nfse_request_status', [
   'canceled',
 ]);
 
-/** Uma NFS-e por documento de faturamento. Não guarda XML. */
+/** Numeração da DPS por empresa e série. A série fica congelada no pedido. */
+export const nfseDpsCounters = pgTable(
+  'nfse_dps_counters',
+  {
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    series: varchar('series', { length: 5 }).notNull(),
+    lastNumber: integer('last_number').default(0).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.tenantId, table.series] }),
+    check(
+      'nfse_dps_counters_series_check',
+      sql`${table.series} ~ '^[0-9]{5}$' and ${table.series}::integer between 1 and 49999`,
+    ),
+    check('nfse_dps_counters_last_number_check', sql`${table.lastNumber} >= 0`),
+  ],
+);
+
+/** Uma NFS-e por documento de faturamento. */
 export const nfseRequests = pgTable(
   'nfse_requests',
   {
@@ -33,11 +57,54 @@ export const nfseRequests = pgTable(
     status: nfseRequestStatusEnum('status').default('pending').notNull(),
     /** Soma das linhas de serviço, em centavos. */
     serviceAmount: integer('service_amount').notNull(),
+    /** Série usada neste pedido. Não muda se a configuração mudar depois. */
+    series: varchar('series', { length: 5 }),
+    dpsNumber: integer('dps_number'),
+    dpsId: varchar('dps_id', { length: 45 }),
+    accessKey: varchar('access_key', { length: 50 }),
+    environment: nfseEnvironmentEnum('environment'),
+    statusMessage: text('status_message'),
+    nfseXml: text('nfse_xml'),
+    sentAt: timestamp('sent_at', { withTimezone: true, mode: 'date' }),
+    claimedAt: timestamp('claimed_at', { withTimezone: true, mode: 'date' }),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => [
     unique('nfse_requests_id_tenant_id_unique').on(table.id, table.tenantId),
     unique('nfse_requests_tenant_document_unique').on(table.tenantId, table.billingDocumentId),
+    uniqueIndex('nfse_requests_series_number_unique')
+      .on(table.tenantId, table.series, table.dpsNumber)
+      .where(sql`${table.dpsNumber} is not null`),
+    check(
+      'nfse_requests_series_check',
+      sql`${table.series} is null or (
+        ${table.series} ~ '^[0-9]{5}$' and ${table.series}::integer between 1 and 49999
+      )`,
+    ),
+    check(
+      'nfse_requests_dps_number_check',
+      sql`${table.dpsNumber} is null or ${table.dpsNumber} > 0`,
+    ),
+    check(
+      'nfse_requests_dps_id_check',
+      sql`${table.dpsId} is null or ${table.dpsId} ~ '^DPS[0-9]{42}$'`,
+    ),
+    check(
+      'nfse_requests_access_key_check',
+      sql`${table.accessKey} is null or ${table.accessKey} ~ '^[0-9]{50}$'`,
+    ),
+    check(
+      'nfse_requests_identity_check',
+      sql`${table.dpsNumber} is null or (
+        ${table.series} is not null and ${table.dpsId} is not null and ${table.environment} is not null
+      )`,
+    ),
+    check(
+      'nfse_requests_status_message_check',
+      sql`${table.statusMessage} is null or (
+        length(trim(${table.statusMessage})) > 0 and length(${table.statusMessage}) <= 2000
+      )`,
+    ),
     foreignKey({
       name: 'nfse_requests_document_tenant_fk',
       columns: [table.billingDocumentId, table.tenantId],

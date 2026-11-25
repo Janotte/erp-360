@@ -139,6 +139,11 @@ export interface ServiceOrderNfseRequest {
   id: string;
   status: 'pending' | 'authorized' | 'rejected' | 'canceled';
   serviceAmount: number;
+  series: string | null;
+  dpsNumber: number | null;
+  accessKey: string | null;
+  environment: 'homologation' | 'production' | null;
+  statusMessage: string | null;
   lines: ServiceOrderNfseLine[];
 }
 
@@ -365,6 +370,20 @@ export const serviceOrdersService = {
     const body = await readBody(res);
     if (res.status !== 200 && res.status !== 409) {
       throw new Error(messageOf(body, 'Não foi possível pedir a NFS-e.'));
+    }
+    return {
+      status: res.status,
+      body: body as unknown as { message: string; request: ServiceOrderNfseRequest },
+    };
+  },
+
+  sendNfse: async (
+    id: string,
+  ): Promise<{ status: number; body: { message: string; request: ServiceOrderNfseRequest } }> => {
+    const res = await apiFetch(`/service-orders/${id}/nfse/send`, { method: 'POST' });
+    const body = await readBody(res);
+    if (res.status !== 200 && res.status !== 409) {
+      throw new Error(messageOf(body, 'Não foi possível enviar a NFS-e.'));
     }
     return {
       status: res.status,

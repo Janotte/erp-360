@@ -6,6 +6,7 @@ import { type NfseSettings, nfseSettingsMessage } from '@erp-360/shared';
 function settings(patch: Partial<NfseSettings> = {}): NfseSettings {
   return {
     environment: 'homologation',
+    series: null,
     simplesNacional: 'non_optant',
     simplesAssessment: null,
     ibsCbsAssessment: null,
@@ -16,6 +17,19 @@ function settings(patch: Partial<NfseSettings> = {}): NfseSettings {
 }
 
 describe('configuração do prestador da NFS-e', () => {
+  it('aceita série de aplicativo e recusa a faixa do emissor web', () => {
+    assert.equal(nfseSettingsMessage(settings({ series: '1' })), null);
+    assert.equal(nfseSettingsMessage(settings({ series: '49999' })), null);
+    assert.equal(
+      nfseSettingsMessage(settings({ series: '50000' })),
+      'A série da NFS-e vai de 00001 a 49999.',
+    );
+    assert.equal(
+      nfseSettingsMessage(settings({ series: '00000' })),
+      'A série da NFS-e vai de 00001 a 49999.',
+    );
+  });
+
   it('aceita não optante sem regime de apuração', () => {
     assert.equal(nfseSettingsMessage(settings()), null);
   });

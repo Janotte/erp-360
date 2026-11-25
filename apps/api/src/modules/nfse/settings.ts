@@ -1,7 +1,7 @@
 import '../../types/fastify.ts';
 
 import { nfseSettings } from '@erp-360/mod-nfse';
-import { nfseSettingsMessage, nfseSettingsSchema } from '@erp-360/shared';
+import { nfseSettingsMessage, nfseSettingsSchema, normalizeNfseSeries } from '@erp-360/shared';
 import { eq } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -9,6 +9,7 @@ import { db } from '../../db/index.ts';
 
 const nfseSettingsColumns = {
   environment: nfseSettings.environment,
+  series: nfseSettings.series,
   simplesNacional: nfseSettings.simplesNacional,
   simplesAssessment: nfseSettings.simplesAssessment,
   ibsCbsAssessment: nfseSettings.ibsCbsAssessment,
@@ -47,12 +48,13 @@ export const nfseSettingsRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.put('/nfse', { schema: { body: nfseSettingsSchema } }, async (request) => {
     const message = nfseSettingsMessage(request.body);
     if (message) reject(message);
+    const series = normalizeNfseSeries(request.body.series);
 
     const tenantId = request.user.tenantId;
     await getOrCreateNfseSettings(tenantId);
     const [updated] = await db
       .update(nfseSettings)
-      .set(request.body)
+      .set({ ...request.body, series })
       .where(eq(nfseSettings.tenantId, tenantId))
       .returning(nfseSettingsColumns);
     return updated;
