@@ -575,6 +575,7 @@ export function FormServiceOrder() {
   const [allocationInstallments, setAllocationInstallments] = useState('');
   const [allocationAmount, setAllocationAmount] = useState('');
   const [reverseOpen, setReverseOpen] = useState(false);
+  const [requestingNfse, setRequestingNfse] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const amountTouched = useRef(false);
 
@@ -760,6 +761,20 @@ export function FormServiceOrder() {
       delete next[key];
       return next;
     });
+  }
+
+  async function requestNfse() {
+    if (!id) return;
+    setRequestingNfse(true);
+    try {
+      const result = await serviceOrdersService.requestNfse(id);
+      toast.success(result.body.message);
+      await queryClient.invalidateQueries({ queryKey: ['service-order', id] });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível pedir a NFS-e.');
+    } finally {
+      setRequestingNfse(false);
+    }
   }
 
   function patch(partial: Partial<Draft>) {
@@ -1437,7 +1452,18 @@ export function FormServiceOrder() {
         <section className="space-y-4 rounded-lg border bg-white p-6">
           <h3 className="text-lg font-semibold text-zinc-900">Financeiro</h3>
           {order.data.billingDocument ? (
-            <BillingDocumentNote document={order.data.billingDocument} />
+            <BillingDocumentNote
+              document={order.data.billingDocument}
+              lines={order.data.nfseRequest?.lines}
+              requesting={requestingNfse}
+              onRequest={
+                order.data.billingDocument.commercialStatus === 'issued' &&
+                order.data.billingDocument.fiscalStatus === 'not_requested' &&
+                order.data.billingDocument.servicesAmount > 0
+                  ? () => void requestNfse()
+                  : undefined
+              }
+            />
           ) : null}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

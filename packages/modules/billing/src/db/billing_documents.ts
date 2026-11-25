@@ -22,8 +22,9 @@ export const billingCommercialStatusEnum = pgEnum('billing_commercial_status', [
 ]);
 
 /**
- * Situação fiscal. Enquanto a nota não sai da empresa, o valor gravado é
- * not_requested. Os demais entram na entrega que fala com o ambiente.
+ * Situação fiscal. not_requested até alguém pedir nota.
+ * pending é o pedido local, ainda na empresa.
+ * authorized, rejected e canceled entram quando o ambiente responder.
  */
 export const billingFiscalStatusEnum = pgEnum('billing_fiscal_status', [
   'not_requested',

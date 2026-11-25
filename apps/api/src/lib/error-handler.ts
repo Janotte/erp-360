@@ -151,6 +151,21 @@ function checkMessage(error: unknown): string | null {
   if (name.includes('billing_documents_')) {
     return 'O documento de faturamento está incompleto.';
   }
+  if (name.includes('nfse_request_lines_description')) {
+    return 'A discriminação do serviço aceita até 2000 caracteres.';
+  }
+  if (name.includes('nfse_request_lines_national')) {
+    return 'O código de tributação nacional precisa ter 6 dígitos.';
+  }
+  if (name.includes('nfse_request_lines_municipal')) {
+    return 'O código tributário municipal precisa ter 3 dígitos.';
+  }
+  if (name.includes('nfse_request_lines_iss')) {
+    return 'Informe a alíquota do ISS entre 0 e 9,99.';
+  }
+  if (name.includes('nfse_requests_') || name.includes('nfse_request_lines_')) {
+    return 'Não foi possível gravar a NFS-e.';
+  }
   if (name.includes('catalog_items_name')) return 'Informe o nome.';
   if (name.includes('cfop_entry_rules_digits')) return 'O CFOP precisa ter 4 dígitos.';
   if (name.includes('payment_methods_code_format')) {

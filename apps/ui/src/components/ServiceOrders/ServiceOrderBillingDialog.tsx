@@ -236,7 +236,10 @@ export function ServiceOrderBillingDialog({
           <div className="space-y-3">
             <p className="text-sm text-zinc-700">{existingMessage}</p>
             {order.data?.billingDocument ? (
-              <BillingDocumentNote document={order.data.billingDocument} />
+              <BillingDocumentNote
+                document={order.data.billingDocument}
+                lines={order.data.nfseRequest?.lines}
+              />
             ) : null}
             <BillingTable rows={existing} />
           </div>

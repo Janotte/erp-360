@@ -567,6 +567,9 @@ importers:
 
   packages/modules/nfse:
     dependencies:
+      '@erp-360/mod-billing':
+        specifier: workspace:*
+        version: link:../billing
       '@erp-360/mod-core':
         specifier: workspace:*
         version: link:../core

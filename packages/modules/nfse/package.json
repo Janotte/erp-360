@@ -9,6 +9,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@erp-360/mod-billing": "workspace:*",
     "@erp-360/mod-core": "workspace:*",
     "drizzle-orm": "^0.45.2"
   },

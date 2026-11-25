@@ -10,6 +10,7 @@ import {
   paymentPlans,
   receivables,
 } from '@erp-360/mod-financial';
+import { nfseRequests } from '@erp-360/mod-nfse';
 import { cities, personAddresses, personContacts, persons, states } from '@erp-360/mod-persons';
 import {
   serviceOrderAttendances,
@@ -32,6 +33,7 @@ import { db } from '../../db/index.ts';
 import { listPageQuery } from '../../lib/list-page.ts';
 import { todayForTenant } from '../contracts/clock.ts';
 import { formatContractNumber } from '../contracts/rules.ts';
+import { loadIssuedNfseRequest, serviceOrderNfseRoutes } from '../nfse/requests.ts';
 import {
   listServiceOrderBillings,
   loadOrderBillingDocument,
@@ -246,6 +248,7 @@ type LoadedOrder = {
   payments: LoadedPayment[];
   today: string;
   billingDocument: Awaited<ReturnType<typeof loadOrderBillingDocument>>;
+  nfseRequest: Awaited<ReturnType<typeof loadIssuedNfseRequest>>;
   billings: Awaited<ReturnType<typeof listServiceOrderBillings>>;
   customer: CustomerCopy;
   fields: LoadedField[];
@@ -692,6 +695,8 @@ async function loadOrder(tenantId: string, id: string): Promise<LoadedOrder | nu
     if (contract) contractNumberLabel = formatContractNumber(contract.number);
   }
 
+  const billingDocument = await loadOrderBillingDocument(tenantId, id);
+
   return {
     id: order.id,
     number: order.number,
@@ -725,7 +730,10 @@ async function loadOrder(tenantId: string, id: string): Promise<LoadedOrder | nu
       amount: line.amount,
     })),
     today: await todayForTenant(tenantId),
-    billingDocument: await loadOrderBillingDocument(tenantId, id),
+    billingDocument,
+    nfseRequest: billingDocument
+      ? await loadIssuedNfseRequest(tenantId, billingDocument.id)
+      : null,
     billings: await listServiceOrderBillings(tenantId, id),
     customer: {
       customerName: order.customerName,
@@ -774,6 +782,7 @@ function present(order: LoadedOrder) {
     ...(order.payments.length > 0 ? { payments: order.payments } : {}),
     today: order.today,
     billingDocument: order.billingDocument,
+    nfseRequest: order.nfseRequest,
     billings: order.billings,
     fields: order.fields,
     notes: order.notes,
@@ -1165,6 +1174,30 @@ async function reverseServiceOrder(tenantId: string, id: string) {
         );
     }
 
+    const [issuedDocument] = await tx
+      .select({ id: billingDocuments.id })
+      .from(billingDocuments)
+      .where(
+        and(
+          eq(billingDocuments.tenantId, tenantId),
+          eq(billingDocuments.serviceOrderId, id),
+          eq(billingDocuments.commercialStatus, 'issued'),
+        ),
+      )
+      .limit(1);
+    if (issuedDocument) {
+      await tx
+        .update(nfseRequests)
+        .set({ status: 'canceled' })
+        .where(
+          and(
+            eq(nfseRequests.tenantId, tenantId),
+            eq(nfseRequests.billingDocumentId, issuedDocument.id),
+            eq(nfseRequests.status, 'pending'),
+          ),
+        );
+    }
+
     await tx
       .update(billingDocuments)
       .set({ commercialStatus: 'canceled' })
@@ -1296,6 +1329,7 @@ async function listServiceOrders(
 export const serviceOrderRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.addHook('preHandler', fastify.autenticarETenant);
   await serviceOrderBillingRoutes(fastify, {});
+  await serviceOrderNfseRoutes(fastify, {});
 
   fastify.get('/', { schema: { querystring: listQuery } }, async (request) => {
     return listServiceOrders(request.user.tenantId, request.query);

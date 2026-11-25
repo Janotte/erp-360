@@ -122,7 +122,24 @@ export interface ServiceOrderBillingDocument {
   numberLabel: string;
   commercialStatus: 'issued' | 'canceled';
   fiscalStatus: 'not_requested' | 'pending' | 'authorized' | 'rejected' | 'canceled';
+  servicesAmount: number;
   totalAmount: number;
+}
+
+export interface ServiceOrderNfseLine {
+  lineNumber: number;
+  description: string;
+  nationalServiceCode: string | null;
+  municipalServiceCode: string | null;
+  issRate: string | null;
+  amount: number;
+}
+
+export interface ServiceOrderNfseRequest {
+  id: string;
+  status: 'pending' | 'authorized' | 'rejected' | 'canceled';
+  serviceAmount: number;
+  lines: ServiceOrderNfseLine[];
 }
 
 export interface ServiceOrderPayment {
@@ -177,6 +194,7 @@ export interface ServiceOrderDetail {
   payments?: ServiceOrderPayment[];
   today: string;
   billingDocument: ServiceOrderBillingDocument | null;
+  nfseRequest: ServiceOrderNfseRequest | null;
   billings: ServiceOrderBilling[];
   fields: ServiceOrderFieldValue[];
   notes: ServiceOrderNoteValue[];
@@ -338,6 +356,20 @@ export const serviceOrdersService = {
     const body = await readBody(res);
     if (!res.ok) throw new Error(messageOf(body, 'Falha ao salvar a ordem.'));
     return body as unknown as ServiceOrderDetail;
+  },
+
+  requestNfse: async (
+    id: string,
+  ): Promise<{ status: number; body: { message: string; request: ServiceOrderNfseRequest } }> => {
+    const res = await apiFetch(`/service-orders/${id}/nfse`, { method: 'POST' });
+    const body = await readBody(res);
+    if (res.status !== 200 && res.status !== 409) {
+      throw new Error(messageOf(body, 'Não foi possível pedir a NFS-e.'));
+    }
+    return {
+      status: res.status,
+      body: body as unknown as { message: string; request: ServiceOrderNfseRequest },
+    };
   },
 
   generateBillings: async (

@@ -69,6 +69,7 @@ const child = spawn(
     'test/service-order-rules.test.ts',
     'test/service-order.integration.test.ts',
     'test/service-order-billing.integration.test.ts',
+    'test/nfse-request.integration.test.ts',
     '../ui/src/components/ServiceOrders/serviceOrderDocument.test.ts',
     '../ui/src/components/ServiceOrders/serviceOrderDecimal.test.ts',
     'test/settlement.integration.test.ts',

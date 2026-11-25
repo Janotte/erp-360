@@ -59,10 +59,12 @@ export type ServiceOrderBillingLine = {
 };
 
 export type OrderBillingDocument = {
+  id: string;
   number: number;
   numberLabel: string;
   commercialStatus: 'issued' | 'canceled';
   fiscalStatus: 'not_requested' | 'pending' | 'authorized' | 'rejected' | 'canceled';
+  servicesAmount: number;
   totalAmount: number;
 };
 
@@ -208,9 +210,11 @@ export async function loadOrderBillingDocument(
 ): Promise<OrderBillingDocument | null> {
   const [row] = await db
     .select({
+      id: billingDocuments.id,
       number: billingDocuments.number,
       commercialStatus: billingDocuments.commercialStatus,
       fiscalStatus: billingDocuments.fiscalStatus,
+      servicesAmount: billingDocuments.servicesAmount,
       totalAmount: billingDocuments.totalAmount,
     })
     .from(billingDocuments)
@@ -224,10 +228,12 @@ export async function loadOrderBillingDocument(
     .limit(1);
   if (!row) return null;
   return {
+    id: row.id,
     number: row.number,
     numberLabel: formatBillingDocumentNumber(row.number),
     commercialStatus: row.commercialStatus,
     fiscalStatus: row.fiscalStatus,
+    servicesAmount: row.servicesAmount,
     totalAmount: row.totalAmount,
   };
 }
