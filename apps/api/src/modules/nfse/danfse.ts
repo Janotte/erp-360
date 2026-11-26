@@ -1,4 +1,12 @@
+import '../../types/fastify.ts';
+
+import { nfseRequests } from '@erp-360/mod-nfse';
+import { and, eq } from 'drizzle-orm';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { XMLParser } from 'fast-xml-parser';
+import { z } from 'zod';
+
+import { db } from '../../db/index.ts';
 
 export type DanfseParty = {
   name: string;
@@ -209,3 +217,41 @@ export function readDanfse(xml: string): DanfseView | null {
     qrCodeUrl: `https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave=${accessKey}`,
   };
 }
+
+function httpError(message: string, status: number): never {
+  const error = new Error(message) as Error & { status: number };
+  error.status = status;
+  throw error;
+}
+
+export async function loadDanfse(tenantId: string, requestId: string): Promise<DanfseView> {
+  const [row] = await db
+    .select({
+      status: nfseRequests.status,
+      nfseXml: nfseRequests.nfseXml,
+      accessKey: nfseRequests.accessKey,
+    })
+    .from(nfseRequests)
+    .where(and(eq(nfseRequests.tenantId, tenantId), eq(nfseRequests.id, requestId)))
+    .limit(1);
+  if (!row) httpError('Pedido de NFS-e não encontrado.', 404);
+  if (row.status !== 'authorized') {
+    httpError('A DANFSe só está disponível para NFS-e autorizada.', 400);
+  }
+  if (!row.nfseXml?.trim()) {
+    httpError('XML da NFS-e não está disponível para a DANFSe.', 400);
+  }
+  const view = readDanfse(row.nfseXml);
+  if (!view) httpError('Não foi possível montar a DANFSe a partir do XML.', 400);
+  return view;
+}
+
+export const nfseDanfseRoutes: FastifyPluginAsyncZod = async (fastify) => {
+  fastify.addHook('preHandler', fastify.autenticarETenant);
+
+  fastify.get(
+    '/:requestId/danfse',
+    { schema: { params: z.object({ requestId: z.string().uuid() }) } },
+    async (request) => loadDanfse(request.user.tenantId, request.params.requestId),
+  );
+};
