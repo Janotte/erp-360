@@ -71,6 +71,7 @@ const child = spawn(
     'test/service-order-billing.integration.test.ts',
     'test/nfse-request.integration.test.ts',
     'test/nfse-dps.test.ts',
+    'test/nfse-danfse.test.ts',
     'test/nfse-send.integration.test.ts',
     'test/nfse-list.integration.test.ts',
     '../ui/src/components/ServiceOrders/serviceOrderDocument.test.ts',
