@@ -1,6 +1,6 @@
 import { tenants } from '@erp-360/mod-core';
 import { sql } from 'drizzle-orm';
-import { check, pgEnum, pgTable, uuid, varchar } from 'drizzle-orm/pg-core';
+import { check, numeric, pgEnum, pgTable, uuid, varchar } from 'drizzle-orm/pg-core';
 
 /** Ambiente da NFS-e nacional. Independente do ambiente da NF-e. */
 export const nfseEnvironmentEnum = pgEnum('nfse_environment', [
@@ -66,6 +66,8 @@ export const nfseSettings = pgTable(
     simplesAssessment: nfseSimplesAssessmentEnum('simples_assessment'),
     /** Nulo para não optante e MEI. Obrigatório para ME/EPP e optante pendente. */
     ibsCbsAssessment: nfseIbsCbsAssessmentEnum('ibs_cbs_assessment'),
+    /** pTotTribSN. Nulo fora de ME/EPP e optante pendente. */
+    simplesTaxPercent: numeric('simples_tax_percent', { precision: 5, scale: 2 }),
     specialTaxRegime: nfseSpecialTaxRegimeEnum('special_tax_regime')
       .default('none')
       .notNull(),
@@ -91,6 +93,22 @@ export const nfseSettings = pgTable(
       sql`(
         (${table.simplesNacional} in ('me_epp', 'pending') and ${table.ibsCbsAssessment} is not null)
         or (${table.simplesNacional} in ('non_optant', 'mei') and ${table.ibsCbsAssessment} is null)
+      )`,
+    ),
+    check(
+      'nfse_settings_simples_tax_percent_check',
+      sql`${table.simplesTaxPercent} is null or (
+        ${table.simplesTaxPercent} >= 0 and ${table.simplesTaxPercent} <= 100
+      )`,
+    ),
+    check(
+      'nfse_settings_simples_tax_percent_regime_check',
+      sql`(
+        ${table.simplesNacional} in ('me_epp', 'pending')
+        or (
+          ${table.simplesNacional} in ('non_optant', 'mei')
+          and ${table.simplesTaxPercent} is null
+        )
       )`,
     ),
     check(

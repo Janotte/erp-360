@@ -10,6 +10,7 @@ function settings(patch: Partial<NfseSettings> = {}): NfseSettings {
     simplesNacional: 'non_optant',
     simplesAssessment: null,
     ibsCbsAssessment: null,
+    simplesTaxPercent: null,
     specialTaxRegime: 'none',
     issqnTaxation: 'taxable',
     ...patch,
@@ -67,13 +68,27 @@ describe('configuração do prestador da NFS-e', () => {
     );
   });
 
-  it('aceita ME/EPP e optante pendente com os dois regimes', () => {
+  it('exige o percentual aproximado do Simples para ME/EPP', () => {
     assert.equal(
       nfseSettingsMessage(
         settings({
           simplesNacional: 'me_epp',
           simplesAssessment: 'outside_simples',
           ibsCbsAssessment: 'both_regular',
+        }),
+      ),
+      'Informe o percentual aproximado dos tributos do Simples Nacional (0 a 100).',
+    );
+  });
+
+  it('aceita ME/EPP e optante pendente com regimes e percentual', () => {
+    assert.equal(
+      nfseSettingsMessage(
+        settings({
+          simplesNacional: 'me_epp',
+          simplesAssessment: 'outside_simples',
+          ibsCbsAssessment: 'both_regular',
+          simplesTaxPercent: '6',
           specialTaxRegime: 'estimate',
         }),
       ),
@@ -85,6 +100,7 @@ describe('configuração do prestador da NFS-e', () => {
           simplesNacional: 'pending',
           simplesAssessment: 'federal_and_municipal',
           ibsCbsAssessment: 'both_by_simples',
+          simplesTaxPercent: '4.50',
           specialTaxRegime: 'professionals_society',
         }),
       ),
@@ -105,6 +121,7 @@ describe('configuração do prestador da NFS-e', () => {
           simplesNacional: 'me_epp',
           simplesAssessment: 'federal_and_municipal',
           ibsCbsAssessment: 'both_by_simples',
+          simplesTaxPercent: '6.00',
           specialTaxRegime: 'estimate',
         }),
       ),

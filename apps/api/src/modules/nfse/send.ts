@@ -11,13 +11,13 @@ import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 
 import { db } from '../../db/index.ts';
 import { trustedCertificates } from '../certificates/trust.ts';
-import { nfeEventTimestamp } from '../inbound/dfe-event.ts';
 import { certificateMaterial } from '../inbound/dfe-sync.ts';
 import { InboundError } from '../inbound/errors.ts';
 import {
   buildSignedDps,
   type NfseDpsDraft,
   nfseDpsId,
+  nfseEmissionTimestamp,
   nfseSubmissionEndpoint,
   readNfseSubmission,
 } from './dps.ts';
@@ -30,6 +30,8 @@ const messages = {
   canceled: 'A NFS-e deste documento foi cancelada.',
   busy: 'O envio desta NFS-e já está em andamento.',
   series: 'Informe a série da NFS-e, de 00001 a 49999.',
+  simplesTaxPercent:
+    'Informe o percentual aproximado dos tributos do Simples Nacional nas configurações da NFS-e.',
   city: 'Informe o município da empresa antes de enviar a NFS-e.',
   cnpj: 'O CNPJ da empresa está incompleto.',
   certificateCnpj: 'O certificado A1 não é o CNPJ desta empresa.',
@@ -284,6 +286,12 @@ export async function sendServiceOrderNfse(tenantId: string, orderId: string) {
     .where(eq(nfseSettings.tenantId, tenantId))
     .limit(1);
   if (!settings?.series) httpError(messages.series, 400);
+  if (
+    (settings.simplesNacional === 'me_epp' || settings.simplesNacional === 'pending') &&
+    !settings.simplesTaxPercent
+  ) {
+    httpError(messages.simplesTaxPercent, 400);
+  }
 
   const lines = await db
     .select({
@@ -403,7 +411,7 @@ export async function sendServiceOrderNfse(tenantId: string, orderId: string) {
 
   const draft: NfseDpsDraft = {
     environment: reserved.environment,
-    emittedAt: nfeEventTimestamp(new Date()),
+    emittedAt: nfseEmissionTimestamp(new Date()),
     series: reserved.series,
     dpsNumber: reserved.dpsNumber,
     cityCode: company.cityCode,
@@ -413,6 +421,7 @@ export async function sendServiceOrderNfse(tenantId: string, orderId: string) {
     simplesAssessment: settings.simplesAssessment
       ? assessmentCode[settings.simplesAssessment]
       : null,
+    simplesTaxPercent: settings.simplesTaxPercent,
     specialTaxRegime: regimeCode[settings.specialTaxRegime],
     issqnTaxation: issqnCode[settings.issqnTaxation],
     tomador: { kind: tomadorKind, taxId, name: person.name.slice(0, 150) },

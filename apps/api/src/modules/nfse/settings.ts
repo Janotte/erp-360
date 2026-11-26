@@ -1,7 +1,13 @@
 import '../../types/fastify.ts';
 
 import { nfseSettings } from '@erp-360/mod-nfse';
-import { nfseSettingsMessage, nfseSettingsSchema, normalizeNfseSeries } from '@erp-360/shared';
+import {
+  nfseAssessmentApplies,
+  nfseSettingsMessage,
+  nfseSettingsSchema,
+  normalizeNfseSeries,
+  normalizeNfseSimplesTaxPercent,
+} from '@erp-360/shared';
 import { eq } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -13,6 +19,7 @@ const nfseSettingsColumns = {
   simplesNacional: nfseSettings.simplesNacional,
   simplesAssessment: nfseSettings.simplesAssessment,
   ibsCbsAssessment: nfseSettings.ibsCbsAssessment,
+  simplesTaxPercent: nfseSettings.simplesTaxPercent,
   specialTaxRegime: nfseSettings.specialTaxRegime,
   issqnTaxation: nfseSettings.issqnTaxation,
 };
@@ -49,12 +56,15 @@ export const nfseSettingsRoutes: FastifyPluginAsyncZod = async (fastify) => {
     const message = nfseSettingsMessage(request.body);
     if (message) reject(message);
     const series = normalizeNfseSeries(request.body.series);
+    const simplesTaxPercent = nfseAssessmentApplies(request.body.simplesNacional)
+      ? normalizeNfseSimplesTaxPercent(request.body.simplesTaxPercent)
+      : null;
 
     const tenantId = request.user.tenantId;
     await getOrCreateNfseSettings(tenantId);
     const [updated] = await db
       .update(nfseSettings)
-      .set({ ...request.body, series })
+      .set({ ...request.body, series, simplesTaxPercent })
       .where(eq(nfseSettings.tenantId, tenantId))
       .returning(nfseSettingsColumns);
     return updated;

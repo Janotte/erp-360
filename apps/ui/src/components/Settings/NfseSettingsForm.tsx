@@ -36,6 +36,7 @@ const emptySettings: NfseSettings = {
   simplesNacional: 'non_optant',
   simplesAssessment: null,
   ibsCbsAssessment: null,
+  simplesTaxPercent: null,
   specialTaxRegime: 'none',
   issqnTaxation: 'taxable',
 };
@@ -80,6 +81,7 @@ export function NfseSettingsForm() {
       if (!nfseAssessmentApplies(merged.simplesNacional)) {
         merged.simplesAssessment = null;
         merged.ibsCbsAssessment = null;
+        merged.simplesTaxPercent = null;
       }
       if (nfseSpecialRegimeLocked(merged)) merged.specialTaxRegime = 'none';
       return merged;
@@ -179,6 +181,18 @@ export function NfseSettingsForm() {
             <option value="">Selecione</option>
             {optionsOf(nfseIbsCbsAssessments, nfseIbsCbsAssessmentLabels)}
           </FloatingSelect>
+          <FloatingInput
+            id="nfseSimplesTaxPercent"
+            label="Percentual aproximado do Simples (%)"
+            inputMode="decimal"
+            value={settings.simplesTaxPercent ?? ''}
+            pinned
+            required
+            onChange={(event) => {
+              const raw = event.target.value.replace(/[^\d.,]/g, '').slice(0, 6);
+              patch({ simplesTaxPercent: raw || null });
+            }}
+          />
         </>
       ) : null}
       <FloatingSelect

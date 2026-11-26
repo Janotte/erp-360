@@ -470,6 +470,13 @@
       "when": 1795568877994,
       "tag": "0066_nfse_send",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1795600000000,
+      "tag": "0067_nfse_simples_tax_percent",
+      "breakpoints": true
     }
   ]
 }

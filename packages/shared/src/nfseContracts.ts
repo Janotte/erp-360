@@ -102,12 +102,26 @@ export function normalizeNfseSeries(value: string | null | undefined): string | 
   return String(number).padStart(5, '0');
 }
 
+/** pTotTribSN — percentual aproximado dos tributos do Simples (0 a 100, duas casas). */
+export function normalizeNfseSimplesTaxPercent(
+  value: string | null | undefined,
+): string | null {
+  const raw = (value ?? '').trim().replace(',', '.');
+  if (!raw) return null;
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(raw)) return null;
+  const number = Number(raw);
+  if (!Number.isFinite(number) || number < 0 || number > 100) return null;
+  return number.toFixed(2);
+}
+
 export const nfseSettingsSchema = z.object({
   environment: z.enum(nfseEnvironments),
   series: z.string().max(5).nullable(),
   simplesNacional: z.enum(nfseSimplesNacionalOptions),
   simplesAssessment: z.enum(nfseSimplesAssessments).nullable(),
   ibsCbsAssessment: z.enum(nfseIbsCbsAssessments).nullable(),
+  /** Obrigatório para ME/EPP e optante pendente (pTotTribSN). */
+  simplesTaxPercent: z.string().nullable(),
   specialTaxRegime: z.enum(nfseSpecialTaxRegimes),
   issqnTaxation: z.enum(nfseIssqnTaxations),
 });
@@ -136,6 +150,12 @@ const federalAssessmentRequired =
 const ibsCbsAssessmentMessage =
   'O regime de apuração do IBS e da CBS só vale para ME/EPP ou optante pendente.';
 const ibsCbsAssessmentRequired = 'Informe o regime de apuração do IBS e da CBS.';
+const simplesTaxPercentMessage =
+  'O percentual aproximado dos tributos do Simples só vale para ME/EPP ou optante pendente.';
+const simplesTaxPercentRequired =
+  'Informe o percentual aproximado dos tributos do Simples Nacional (0 a 100).';
+const simplesTaxPercentInvalid =
+  'O percentual aproximado dos tributos do Simples Nacional vai de 0 a 100.';
 
 /** Recusa a combinação que o padrão nacional rejeita na DPS. */
 export function nfseSettingsMessage(settings: NfseSettings): string | null {
@@ -148,6 +168,13 @@ export function nfseSettingsMessage(settings: NfseSettings): string | null {
   if (!applies && settings.simplesAssessment != null) return federalAssessmentMessage;
   if (applies && settings.ibsCbsAssessment == null) return ibsCbsAssessmentRequired;
   if (!applies && settings.ibsCbsAssessment != null) return ibsCbsAssessmentMessage;
+  const percentRaw = settings.simplesTaxPercent?.trim() ?? '';
+  if (applies) {
+    if (!percentRaw) return simplesTaxPercentRequired;
+    if (normalizeNfseSimplesTaxPercent(percentRaw) == null) return simplesTaxPercentInvalid;
+  } else if (percentRaw) {
+    return simplesTaxPercentMessage;
+  }
   if (settings.specialTaxRegime === 'none') return null;
   if (settings.simplesNacional === 'mei') {
     return 'MEI não usa regime especial de tributação.';

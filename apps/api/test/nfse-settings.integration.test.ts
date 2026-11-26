@@ -52,22 +52,25 @@ describe('configuração da NFS-e', { concurrency: false }, () => {
       simplesNacional: 'non_optant',
       simplesAssessment: null,
       ibsCbsAssessment: null,
+      simplesTaxPercent: null,
       specialTaxRegime: 'none',
       issqnTaxation: 'taxable',
     });
   });
 
-  it('grava ME/EPP com os dois regimes e devolve a mesma linha na segunda leitura', async () => {
+  it('grava ME/EPP com regimes, percentual e devolve a mesma linha na segunda leitura', async () => {
     const saved = await call('PUT', {
       environment: 'production',
       series: '49001',
       simplesNacional: 'me_epp',
       simplesAssessment: 'federal_by_simples',
       ibsCbsAssessment: 'cbs_by_simples',
+      simplesTaxPercent: '6',
       specialTaxRegime: 'none',
       issqnTaxation: 'taxable',
     });
     assert.equal(saved.statusCode, 200, saved.body);
+    assert.equal(saved.json().simplesTaxPercent, '6.00');
     const again = await call('GET');
     assert.deepEqual(again.json(), saved.json());
   });
@@ -79,6 +82,7 @@ describe('configuração da NFS-e', { concurrency: false }, () => {
       simplesNacional: 'mei',
       simplesAssessment: null,
       ibsCbsAssessment: null,
+      simplesTaxPercent: null,
       specialTaxRegime: 'estimate',
       issqnTaxation: 'taxable',
     });
@@ -89,5 +93,6 @@ describe('configuração da NFS-e', { concurrency: false }, () => {
     assert.equal(current.json().simplesNacional, 'me_epp');
     assert.equal(current.json().environment, 'production');
     assert.equal(current.json().series, '49001');
+    assert.equal(current.json().simplesTaxPercent, '6.00');
   });
 });

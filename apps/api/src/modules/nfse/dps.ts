@@ -3,6 +3,15 @@ import { gunzipSync, gzipSync } from 'node:zlib';
 
 import type { NfseEnvironment } from '@erp-360/shared';
 
+import { nfeEventTimestamp } from '../inbound/dfe-event.ts';
+
+/** O SEFIN rejeita dhEmi à frente do relógio dele (E0008). Dois minutos cobrem o atraso conhecido. */
+export const nfseEmissionSkewMs = 120_000;
+
+export function nfseEmissionTimestamp(now: Date) {
+  return nfeEventTimestamp(new Date(now.getTime() - nfseEmissionSkewMs));
+}
+
 const nfseNs = 'http://www.sped.fazenda.gov.br/nfse';
 const xmldsig = 'http://www.w3.org/2000/09/xmldsig#';
 const excC14n = 'http://www.w3.org/2001/10/xml-exc-c14n#';
@@ -39,6 +48,8 @@ export interface NfseDpsDraft {
   municipalRegistration: string | null;
   simplesNacional: '1' | '2' | '3' | '4';
   simplesAssessment: '1' | '2' | '3' | null;
+  /** pTotTribSN — obrigatório para ME/EPP (3) e optante pendente (4). */
+  simplesTaxPercent: string | null;
   specialTaxRegime: '0' | '1' | '2' | '3' | '4' | '5' | '6' | '9';
   issqnTaxation: '1' | '2' | '3' | '4';
   tomador: { kind: 'cpf' | 'cnpj'; taxId: string; name: string };
@@ -82,8 +93,10 @@ export function buildSignedDps(draft: NfseDpsDraft) {
   const competence = draft.emittedAt.slice(0, 10);
   const includeRate =
     draft.issRate != null && draft.simplesNacional !== '2' && draft.issqnTaxation === '1';
-  const municipalRegistration = draft.municipalRegistration
-    ? `<IM>${escapeXml(draft.municipalRegistration)}</IM>`
+  const registration = draft.municipalRegistration?.trim() || '';
+  // E0120: IM só quando o município tem complemento no CNC; sem cadastro, omitir.
+  const municipalRegistration = registration
+    ? `<IM>${escapeXml(registration)}</IM>`
     : '';
   const assessment = draft.simplesAssessment
     ? `<regApTribSN>${draft.simplesAssessment}</regApTribSN>`
@@ -92,6 +105,11 @@ export function buildSignedDps(draft: NfseDpsDraft) {
     ? `<cTribMun>${draft.municipalServiceCode}</cTribMun>`
     : '';
   const aliq = includeRate && draft.issRate ? `<pAliq>${rate(draft.issRate)}</pAliq>` : '';
+  // E1235: trib exige tribFed ou totTrib. E0712: ME/EPP usa pTotTribSN, não indTotTrib.
+  const totalTax =
+    draft.simplesNacional === '3' || draft.simplesNacional === '4'
+      ? `<totTrib><pTotTribSN>${rate(draft.simplesTaxPercent ?? '0')}</pTotTribSN></totTrib>`
+      : '<totTrib><indTotTrib>0</indTotTrib></totTrib>';
   const documentTag = draft.tomador.kind === 'cpf' ? 'CPF' : 'CNPJ';
   const infDps = [
     `<infDPS xmlns="${nfseNs}" Id="${dpsId}">`,
@@ -136,7 +154,7 @@ export function buildSignedDps(draft: NfseDpsDraft) {
     aliq,
     '<tpRetISSQN>1</tpRetISSQN>',
     '</tribMun>',
-    '<totTrib><indTotTrib>0</indTotTrib></totTrib>',
+    totalTax,
     '</trib>',
     '</valores>',
     '</infDPS>',
