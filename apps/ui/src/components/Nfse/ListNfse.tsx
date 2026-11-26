@@ -1,6 +1,7 @@
 import { formatCurrency, type ListPageSize, listPageSizes } from '@erp-360/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, FileText } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 
@@ -9,8 +10,17 @@ import {
   shortKey,
   todayInSaoPaulo,
 } from '@/components/Inbound/inboundQuery';
+import { danfseDocument } from '@/components/Nfse/danfseDocument';
 import { nfseStatusTone } from '@/components/Nfse/nfseTone';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ListPagination } from '@/components/ui/ListPagination';
 import {
@@ -30,7 +40,7 @@ import {
 } from '@/services/nfse';
 
 const columns =
-  'grid grid-cols-[88px_110px_130px_110px_minmax(160px,1.4fr)_110px_minmax(120px,1fr)]';
+  'grid grid-cols-[44px_88px_110px_130px_110px_minmax(160px,1.4fr)_110px_minmax(120px,1fr)]';
 
 const sortFields: NfseListSortField[] = [
   'dpsNumber',
@@ -112,6 +122,9 @@ function DateFilter({
 
 export function ListNfse() {
   const [params, setParams] = useSearchParams();
+  const [danfseId, setDanfseId] = useState<string | null>(null);
+  const [danfseHtml, setDanfseHtml] = useState('');
+  const danfseFrame = useRef<HTMLIFrameElement>(null);
   const page = readPage(params);
   const limit = readLimit(params);
   const sortField = readSort(params);
@@ -168,6 +181,33 @@ export function ListNfse() {
         issuedTo: issuedTo || undefined,
       }),
   });
+
+  const danfse = useQuery({
+    queryKey: ['nfse', 'danfse', danfseId],
+    queryFn: () => nfseService.danfse(danfseId!),
+    enabled: Boolean(danfseId),
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!danfse.data) {
+      setDanfseHtml('');
+      return;
+    }
+    void danfseDocument(danfse.data)
+      .then((html) => {
+        if (!cancelled) setDanfseHtml(html);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDanfseHtml('');
+          toast.error('Não foi possível montar a DANFSe.');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [danfse.data]);
 
   const replaceParams = (change: (next: URLSearchParams) => void) => {
     const next = new URLSearchParams(params);
@@ -310,6 +350,7 @@ export function ListNfse() {
         <div className="overflow-x-auto">
           <div className="min-w-[900px]">
             <StatusListHeader columns={columns}>
+              <span />
               <button
                 type="button"
                 className="inline-flex items-center gap-1 text-left"
@@ -384,6 +425,19 @@ export function ListNfse() {
                   tone={nfseStatusTone[row.status]}
                   label={`DPS ${row.dpsNumber ?? 'sem número'}, ${nfseStatusLabel[row.status]}, ${row.customerName}`}
                 >
+                  <span data-row-ignore>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      title="DANFSe"
+                      aria-label="DANFSe"
+                      disabled={row.status !== 'authorized' || !row.accessKey}
+                      onClick={() => setDanfseId(row.id)}
+                    >
+                      <FileText />
+                    </Button>
+                  </span>
                   <span className="tabular-nums text-[var(--status-text)]">
                     {row.dpsNumber ?? '—'}
                   </span>
@@ -435,6 +489,56 @@ export function ListNfse() {
           />
         ) : null}
       </ListPanel>
+
+      <Dialog
+        open={Boolean(danfseId)}
+        onOpenChange={(open) => {
+          if (open) return;
+          setDanfseId(null);
+          setDanfseHtml('');
+        }}
+      >
+        <DialogContent className="max-h-[92vh] max-w-[1100px]">
+          <DialogHeader>
+            <DialogTitle>DANFSe</DialogTitle>
+            <DialogDescription>
+              Visualização da NFS-e autorizada a partir do XML local.
+            </DialogDescription>
+          </DialogHeader>
+          {danfse.isPending ? (
+            <p className="text-sm text-zinc-500">Carregando...</p>
+          ) : null}
+          {danfse.isError ? (
+            <p className="text-sm text-rose-700">{danfse.error.message}</p>
+          ) : null}
+          {danfseHtml ? (
+            <>
+              <iframe
+                ref={danfseFrame}
+                title="DANFSe"
+                className="h-[65vh] w-full rounded-md border bg-white"
+                srcDoc={danfseHtml}
+              />
+              <DialogFooter>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    const frame = danfseFrame.current?.contentWindow;
+                    if (!frame) {
+                      toast.error('Não foi possível imprimir a DANFSe.');
+                      return;
+                    }
+                    frame.focus();
+                    frame.print();
+                  }}
+                >
+                  Imprimir
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

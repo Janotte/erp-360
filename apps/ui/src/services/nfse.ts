@@ -144,4 +144,12 @@ export const nfseService = {
     }
     return body as NfseListPage;
   },
+  danfse: async (requestId: string): Promise<DanfseView> => {
+    const res = await apiFetch(`/nfse/${requestId}/danfse`);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(body.message || body.error || 'Falha ao carregar a DANFSe.');
+    }
+    return body as DanfseView;
+  },
 };
