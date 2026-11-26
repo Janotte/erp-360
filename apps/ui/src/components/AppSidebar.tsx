@@ -7,6 +7,7 @@ import {
   ChevronRight,
   ClipboardList,
   CreditCard,
+  FileSpreadsheet,
   FileText,
   FolderTree,
   Landmark,
@@ -56,6 +57,7 @@ const itensMenu: ItemMenu[] = [
   { title: 'Dashboard', icon: LayoutDashboard, url: '/dashboard' },
   { title: 'Pessoas', icon: Users, url: '/persons' },
   { title: 'Ordens de serviço', icon: ClipboardList, url: '/service-orders' },
+  { title: 'NFS-e', icon: FileSpreadsheet, url: '/nfse' },
   { title: 'Contratos', icon: ScrollText, url: '/contracts' },
   {
     title: 'Catálogo',

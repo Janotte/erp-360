@@ -50,6 +50,7 @@ import { NaturePage } from './components/Inbound/Setup/NaturePage';
 import { Navbar } from './components/Navbar';
 import { ListPersons } from './components/Persons/ListPersons';
 import { PersonPage } from './components/Persons/PersonPage';
+import { ListNfse } from './components/Nfse/ListNfse';
 import { FormServiceOrder } from './components/ServiceOrders/FormServiceOrder';
 import { ListServiceOrders } from './components/ServiceOrders/ListServiceOrders';
 import { SettingsPage } from './components/Settings/SettingsPage';
@@ -75,6 +76,7 @@ const rotasPorHash: Record<string, string> = {
   '#inbound-setup': '/inbound/setup',
   '#settings': '/settings',
   '#service-orders': '/service-orders',
+  '#nfse': '/nfse',
   '#contracts': '/contracts',
 };
 
@@ -575,6 +577,14 @@ function App() {
               element={
                 <Pagina>
                   <FormServiceOrder />
+                </Pagina>
+              }
+            />
+            <Route
+              path="/nfse"
+              element={
+                <Pagina>
+                  <ListNfse />
                 </Pagina>
               }
             />
