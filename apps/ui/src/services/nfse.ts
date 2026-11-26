@@ -43,6 +43,73 @@ export type NfseListPage = {
   };
 };
 
+export type DanfseParty = {
+  name: string;
+  taxId: string;
+  municipalRegistration: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  postalCode: string;
+};
+
+export type DanfseIssqn = {
+  taxation: string;
+  rate: string;
+  retention: string;
+  cityLabel: string;
+  immunityType: string;
+  suspended: string;
+  processNumber: string;
+  base: string;
+  amount: string;
+};
+
+export type DanfseView = {
+  accessKey: string;
+  nfseNumber: string;
+  competence: string;
+  nfseIssuedAt: string;
+  dpsNumber: string;
+  dpsSeries: string;
+  dpsIssuedAt: string;
+  situation: string;
+  purpose: string;
+  issuerCityName: string;
+  environment: 'homologation' | 'production';
+  environmentLabel: string;
+  provider: DanfseParty;
+  taker: DanfseParty;
+  takerPresent: boolean;
+  recipientSameAsTaker: boolean;
+  intermediaryPresent: boolean;
+  intermediary: DanfseParty;
+  service: {
+    nationalCode: string;
+    municipalCode: string;
+    description: string;
+  };
+  issqn: DanfseIssqn;
+  issqnApplicable: boolean;
+  federal: {
+    irrf: string;
+    cp: string;
+    social: string;
+  };
+  federalPresent: boolean;
+  ibsCbsPresent: boolean;
+  ibsCbs: Record<string, string>;
+  serviceAmount: string;
+  discountAmount: string;
+  federalRetentionTotal: string;
+  ibsCbsTotal: string;
+  netAmount: string;
+  complementaryInfo: string;
+  qrCodeUrl: string;
+};
+
 export const nfseStatusLabel: Record<NfseListStatus, string> = {
   pending: 'Pendente',
   authorized: 'Autorizada',

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>DANFSe [nfseNumber]</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 8mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #fff;
+      color: #000;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .page {
+      width: 19.4cm;
+      margin: 0 auto;
+      border: 1pt solid #000;
+      font-size: 7pt;
+      line-height: 1.2;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    td,
+    th {
+      border: 0.5pt solid #000;
+      vertical-align: top;
+      padding: 2px 4px;
+    }
+
+    .shade {
+      background: #f2f2f2;
+    }
+
+    .label {
+      display: block;
+      font-size: 6pt;
+      font-weight: 700;
+      text-transform: capitalize;
+      margin-bottom: 1px;
+    }
+
+    .value {
+      display: block;
+      font-size: 7pt;
+      min-height: 1em;
+    }
+
+    .block-title {
+      font-size: 7pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 3px 4px;
+    }
+
+    .head td {
+      border: none;
+      vertical-align: middle;
+    }
+
+    .head {
+      border-bottom: 0.5pt solid #000;
+    }
+
+    .logo img {
+      max-height: 42px;
+      max-width: 120px;
+    }
+
+    .title {
+      text-align: center;
+    }
+
+    .danfse {
+      font-size: 9pt;
+      font-weight: 700;
+    }
+
+    .homolog {
+      color: #c00;
+      font-size: 9pt;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .city {
+      font-size: 8pt;
+      margin-top: 4px;
+    }
+
+    .env {
+      font-size: 6pt;
+      margin-top: 2px;
+    }
+
+    .qr {
+      width: 3.6cm;
+      text-align: center;
+    }
+
+    .qr img {
+      width: 86px;
+      height: 86px;
+    }
+
+    .auth {
+      font-size: 6pt;
+      margin-top: 4px;
+      text-align: left;
+    }
+
+    .key {
+      font-family: Consolas, monospace;
+      letter-spacing: 0.5px;
+      font-size: 8pt;
+      font-weight: 700;
+    }
+
+    .desc {
+      min-height: 2.2cm;
+      white-space: pre-wrap;
+    }
+
+    .net {
+      font-size: 9pt;
+      font-weight: 700;
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .page {
+        border-color: #000;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <table class="head shade">
+      <tr>
+        <td class="logo" style="width: 3.4cm">[logo]</td>
+        <td class="title">
+          <div class="danfse">DANFSe v2.0</div>
+          <div><strong>Documento Auxiliar da NFS-e</strong></div>
+          [homologationBanner]
+          <div class="city">[issuerCityName]</div>
+          <div class="env">[environmentLabel]</div>
+        </td>
+        <td class="qr">
+          [qrImage]
+          <div class="auth">
+            A autenticidade desta NFS-e pode ser verificada pela leitura deste código QR
+            ou pela consulta da chave de acesso no portal nacional da NFS-e
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="block-title shade">Identificação da NFS-e</div>
+    <table>
+      <tr>
+        <td colspan="4">
+          <span class="label">Chave de acesso</span>
+          <span class="value key">[accessKey]</span>
+        </td>
+      </tr>
+      <tr>
+        <td><span class="label">Número da NFS-e</span><span class="value">[nfseNumber]</span></td>
+        <td><span class="label">Competência</span><span class="value">[competence]</span></td>
+        <td><span class="label">Emissão da NFS-e</span><span class="value">[nfseIssuedAt]</span></td>
+        <td><span class="label">Situação</span><span class="value">[situation]</span></td>
+      </tr>
+      <tr>
+        <td><span class="label">Número da DPS</span><span class="value">[dpsNumber]</span></td>
+        <td><span class="label">Série da DPS</span><span class="value">[dpsSeries]</span></td>
+        <td><span class="label">Emissão da DPS</span><span class="value">[dpsIssuedAt]</span></td>
+        <td><span class="label">Finalidade</span><span class="value">[purpose]</span></td>
+      </tr>
+    </table>
+
+    <div class="block-title shade">Prestador / Fornecedor</div>
+    <table>
+      <tr>
+        <td colspan="2"><span class="label">Nome / Nome empresarial</span><span class="value">[providerName]</span></td>
+        <td><span class="label">CNPJ / CPF</span><span class="value">[providerTaxId]</span></td>
+      </tr>
+      <tr>
+        <td colspan="3"><span class="label">Endereço</span><span class="value">[providerAddress]</span></td>
+      </tr>
+    </table>
+
+    <div class="block-title shade">Tomador / Adquirente</div>
+    <div style="padding: 4px; border-bottom: 0.5pt solid #000">[takerBlock]</div>
+
+    <div class="block-title shade">Destinatário da operação</div>
+    <div style="padding: 4px; border-bottom: 0.5pt solid #000">[recipientBlock]</div>
+
+    <div class="block-title shade">Intermediário da operação</div>
+    <div style="padding: 4px; border-bottom: 0.5pt solid #000">[intermediaryBlock]</div>
+
+    <div class="block-title shade">Serviço prestado</div>
+    <table>
+      <tr>
+        <td><span class="label">Código de tributação nacional</span><span class="value">[serviceNationalCode]</span></td>
+        <td><span class="label">Código tributário municipal</span><span class="value">[serviceMunicipalCode]</span></td>
+      </tr>
+      <tr>
+        <td colspan="2">
+          <span class="label">Descrição do serviço</span>
+          <span class="value desc">[serviceDescription]</span>
+        </td>
+      </tr>
+    </table>
+
+    <div class="block-title shade">Tributação municipal (ISSQN)</div>
+    <div style="padding: 4px; border-bottom: 0.5pt solid #000">[issqnBlock]</div>
+
+    <div class="block-title shade">Tributação federal (exceto CBS)</div>
+    <div style="padding: 4px; border-bottom: 0.5pt solid #000">[federalBlock]</div>
+
+    <div class="block-title shade">Tributação IBS/CBS</div>
+    <div style="padding: 4px; border-bottom: 0.5pt solid #000">[ibsCbsBlock]</div>
+
+    <div class="block-title shade">Valor total da NFS-e</div>
+    <table>
+      <tr>
+        <td><span class="label">Valor do serviço</span><span class="value">[serviceAmount]</span></td>
+        <td><span class="label">Descontos</span><span class="value">[discountAmount]</span></td>
+        <td><span class="label">Retenções federais</span><span class="value">[federalRetentionTotal]</span></td>
+        <td><span class="label">Total IBS/CBS</span><span class="value">[ibsCbsTotal]</span></td>
+      </tr>
+      <tr>
+        <td colspan="4" class="shade">
+          <span class="label">Valor líquido da NFS-e + IBS/CBS</span>
+          <span class="value net">[netAmount]</span>
+        </td>
+      </tr>
+    </table>
+
+    <div class="block-title shade">Informações complementares</div>
+    <div style="padding: 4px; min-height: 1.4cm">[complementaryInfo]</div>
+  </div>
+</body>
+</html>
