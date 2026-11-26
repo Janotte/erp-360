@@ -24,6 +24,7 @@ import { dfeSyncRoutes } from './modules/inbound/dfe-sync.ts';
 import { inboundRoutes } from './modules/inbound/inbound.ts';
 import { inboundMaintenanceRoutes } from './modules/inbound/maintenance.ts';
 import { nfeSettingsRoutes } from './modules/inbound/nfe-settings.ts';
+import { nfseListRoutes } from './modules/nfse/list.ts';
 import { nfseSettingsRoutes } from './modules/nfse/settings.ts';
 import { paymentMethodRoutes } from './modules/payment-methods/payment-methods.ts';
 import { locationsRoutes } from './modules/persons/locations.ts';
@@ -88,6 +89,7 @@ export function buildApp(options?: { logger?: boolean }) {
   fastify.register(emitterRoutes, { prefix: '/settings' });
   fastify.register(nfeSettingsRoutes, { prefix: '/settings' });
   fastify.register(nfseSettingsRoutes, { prefix: '/settings' });
+  fastify.register(nfseListRoutes, { prefix: '/nfse' });
   fastify.register(serviceOrderSettingsRoutes, { prefix: '/settings' });
   fastify.register(serviceOrderRoutes, { prefix: '/service-orders' });
   fastify.register(contractRoutes, { prefix: '/contracts' });
