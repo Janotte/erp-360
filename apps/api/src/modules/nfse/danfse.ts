@@ -358,8 +358,9 @@ export function readDanfse(xml: string): DanfseView | null {
   const serviceLocation = text(locPrest?.cLocPrestacao) || text(inf.xLocPrestacao) || text(infDps.cLocEmi);
   const pTotTribSn = text(totTrib?.pTotTribSN);
   const vTotTrib = text(totTrib?.vTotTrib);
+  // pTotTribSN é percentual (Simples); vTotTrib é valor em moeda.
   const complementaryInfo = pTotTribSn
-    ? `Valor aproximado dos tributos (Lei 12.741/2012): ${pTotTribSn}%.`
+    ? `Percentual aproximado dos tributos (Lei 12.741/2012): ${pTotTribSn}%.`
     : vTotTrib
       ? `Valor aproximado dos tributos (Lei 12.741/2012): ${vTotTrib}.`
       : '';

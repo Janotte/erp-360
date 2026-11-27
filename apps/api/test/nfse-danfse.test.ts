@@ -105,7 +105,10 @@ describe('DANFSe a partir do XML autorizado', () => {
     assert.match(view.environmentType, /Produção restrita/);
     assert.match(view.issqn.taxation, /^1/);
     assert.equal(view.issqn.rate, '2.00');
-    assert.match(view.complementaryInfo, /12\.741/);
+    assert.match(
+      view.complementaryInfo,
+      /Percentual aproximado dos tributos \(Lei 12\.741\/2012\): 6\.00%\./,
+    );
     assert.match(view.qrCodeUrl, new RegExp(`chave=${accessKey}$`));
     assert.match(view.qrCodeUrl, /ConsultaPublica/);
   });
