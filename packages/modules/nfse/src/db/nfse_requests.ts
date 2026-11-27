@@ -47,7 +47,7 @@ export const nfseDpsCounters = pgTable(
   ],
 );
 
-/** Uma NFS-e por documento de faturamento. */
+/** Pedido de NFS-e ligado ao documento. Cancelados ficam no histórico. */
 export const nfseRequests = pgTable(
   'nfse_requests',
   {
@@ -71,7 +71,10 @@ export const nfseRequests = pgTable(
   },
   (table) => [
     unique('nfse_requests_id_tenant_id_unique').on(table.id, table.tenantId),
-    unique('nfse_requests_tenant_document_unique').on(table.tenantId, table.billingDocumentId),
+    /** Um pedido vivo por documento; vários cancelados podem coexistir. */
+    uniqueIndex('nfse_requests_tenant_document_live_unique')
+      .on(table.tenantId, table.billingDocumentId)
+      .where(sql`${table.status} in ('pending', 'rejected', 'authorized')`),
     uniqueIndex('nfse_requests_series_number_unique')
       .on(table.tenantId, table.series, table.dpsNumber)
       .where(sql`${table.dpsNumber} is not null`),
@@ -161,6 +164,56 @@ export const nfseRequestLines = pgTable(
     check(
       'nfse_request_lines_iss_rate_check',
       sql`${table.issRate} is null or (${table.issRate} >= 0 and ${table.issRate} < 10)`,
+    ),
+  ],
+);
+
+/** Eventos SEFIN aceitos para um pedido (ex.: cancelamento e101101). */
+export const nfseEvents = pgTable(
+  'nfse_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ...tenantColumns,
+    requestId: uuid('request_id').notNull(),
+    type: varchar('type', { length: 16 }).notNull(),
+    sequence: integer('sequence').notNull(),
+    reasonCode: varchar('reason_code', { length: 1 }),
+    reasonText: text('reason_text'),
+    eventXml: text('event_xml').notNull(),
+    registeredAt: timestamp('registered_at', { withTimezone: true, mode: 'date' }).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    unique('nfse_events_id_tenant_id_unique').on(table.id, table.tenantId),
+    unique('nfse_events_request_type_sequence_unique').on(
+      table.tenantId,
+      table.requestId,
+      table.type,
+      table.sequence,
+    ),
+    foreignKey({
+      name: 'nfse_events_request_tenant_fk',
+      columns: [table.requestId, table.tenantId],
+      foreignColumns: [nfseRequests.id, nfseRequests.tenantId],
+    }).onDelete('cascade'),
+    check(
+      'nfse_events_type_check',
+      sql`${table.type} ~ '^[a-z][a-z0-9]{0,15}$'`,
+    ),
+    check('nfse_events_sequence_check', sql`${table.sequence} between 1 and 999`),
+    check(
+      'nfse_events_reason_code_check',
+      sql`${table.reasonCode} is null or ${table.reasonCode} in ('1', '2', '9')`,
+    ),
+    check(
+      'nfse_events_reason_text_check',
+      sql`${table.reasonText} is null or (
+        length(trim(${table.reasonText})) >= 15 and length(${table.reasonText}) <= 255
+      )`,
+    ),
+    check(
+      'nfse_events_event_xml_check',
+      sql`length(trim(${table.eventXml})) > 0 and length(${table.eventXml}) <= 500000`,
     ),
   ],
 );

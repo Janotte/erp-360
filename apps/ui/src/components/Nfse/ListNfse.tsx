@@ -1,6 +1,7 @@
 import { formatCurrency, type ListPageSize, listPageSizes } from '@erp-360/shared';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, ArrowUpDown, FileText } from 'lucide-react';
+import type { MouseEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
@@ -11,8 +12,10 @@ import {
   todayInSaoPaulo,
 } from '@/components/Inbound/inboundQuery';
 import { danfseDocument } from '@/components/Nfse/danfseDocument';
+import { NfseNoteMenu } from '@/components/Nfse/NfseNoteMenu';
 import { nfseStatusTone } from '@/components/Nfse/nfseTone';
 import { Button } from '@/components/ui/button';
+
 import {
   Dialog,
   DialogContent,
@@ -33,11 +36,13 @@ import {
 import { StatusBadge, StatusListHeader, StatusListRow } from '@/components/ui/StatusList';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import {
+  type NfseListItem,
   type NfseListSortField,
   type NfseListStatus,
   nfseService,
   nfseStatusLabel,
 } from '@/services/nfse';
+
 
 const columns =
   'grid grid-cols-[44px_88px_110px_130px_110px_minmax(160px,1.4fr)_110px_minmax(120px,1fr)]';
@@ -124,6 +129,11 @@ export function ListNfse() {
   const [params, setParams] = useSearchParams();
   const [danfseId, setDanfseId] = useState<string | null>(null);
   const [danfseHtml, setDanfseHtml] = useState('');
+  const [noteMenu, setNoteMenu] = useState<{
+    row: NfseListItem;
+    x: number;
+    y: number;
+  } | null>(null);
   const danfseFrame = useRef<HTMLIFrameElement>(null);
   const page = readPage(params);
   const limit = readLimit(params);
@@ -424,6 +434,10 @@ export function ListNfse() {
                   columns={columns}
                   tone={nfseStatusTone[row.status]}
                   label={`DPS ${row.dpsNumber ?? 'sem número'}, ${nfseStatusLabel[row.status]}, ${row.customerName}`}
+                  onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
+                    event.preventDefault();
+                    setNoteMenu({ row, x: event.clientX, y: event.clientY });
+                  }}
                 >
                   <span data-row-ignore>
                     <Button
@@ -489,6 +503,15 @@ export function ListNfse() {
           />
         ) : null}
       </ListPanel>
+
+      <NfseNoteMenu
+        cursor={noteMenu}
+        onClose={() => setNoteMenu(null)}
+        onOpenDanfse={(row) => setDanfseId(row.id)}
+        onCanceled={() => {
+          void list.refetch();
+        }}
+      />
 
       <Dialog
         open={Boolean(danfseId)}

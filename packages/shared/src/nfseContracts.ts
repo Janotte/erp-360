@@ -92,6 +92,27 @@ export const nfseIssqnTaxationLabels: Record<NfseIssqnTaxation, string> = {
   non_incidence: 'Não incidência',
 };
 
+/** Motivos oficiais do evento e101101 (cancelamento). */
+export const nfseCancelReasonCodes = ['1', '2', '9'] as const;
+export type NfseCancelReasonCode = (typeof nfseCancelReasonCodes)[number];
+
+export const nfseCancelReasonLabels: Record<NfseCancelReasonCode, string> = {
+  '1': 'Erro na emissão',
+  '2': 'Serviço não prestado',
+  '9': 'Outros',
+};
+
+export const nfseCancelBodySchema = z.object({
+  reasonCode: z.enum(nfseCancelReasonCodes),
+  reasonText: z
+    .string()
+    .trim()
+    .min(15, 'A justificativa precisa ter no mínimo 15 caracteres.')
+    .max(255, 'A justificativa aceita no máximo 255 caracteres.'),
+});
+
+export type NfseCancelBody = z.infer<typeof nfseCancelBodySchema>;
+
 /** Série da DPS na faixa de aplicativo próprio. 00001 a 49999. */
 export function normalizeNfseSeries(value: string | null | undefined): string | null {
   const raw = (value ?? '').trim();

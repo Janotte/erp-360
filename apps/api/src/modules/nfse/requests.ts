@@ -4,7 +4,7 @@ import { billingDocuments } from '@erp-360/mod-billing';
 import { catalogItems } from '@erp-360/mod-catalog';
 import { nfseRequestLines, nfseRequests } from '@erp-360/mod-nfse';
 import { serviceOrderLines, serviceOrders } from '@erp-360/mod-service-orders';
-import { and, asc, eq, ne } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
@@ -135,6 +135,7 @@ export async function requestServiceOrderNfse(tenantId: string, orderId: string)
           and(
             eq(nfseRequests.tenantId, tenantId),
             eq(nfseRequests.billingDocumentId, document.id),
+            inArray(nfseRequests.status, ['pending', 'rejected', 'authorized']),
           ),
         )
         .limit(1);
@@ -228,6 +229,7 @@ export async function requestServiceOrderNfse(tenantId: string, orderId: string)
           eq(nfseRequests.tenantId, tenantId),
           eq(billingDocuments.serviceOrderId, orderId),
           eq(billingDocuments.commercialStatus, 'issued'),
+          inArray(nfseRequests.status, ['pending', 'rejected', 'authorized']),
         ),
       )
       .limit(1);

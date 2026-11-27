@@ -116,6 +116,20 @@ export function setNfseCertificateLoaderForTests(next: CertificateLoader | null)
   loadCertificate = next ?? certificateMaterial;
 }
 
+/** Usado pelo cancelamento e pelos testes para o mesmo canal HTTPS/mTLS. */
+export function submitNfseHttp(input: {
+  endpoint: string;
+  body: string;
+  certificatePem: string;
+  privateKeyPem: string;
+}) {
+  return transport(input);
+}
+
+export function loadNfseCertificate(tenantId: string, environment: NfseEnvironment) {
+  return loadCertificate(tenantId, environment);
+}
+
 function httpError(message: string, status: number): never {
   const error = new Error(message) as Error & { status: number };
   error.status = status;
@@ -277,12 +291,15 @@ export async function sendServiceOrderNfse(tenantId: string, orderId: string) {
     })
     .from(nfseRequests)
     .where(
-      and(eq(nfseRequests.tenantId, tenantId), eq(nfseRequests.billingDocumentId, document.id)),
+      and(
+        eq(nfseRequests.tenantId, tenantId),
+        eq(nfseRequests.billingDocumentId, document.id),
+        inArray(nfseRequests.status, ['pending', 'rejected', 'authorized']),
+      ),
     )
     .limit(1);
   if (!request) httpError(messages.missingRequest, 400);
   if (request.status === 'authorized') httpError(messages.authorized, 409);
-  if (request.status === 'canceled') httpError(messages.canceled, 400);
 
   const [settings] = await db
     .select()

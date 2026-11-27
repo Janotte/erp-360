@@ -477,6 +477,13 @@
       "when": 1795600000000,
       "tag": "0067_nfse_simples_tax_percent",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1795700000000,
+      "tag": "0068_nfse_cancel",
+      "breakpoints": true
     }
   ]
 }

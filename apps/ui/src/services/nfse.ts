@@ -148,6 +148,24 @@ function buildQuery(filter: NfseListFilter) {
   return query ? `?${query}` : '';
 }
 
+export type NfseCancelReasonCode = '1' | '2' | '9';
+
+export type NfseEventItem = {
+  id: string;
+  type: string;
+  sequence: number;
+  reasonCode: string | null;
+  reasonText: string | null;
+  registeredAt: string;
+  eventXml: string;
+};
+
+export const nfseCancelReasonLabel: Record<NfseCancelReasonCode, string> = {
+  '1': 'Erro na emissão',
+  '2': 'Serviço não prestado',
+  '9': 'Outros',
+};
+
 export const nfseService = {
   list: async (filter: NfseListFilter = {}): Promise<NfseListPage> => {
     const res = await apiFetch(`/nfse${buildQuery(filter)}`);
@@ -164,5 +182,28 @@ export const nfseService = {
       throw new Error(body.message || body.error || 'Falha ao carregar a DANFSe.');
     }
     return body as DanfseView;
+  },
+  events: async (requestId: string): Promise<NfseEventItem[]> => {
+    const res = await apiFetch(`/nfse/${requestId}/events`);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(body.message || body.error || 'Falha ao carregar os eventos da NFS-e.');
+    }
+    return (body as { data: NfseEventItem[] }).data;
+  },
+  cancel: async (
+    requestId: string,
+    input: { reasonCode: NfseCancelReasonCode; reasonText: string },
+  ): Promise<{ message: string }> => {
+    const res = await apiFetch(`/nfse/${requestId}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(body.message || body.error || 'Falha ao cancelar a NFS-e.');
+    }
+    return body as { message: string };
   },
 };

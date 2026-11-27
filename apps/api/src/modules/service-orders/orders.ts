@@ -1186,6 +1186,24 @@ async function reverseServiceOrder(tenantId: string, id: string) {
       )
       .limit(1);
     if (issuedDocument) {
+      const [authorizedNfse] = await tx
+        .select({ id: nfseRequests.id })
+        .from(nfseRequests)
+        .where(
+          and(
+            eq(nfseRequests.tenantId, tenantId),
+            eq(nfseRequests.billingDocumentId, issuedDocument.id),
+            eq(nfseRequests.status, 'authorized'),
+          ),
+        )
+        .limit(1);
+      if (authorizedNfse) {
+        const blocked = new Error(
+          'Cancele a NFS-e autorizada na lista de NFS-e antes de estornar esta ordem.',
+        ) as Error & { status: number };
+        blocked.status = 409;
+        throw blocked;
+      }
       await tx
         .update(nfseRequests)
         .set({ status: 'canceled' })
