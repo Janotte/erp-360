@@ -680,7 +680,9 @@ export function FormServiceOrder() {
       queryClient.setQueryData(['service-order', saved.id], saved);
       void queryClient.invalidateQueries({ queryKey: ['service-orders'] });
       setReverseOpen(false);
-      toast.success('Entrega estornada.');
+      toast.success(
+        'Entrega estornada. Ajuste os itens e o pagamento, entregue de novo e use Gerar financeiro na lista.',
+      );
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Não foi possível estornar a entrega.');
@@ -698,6 +700,41 @@ export function FormServiceOrder() {
     const remaining = orderTotal(draft).totalAmount - allocatedPayments(draft);
     setAllocationAmount(remaining > 0 ? maskCurrencyInput(String(remaining)) : '');
   }, [draft]);
+
+  /** Após estorno/alteração de itens, o plano antigo não pode travar o salvamento nem a reentrega. */
+  useEffect(() => {
+    if (!draft) return;
+    const status = order.data?.status;
+    if (status === 'delivered' || status === 'cancelled') return;
+    if (draft.payments.length === 0) return;
+
+    const total = orderTotal(draft).totalAmount;
+    const amounts = draft.payments.map((row) => decimalToCents(row.amount));
+    const allocated = amounts.reduce((sum, value) => sum + value, 0);
+
+    let nextAmounts: number[] | null = null;
+    if (draft.payments.length === 1) {
+      if (amounts[0] !== total) nextAmounts = [Math.max(0, total)];
+    } else if (allocated > total && allocated > 0) {
+      const scaled = amounts.map((amount) => Math.floor((amount * total) / allocated));
+      const head = scaled.slice(0, -1).reduce((sum, value) => sum + value, 0);
+      scaled[scaled.length - 1] = Math.max(0, total - head);
+      nextAmounts = scaled;
+    }
+    if (!nextAmounts) return;
+    if (nextAmounts.every((amount, index) => amount === amounts[index])) return;
+
+    setDraft((current) => {
+      if (!current || current.payments.length !== nextAmounts.length) return current;
+      return {
+        ...current,
+        payments: current.payments.map((row, index) => ({
+          ...row,
+          amount: maskCurrencyInput(String(nextAmounts[index] ?? 0)),
+        })),
+      };
+    });
+  }, [draft, order.data?.status]);
 
   if (order.isError || settings.isError) {
     return <p className="text-sm text-red-600">Não foi possível carregar a ordem.</p>;

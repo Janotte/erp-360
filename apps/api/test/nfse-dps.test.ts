@@ -77,7 +77,7 @@ describe('DPS da NFS-e nacional', () => {
     assert.match(signed.xml, /<tpAmb>2<\/tpAmb>/);
     assert.match(signed.xml, /<serie>49001<\/serie>/);
     assert.match(signed.xml, /<nDPS>1<\/nDPS>/);
-    assert.match(signed.xml, /<pAliq>2.00<\/pAliq><tpRetISSQN>1<\/tpRetISSQN>/);
+    assert.match(signed.xml, /<tpRetISSQN>1<\/tpRetISSQN><pAliq>2.00<\/pAliq>/);
     assert.match(signed.xml, /<totTrib><indTotTrib>0<\/indTotTrib><\/totTrib>/);
     assert.doesNotMatch(signed.xml, /<IM>/);
     const prest = signed.xml.match(/<prest>[\s\S]*?<\/prest>/)?.[0] ?? '';
@@ -121,6 +121,8 @@ describe('DPS da NFS-e nacional', () => {
     assert.match(signed.xml, /<opSimpNac>3<\/opSimpNac>/);
     assert.doesNotMatch(signed.xml, /<IM>/);
     assert.doesNotMatch(signed.xml, /indTotTrib/);
+    assert.doesNotMatch(signed.xml, /<pAliq>/);
+    assert.match(signed.xml, /<tpRetISSQN>1<\/tpRetISSQN>/);
     assert.match(signed.xml, /<totTrib><pTotTribSN>6.00<\/pTotTribSN><\/totTrib>/);
   });
 

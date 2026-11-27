@@ -5,6 +5,7 @@ export type NfseListStatus = 'pending' | 'authorized' | 'rejected' | 'canceled';
 export type NfseListSortField =
   | 'dpsNumber'
   | 'series'
+  | 'nfseNumber'
   | 'status'
   | 'createdAt'
   | 'customerName'
@@ -15,6 +16,7 @@ export type NfseListItem = {
   id: string;
   dpsNumber: number | null;
   series: string | null;
+  nfseNumber: string | null;
   status: NfseListStatus;
   createdAt: string;
   customerName: string;

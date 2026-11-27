@@ -14,12 +14,19 @@ import { listPageQuery } from '../../lib/list-page.ts';
 const sortFields = [
   'dpsNumber',
   'series',
+  'nfseNumber',
   'status',
   'createdAt',
   'customerName',
   'serviceAmount',
   'accessKey',
 ] as const;
+
+/** Número da NFS-e autorizada no XML local (nNFSe / nDFSe). */
+const nfseNumberSql = sql`coalesce(
+  substring(${nfseRequests.nfseXml} from '<nNFSe>([0-9]+)'),
+  substring(${nfseRequests.nfseXml} from '<nDFSe>([0-9]+)')
+)`;
 
 const listQuery = z.object({
   ...listPageQuery,
@@ -93,6 +100,7 @@ export const nfseListRoutes: FastifyPluginAsyncZod = async (fastify) => {
     const sortSql = {
       dpsNumber: sql`${nfseRequests.dpsNumber} ${sql.raw(direction)} NULLS LAST`,
       series: sql`${nfseRequests.series} ${sql.raw(direction)} NULLS LAST`,
+      nfseNumber: sql`${nfseNumberSql} ${sql.raw(direction)} NULLS LAST`,
       status: sql`${nfseRequests.status} ${sql.raw(direction)}`,
       createdAt: sql`${nfseRequests.createdAt} ${sql.raw(direction)}`,
       customerName: sql`${persons.name} ${sql.raw(direction)}`,
@@ -106,6 +114,7 @@ export const nfseListRoutes: FastifyPluginAsyncZod = async (fastify) => {
         id: nfseRequests.id,
         dpsNumber: nfseRequests.dpsNumber,
         series: nfseRequests.series,
+        nfseNumber: sql<string | null>`${nfseNumberSql}`,
         status: nfseRequests.status,
         createdAt: nfseRequests.createdAt,
         customerName: persons.name,
@@ -131,6 +140,7 @@ export const nfseListRoutes: FastifyPluginAsyncZod = async (fastify) => {
     return {
       data: rows.map((row) => ({
         ...row,
+        nfseNumber: row.nfseNumber?.trim() || null,
         createdAt: row.createdAt.toISOString(),
       })),
       meta: listPageMeta(total, page, limit),

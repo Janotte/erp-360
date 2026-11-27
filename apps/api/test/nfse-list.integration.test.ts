@@ -16,6 +16,7 @@ type ListItem = {
   id: string;
   dpsNumber: number | null;
   series: string | null;
+  nfseNumber: string | null;
   status: string;
   createdAt: string;
   customerName: string;
@@ -66,6 +67,7 @@ describe('lista de NFS-e', { concurrency: false }, () => {
       series: string | null;
       dpsNumber: number | null;
       accessKey: string | null;
+      nfseXml?: string | null;
       createdAt: Date;
     }) {
       const [order] = await db
@@ -112,6 +114,7 @@ describe('lista de NFS-e', { concurrency: false }, () => {
             ? `DPS${String(input.dpsNumber).padStart(42, '0')}`
             : null,
           accessKey: input.accessKey,
+          nfseXml: input.nfseXml ?? null,
           environment: input.dpsNumber ? 'homologation' : null,
           createdAt: input.createdAt,
         })
@@ -138,6 +141,7 @@ describe('lista de NFS-e', { concurrency: false }, () => {
       series: '00001',
       dpsNumber: 42,
       accessKey: '1'.repeat(50),
+      nfseXml: '<NFSe><infNFSe><nNFSe>900001</nNFSe></infNFSe></NFSe>',
       createdAt: new Date('2026-11-22T15:00:00.000Z'),
     });
   });
@@ -167,9 +171,12 @@ describe('lista de NFS-e', { concurrency: false }, () => {
     assert.equal(body.meta.total, 2);
     assert.equal(body.data[0]?.id, authorizedId);
     assert.equal(body.data[0]?.dpsNumber, 42);
+    assert.equal(body.data[0]?.series, '00001');
+    assert.equal(body.data[0]?.nfseNumber, '900001');
     assert.equal(body.data[0]?.customerName, 'Cliente Beta');
     assert.equal(body.data[1]?.id, pendingId);
     assert.equal(body.data[1]?.dpsNumber, null);
+    assert.equal(body.data[1]?.nfseNumber, null);
   });
 
   it('filtra por status e intervalo de emissão', async () => {

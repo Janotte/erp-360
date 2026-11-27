@@ -45,17 +45,24 @@ import {
 
 
 const columns =
-  'grid grid-cols-[44px_88px_110px_130px_110px_minmax(160px,1.4fr)_110px_minmax(120px,1fr)]';
+  'grid grid-cols-[44px_120px_110px_130px_110px_minmax(160px,1.4fr)_110px_minmax(120px,1fr)]';
 
 const sortFields: NfseListSortField[] = [
   'dpsNumber',
-  'series',
+  'nfseNumber',
   'status',
   'createdAt',
   'customerName',
   'serviceAmount',
   'accessKey',
 ];
+
+function formatDpsSeries(dpsNumber: number | null, series: string | null) {
+  if (dpsNumber == null && !series) return '—';
+  if (dpsNumber == null) return series ?? '—';
+  if (!series) return String(dpsNumber);
+  return `${dpsNumber} / ${series}`;
+}
 
 const statuses = Object.keys(nfseStatusLabel) as NfseListStatus[];
 
@@ -366,16 +373,16 @@ export function ListNfse() {
                 className="inline-flex items-center gap-1 text-left"
                 onClick={() => changeSort('dpsNumber')}
               >
-                DPS
+                DPS/Série
                 {sortIcon('dpsNumber')}
               </button>
               <button
                 type="button"
                 className="inline-flex items-center gap-1 text-left"
-                onClick={() => changeSort('series')}
+                onClick={() => changeSort('nfseNumber')}
               >
-                NFS-e/Série
-                {sortIcon('series')}
+                NFS-e
+                {sortIcon('nfseNumber')}
               </button>
               <button
                 type="button"
@@ -453,10 +460,10 @@ export function ListNfse() {
                     </Button>
                   </span>
                   <span className="tabular-nums text-[var(--status-text)]">
-                    {row.dpsNumber ?? '—'}
+                    {formatDpsSeries(row.dpsNumber, row.series)}
                   </span>
                   <span className="tabular-nums text-[var(--status-text)]">
-                    {row.status === 'authorized' ? (row.series ?? '—') : '—'}
+                    {row.nfseNumber ?? '—'}
                   </span>
                   <span>
                     <StatusBadge

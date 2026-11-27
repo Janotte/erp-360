@@ -161,8 +161,16 @@ function imXml(value: string | null | undefined) {
 export function buildSignedDps(draft: NfseDpsDraft) {
   const dpsId = nfseDpsId(draft);
   const competence = draft.emittedAt.slice(0, 10);
+  // E0625: ME/EPP (e optante pendente) com ISSQN pelo SN (regApTribSN=1) e
+  // tpRetISSQN=1 não pode informar pAliq. MEI também não informa.
+  const issBySimples =
+    (draft.simplesNacional === '3' || draft.simplesNacional === '4') &&
+    draft.simplesAssessment === '1';
   const includeRate =
-    draft.issRate != null && draft.simplesNacional !== '2' && draft.issqnTaxation === '1';
+    draft.issRate != null &&
+    draft.issqnTaxation === '1' &&
+    draft.simplesNacional !== '2' &&
+    !issBySimples;
   // E0120: IM só quando o município tem complemento no CNC; sem cadastro, omitir.
   const municipalRegistration = imXml(draft.municipalRegistration);
   const assessment = draft.simplesAssessment
@@ -226,8 +234,9 @@ export function buildSignedDps(draft: NfseDpsDraft) {
     '<trib>',
     '<tribMun>',
     `<tribISSQN>${draft.issqnTaxation}</tribISSQN>`,
-    aliq,
+    // XSD: tribISSQN … tpRetISSQN … pAliq (pAliq antes de tpRetISSQN → E1235).
     '<tpRetISSQN>1</tpRetISSQN>',
+    aliq,
     '</tribMun>',
     totalTax,
     '</trib>',
