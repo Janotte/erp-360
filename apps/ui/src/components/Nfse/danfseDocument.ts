@@ -1,9 +1,61 @@
 import QRCode from 'qrcode';
 
 import type { DanfseParty, DanfseView } from '@/services/nfse';
+import liberationMonoRegularUrl from '@/assets/fonts/LiberationMono-Regular.ttf?url';
+import liberationSansBoldUrl from '@/assets/fonts/LiberationSans-Bold.ttf?url';
+import liberationSansRegularUrl from '@/assets/fonts/LiberationSans-Regular.ttf?url';
 import logoUrl from '@/assets/nfse-logo.png';
 
 import template from '../../../../../doc/templates/danfse2.html?raw';
+
+async function fontDataUri(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Falha ao carregar fonte da DANFSe (${response.status}).`);
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const chunkSize = 0x8000;
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return `data:font/ttf;base64,${btoa(binary)}`;
+}
+
+let fontFacesPromise: Promise<string> | null = null;
+
+function fontFacesCss() {
+  fontFacesPromise ??= (async () => {
+    const [sansRegular, sansBold, monoRegular] = await Promise.all([
+      fontDataUri(liberationSansRegularUrl),
+      fontDataUri(liberationSansBoldUrl),
+      fontDataUri(liberationMonoRegularUrl),
+    ]);
+    return `
+@font-face {
+  font-family: 'Liberation Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('${sansRegular}') format('truetype');
+}
+@font-face {
+  font-family: 'Liberation Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('${sansBold}') format('truetype');
+}
+@font-face {
+  font-family: 'Liberation Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('${monoRegular}') format('truetype');
+}`.trim();
+  })();
+  return fontFacesPromise;
+}
 
 function escapeHtml(value: string) {
   return value
@@ -145,11 +197,14 @@ function ibsCbsRows(view: DanfseView) {
 }
 
 export async function danfseDocument(view: DanfseView): Promise<string> {
-  const qrDataUrl = await QRCode.toDataURL(view.qrCodeUrl, {
-    margin: 0,
-    width: 120,
-    errorCorrectionLevel: 'M',
-  });
+  const [qrDataUrl, fontFaces] = await Promise.all([
+    QRCode.toDataURL(view.qrCodeUrl, {
+      margin: 0,
+      width: 120,
+      errorCorrectionLevel: 'M',
+    }),
+    fontFacesCss(),
+  ]);
   const logoImg = `<img src="${logoUrl}" alt="NFS-e" />`;
   const qrImg = `<img src="${qrDataUrl}" alt="QR Code" width="74" height="74" />`;
   const homologationBanner =
@@ -212,8 +267,13 @@ export async function danfseDocument(view: DanfseView): Promise<string> {
     issqnBlock: issqnRows(view),
   };
 
+  const withFonts = template.replaceAll(
+    '<!--[fontFaces]-->',
+    `<style>\n${fontFaces}\n    </style>`,
+  );
+
   return Object.entries(values).reduce(
     (html, [key, value]) => html.replaceAll(`[${key}]`, value),
-    template,
+    withFonts,
   );
 }

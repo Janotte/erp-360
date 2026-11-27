@@ -528,8 +528,15 @@ export function ListNfse() {
                       toast.error('Não foi possível imprimir a DANFSe.');
                       return;
                     }
-                    frame.focus();
-                    frame.print();
+                    void (async () => {
+                      try {
+                        await frame.document.fonts.ready;
+                        frame.focus();
+                        frame.print();
+                      } catch {
+                        toast.error('Não foi possível imprimir a DANFSe.');
+                      }
+                    })();
                   }}
                 >
                   Imprimir

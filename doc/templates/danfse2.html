@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <title>DANFSe [nfseNumber]</title>
+    <!--[fontFaces]-->
     <style>
       @page {
         size: A4 portrait;
@@ -13,13 +14,22 @@
         box-sizing: border-box;
         margin: 0;
         padding: 0;
-        font-family: Arial, Helvetica, sans-serif;
+        font-family: 'Liberation Sans', Arial, Helvetica, sans-serif;
+        /* Evita kerning irregular no "Salvar como PDF" do Chrome */
+        text-rendering: geometricPrecision;
+        font-kerning: none;
+        font-variant-ligatures: none;
+        font-synthesis: none;
+        letter-spacing: normal;
+        word-spacing: normal;
       }
 
       body {
-        font-size: 9px;
+        font-size: 8pt;
         color: #000;
         background: #fff;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
 
       .container {
@@ -36,39 +46,41 @@
       }
 
       .col {
-        padding: 4px 6px;
+        padding: 3pt 4.5pt;
         display: flex;
         flex-direction: column;
         justify-content: center;
       }
 
       .section-title {
-        font-weight: bold;
-        font-size: 8.5px;
-        padding: 3px 6px;
+        font-weight: 700;
+        font-size: 6.5pt;
+        padding: 2pt 4.5pt;
         text-transform: uppercase;
         border-top: 1px solid #000;
       }
 
       .label {
-        font-weight: bold;
-        font-size: 7px;
+        font-weight: 700;
+        font-size: 5.5pt;
         color: #333;
-        margin-bottom: 2px;
+        margin-bottom: 1.5pt;
       }
 
       .value {
-        font-size: 9px;
-        font-weight: bold;
+        font-size: 7.5pt;
+        font-weight: 700;
         word-break: break-word;
         min-height: 1em;
+        line-height: 1.2;
       }
 
       .value-normal {
-        font-size: 8.5px;
-        font-weight: normal;
+        font-size: 7pt;
+        font-weight: 400;
         word-break: break-word;
         min-height: 1em;
+        line-height: 1.2;
       }
 
       .center {
@@ -76,32 +88,32 @@
       }
 
       .header-title {
-        font-size: 13px;
-        font-weight: bold;
+        font-size: 10pt;
+        font-weight: 700;
       }
 
       .header-sub {
-        font-size: 8px;
-        margin-top: 2px;
+        font-size: 6pt;
+        margin-top: 1.5pt;
       }
 
       .homolog {
         color: #c00;
-        font-size: 10px;
-        font-weight: bold;
-        margin-top: 4px;
+        font-size: 8pt;
+        font-weight: 700;
+        margin-top: 3pt;
       }
 
       .chave-acesso {
-        font-family: 'Courier New', Courier, monospace;
-        font-size: 9.5px;
-        letter-spacing: 0.5px;
+        font-family: 'Liberation Mono', 'Courier New', Courier, monospace;
+        font-size: 7.5pt;
+        letter-spacing: 0;
       }
 
       .desc-line,
       .desc-box {
-        padding: 6px;
-        font-size: 8.5px;
+        padding: 4.5pt;
+        font-size: 7pt;
         line-height: 1.35;
         white-space: pre-wrap;
       }
@@ -125,8 +137,8 @@
         align-items: center;
         justify-content: center;
         margin: 0 auto;
-        padding: 4px;
-        font-size: 7px;
+        padding: 3pt;
+        font-size: 5.5pt;
         text-align: center;
       }
 
@@ -137,13 +149,22 @@
       }
 
       .net {
-        font-size: 10px;
-        font-weight: bold;
+        font-size: 8pt;
+        font-weight: 700;
       }
 
       @media print {
+        html,
         body {
           margin: 0;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
+        * {
+          text-rendering: geometricPrecision !important;
+          font-kerning: none !important;
+          font-variant-ligatures: none !important;
         }
 
         .container {
@@ -159,7 +180,7 @@
         <div class="col center logo" style="width: 30%">[logo]</div>
         <div class="col center" style="width: 40%">
           <div class="header-title">DANFSe v2.0</div>
-          <div class="value">Documento Auxiliar da NFS-e</div>
+          <div class="value-normal">Documento Auxiliar da NFS-e</div>
           <div class="header-sub">
             Sistema Nacional de Nota Fiscal de Serviço Eletrônica
           </div>
@@ -168,11 +189,11 @@
         </div>
         <div class="col" style="width: 30%">
           <div class="label">Número da NFS-e</div>
-          <div class="value">[nfseNumber]</div>
+          <div class="value-normal">[nfseNumber]</div>
           <div class="label" style="margin-top: 4px">Ambiente gerador</div>
-          <div class="value">[environmentGenerator]</div>
+          <div class="value-normal">[environmentGenerator]</div>
           <div class="label" style="margin-top: 4px">Tipo de ambiente</div>
-          <div class="value">[environmentType]</div>
+          <div class="value-normal">[environmentType]</div>
         </div>
       </div>
 
@@ -192,43 +213,43 @@
           <div class="row" style="border-top: 1px solid #ccc">
             <div class="col" style="width: 33%">
               <div class="label">Número da NFS-e</div>
-              <div class="value">[nfseNumber]</div>
+              <div class="value-normal">[nfseNumber]</div>
             </div>
             <div class="col" style="width: 33%">
               <div class="label">Competência da NFS-e</div>
-              <div class="value">[competence]</div>
+              <div class="value-normal">[competence]</div>
             </div>
             <div class="col" style="width: 33%">
               <div class="label">Data e hora da emissão da NFS-e</div>
-              <div class="value">[nfseIssuedAt]</div>
+              <div class="value-normal">[nfseIssuedAt]</div>
             </div>
           </div>
           <div class="row">
             <div class="col" style="width: 33%">
               <div class="label">Número do DPS</div>
-              <div class="value">[dpsNumber]</div>
+              <div class="value-normal">[dpsNumber]</div>
             </div>
             <div class="col" style="width: 33%">
               <div class="label">Série do DPS</div>
-              <div class="value">[dpsSeries]</div>
+              <div class="value-normal">[dpsSeries]</div>
             </div>
             <div class="col" style="width: 33%">
               <div class="label">Data e hora da emissão do DPS</div>
-              <div class="value">[dpsIssuedAt]</div>
+              <div class="value-normal">[dpsIssuedAt]</div>
             </div>
           </div>
           <div class="row">
             <div class="col" style="width: 33%">
               <div class="label">Emitente da NFS-e</div>
-              <div class="value">Prestador do serviço</div>
+              <div class="value-normal">Prestador do serviço</div>
             </div>
             <div class="col" style="width: 33%">
               <div class="label">Situação da NFS-e</div>
-              <div class="value">[situation]</div>
+              <div class="value-normal">[situation]</div>
             </div>
             <div class="col" style="width: 33%">
               <div class="label">Finalidade</div>
-              <div class="value">[purpose]</div>
+              <div class="value-normal">[purpose]</div>
             </div>
           </div>
         </div>
@@ -353,7 +374,7 @@
         </div>
         <div class="col" style="width: 20%">
           <div class="label">Valor líquido da NFS-e + IBS/CBS</div>
-          <div class="value-normal net">[netAmount]</div>
+          <div class="value net">[netAmount]</div>
         </div>
       </div>
 
