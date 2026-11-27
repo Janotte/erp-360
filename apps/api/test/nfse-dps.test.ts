@@ -38,7 +38,23 @@ describe('DPS da NFS-e nacional', () => {
       simplesTaxPercent: null,
       specialTaxRegime: '0',
       issqnTaxation: '1',
-      tomador: { kind: 'cpf', taxId: '52998224725', name: 'CLIENTE' },
+      prestadorPhone: '1133334444',
+      prestadorEmail: 'prestador@empresa.local',
+      tomador: {
+        kind: 'cpf',
+        taxId: '52998224725',
+        name: 'CLIENTE',
+        address: {
+          cityCode: '3550308',
+          postalCode: '01001000',
+          street: 'Rua B',
+          number: '200',
+          complement: 'Sala 1',
+          neighborhood: 'Sé',
+        },
+        phone: '11999998888',
+        email: 'cliente@teste.local',
+      },
       nationalServiceCode: '010701',
       municipalServiceCode: '001',
       description: 'SUPORTE MENSAL',
@@ -64,6 +80,14 @@ describe('DPS da NFS-e nacional', () => {
     assert.match(signed.xml, /<pAliq>2.00<\/pAliq><tpRetISSQN>1<\/tpRetISSQN>/);
     assert.match(signed.xml, /<totTrib><indTotTrib>0<\/indTotTrib><\/totTrib>/);
     assert.doesNotMatch(signed.xml, /<IM>/);
+    const prest = signed.xml.match(/<prest>[\s\S]*?<\/prest>/)?.[0] ?? '';
+    const toma = signed.xml.match(/<toma>[\s\S]*?<\/toma>/)?.[0] ?? '';
+    assert.doesNotMatch(prest, /<xNome>/);
+    assert.doesNotMatch(prest, /<end>/);
+    assert.match(prest, /<fone>1133334444<\/fone>/);
+    assert.match(prest, /<email>prestador@empresa\.local<\/email>/);
+    assert.match(toma, /<xLgr>Rua B<\/xLgr><nro>200<\/nro><xCpl>Sala 1<\/xCpl><xBairro>Sé<\/xBairro>/);
+    assert.match(toma, /<fone>11999998888<\/fone><email>cliente@teste\.local<\/email>/);
     assert.match(signed.xml, /rsa-sha256/);
     assert.match(signed.xml, /xmlenc#sha256/);
     assert.doesNotMatch(signed.xml, /sefin\.nfse\.gov\.br/);

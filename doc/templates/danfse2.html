@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>DANFSe [nfseNumber]</title>
+    <style>
+      @page {
+        size: A4 portrait;
+        margin: 10mm;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      body {
+        font-size: 9px;
+        color: #000;
+        background: #fff;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 19cm;
+        margin: 0 auto;
+        border: 1px solid #000;
+        overflow: hidden;
+      }
+
+      .row {
+        display: flex;
+        width: 100%;
+      }
+
+      .col {
+        padding: 4px 6px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .section-title {
+        font-weight: bold;
+        font-size: 8.5px;
+        padding: 3px 6px;
+        text-transform: uppercase;
+        border-top: 1px solid #000;
+      }
+
+      .label {
+        font-weight: bold;
+        font-size: 7px;
+        color: #333;
+        margin-bottom: 2px;
+      }
+
+      .value {
+        font-size: 9px;
+        font-weight: bold;
+        word-break: break-word;
+        min-height: 1em;
+      }
+
+      .value-normal {
+        font-size: 8.5px;
+        font-weight: normal;
+        word-break: break-word;
+        min-height: 1em;
+      }
+
+      .center {
+        text-align: center;
+      }
+
+      .header-title {
+        font-size: 13px;
+        font-weight: bold;
+      }
+
+      .header-sub {
+        font-size: 8px;
+        margin-top: 2px;
+      }
+
+      .homolog {
+        color: #c00;
+        font-size: 10px;
+        font-weight: bold;
+        margin-top: 4px;
+      }
+
+      .chave-acesso {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 9.5px;
+        letter-spacing: 0.5px;
+      }
+
+      .desc-line,
+      .desc-box {
+        padding: 6px;
+        font-size: 8.5px;
+        line-height: 1.35;
+        white-space: pre-wrap;
+      }
+
+      .qr-box {
+        width: 78px;
+        height: 78px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+      }
+
+      .qr-box img {
+        width: 74px;
+        height: 74px;
+      }
+
+      .qr-text {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        padding: 4px;
+        font-size: 7px;
+        text-align: center;
+      }
+
+      .logo img {
+        max-height: 45px;
+        max-width: 100%;
+        object-fit: contain;
+      }
+
+      .net {
+        font-size: 10px;
+        font-weight: bold;
+      }
+
+      @media print {
+        body {
+          margin: 0;
+        }
+
+        .container {
+          border: 1px solid #000;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="row">
+        <div class="col center logo" style="width: 30%">[logo]</div>
+        <div class="col center" style="width: 40%">
+          <div class="header-title">DANFSe v2.0</div>
+          <div class="value">Documento Auxiliar da NFS-e</div>
+          <div class="header-sub">
+            Sistema Nacional de Nota Fiscal de Serviço Eletrônica
+          </div>
+          [homologationBanner]
+          <div class="header-sub">[issuerCityName]</div>
+        </div>
+        <div class="col" style="width: 30%">
+          <div class="label">Número da NFS-e</div>
+          <div class="value">[nfseNumber]</div>
+          <div class="label" style="margin-top: 4px">Ambiente gerador</div>
+          <div class="value">[environmentGenerator]</div>
+          <div class="label" style="margin-top: 4px">Tipo de ambiente</div>
+          <div class="value">[environmentType]</div>
+        </div>
+      </div>
+
+      <div class="section-title">Identificação da NFS-e</div>
+      <div class="row">
+        <div class="col" style="width: 80%">
+          <div class="row">
+            <div class="col">
+              <div class="label">Chave de acesso da NFS-e</div>
+              <div class="value chave-acesso">[accessKey]</div>
+              <div class="value-normal" style="margin-top: 4px">
+                Autenticidade verificável no portal nacional:
+                <strong>https://www.nfse.gov.br</strong>
+              </div>
+            </div>
+          </div>
+          <div class="row" style="border-top: 1px solid #ccc">
+            <div class="col" style="width: 33%">
+              <div class="label">Número da NFS-e</div>
+              <div class="value">[nfseNumber]</div>
+            </div>
+            <div class="col" style="width: 33%">
+              <div class="label">Competência da NFS-e</div>
+              <div class="value">[competence]</div>
+            </div>
+            <div class="col" style="width: 33%">
+              <div class="label">Data e hora da emissão da NFS-e</div>
+              <div class="value">[nfseIssuedAt]</div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col" style="width: 33%">
+              <div class="label">Número do DPS</div>
+              <div class="value">[dpsNumber]</div>
+            </div>
+            <div class="col" style="width: 33%">
+              <div class="label">Série do DPS</div>
+              <div class="value">[dpsSeries]</div>
+            </div>
+            <div class="col" style="width: 33%">
+              <div class="label">Data e hora da emissão do DPS</div>
+              <div class="value">[dpsIssuedAt]</div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col" style="width: 33%">
+              <div class="label">Emitente da NFS-e</div>
+              <div class="value">Prestador do serviço</div>
+            </div>
+            <div class="col" style="width: 33%">
+              <div class="label">Situação da NFS-e</div>
+              <div class="value">[situation]</div>
+            </div>
+            <div class="col" style="width: 33%">
+              <div class="label">Finalidade</div>
+              <div class="value">[purpose]</div>
+            </div>
+          </div>
+        </div>
+        <div class="col center" style="width: 20%">
+          <div class="qr-box">[qrImage]</div>
+          <div class="qr-text">
+            A autenticidade desta NFS-e pode ser verificada pela leitura deste código QR
+            ou pela consulta da chave de acesso no portal nacional da NFS-e
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">Prestador / Fornecedor</div>
+      <div class="row">
+        <div class="col" style="width: 57%">
+          <div class="label">Nome / Razão social</div>
+          <div class="value">[providerName]</div>
+        </div>
+        <div class="col" style="width: 25%">
+          <div class="label">CPF / CNPJ</div>
+          <div class="value">[providerTaxId]</div>
+        </div>
+        <div class="col" style="width: 18%">
+          <div class="label">Inscrição municipal</div>
+          <div class="value">[providerMunicipalRegistration]</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col" style="width: 57%">
+          <div class="label">Endereço</div>
+          <div class="value-normal">[providerAddressLine]</div>
+        </div>
+        <div class="col" style="width: 25%">
+          <div class="label">Município / UF</div>
+          <div class="value-normal">[providerCityState]</div>
+        </div>
+        <div class="col" style="width: 18%">
+          <div class="label">CEP</div>
+          <div class="value-normal">[providerPostalCode]</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col" style="width: 50%">
+          <div class="label">Telefone</div>
+          <div class="value-normal">[providerPhone]</div>
+        </div>
+        <div class="col" style="width: 50%">
+          <div class="label">E-mail</div>
+          <div class="value-normal">[providerEmail]</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col" style="width: 50%">
+          <div class="label">Simples Nacional na Data de Competência</div>
+          <div class="value-normal">[providerSimplesNacional]</div>
+        </div>
+        <div class="col" style="width: 50%">
+          <div class="label">Regime de Apuração Tributária pelo SN</div>
+          <div class="value-normal">[providerSimplesAssessment]</div>
+        </div>
+      </div>
+
+      <div class="section-title">Tomador / Adquirente</div>
+      <div class="col">[takerBlock]</div>
+
+      <div class="section-title">Destinatário da operação</div>
+      <div class="col">[recipientBlock]</div>
+
+      <div class="section-title">Intermediário da operação</div>
+      <div class="col">[intermediaryBlock]</div>
+
+      <div class="section-title">Serviço prestado</div>
+      <div class="row">
+        <div class="col" style="width: 25%">
+          <div class="label">Código de tributação nacional</div>
+          <div class="value-normal">[serviceNationalCode]</div>
+        </div>
+        <div class="col" style="width: 25%">
+          <div class="label">Código de tributação municipal</div>
+          <div class="value-normal">[serviceMunicipalCode]</div>
+        </div>
+        <div class="col" style="width: 25%">
+          <div class="label">Código NBS</div>
+          <div class="value-normal">[serviceNbsCode]</div>
+        </div>
+        <div class="col" style="width: 25%">
+          <div class="label">Local da prestação / UF / País</div>
+          <div class="value-normal">[serviceLocation]</div>
+        </div>
+      </div>
+      <div class="desc-box">
+        <div class="label">Descrição detalhada do serviço</div>
+        [serviceDescription]
+      </div>
+
+      <div class="section-title">Tributação municipal (ISSQN)</div>
+      <div style="padding: 0">[issqnBlock]</div>
+
+      <div class="section-title">Tributação federal (exceto CBS)</div>
+      <div style="padding: 0">[federalBlock]</div>
+
+      <div class="section-title">Tributação IBS/CBS</div>
+      <div style="padding: 0">[ibsCbsBlock]</div>
+
+      <div class="section-title">Valor total da NFS-e</div>
+      <div class="row">
+        <div class="col" style="width: 20%">
+          <div class="label">Valor do serviço</div>
+          <div class="value-normal">[serviceAmount]</div>
+        </div>
+        <div class="col" style="width: 20%">
+          <div class="label">Valor do desconto</div>
+          <div class="value-normal">[discountAmount]</div>
+        </div>
+        <div class="col" style="width: 20%">
+          <div class="label">Total das retenções</div>
+          <div class="value-normal">[federalRetentionTotal]</div>
+        </div>
+        <div class="col" style="width: 20%">
+          <div class="label">Total do IBS/CBS</div>
+          <div class="value-normal">[ibsCbsTotal]</div>
+        </div>
+        <div class="col" style="width: 20%">
+          <div class="label">Valor líquido da NFS-e + IBS/CBS</div>
+          <div class="value-normal net">[netAmount]</div>
+        </div>
+      </div>
+
+      <div class="section-title">Informações complementares</div>
+      <div class="row">
+        <div class="col">
+          <div class="value-normal">[complementaryInfo]</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

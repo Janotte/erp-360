@@ -38,6 +38,25 @@ export function nfseDpsId(input: {
   return `DPS${input.cityCode}2${input.cnpj}${input.series}${number}`;
 }
 
+export type NfseAddressDraft = {
+  cityCode: string;
+  postalCode: string;
+  street: string;
+  number: string;
+  complement?: string | null;
+  neighborhood: string;
+};
+
+export type NfseTomadorDraft = {
+  kind: 'cpf' | 'cnpj';
+  taxId: string;
+  name: string;
+  municipalRegistration?: string | null;
+  address?: NfseAddressDraft | null;
+  phone?: string | null;
+  email?: string | null;
+};
+
 export interface NfseDpsDraft {
   environment: NfseEnvironment;
   emittedAt: string;
@@ -46,13 +65,16 @@ export interface NfseDpsDraft {
   cityCode: string;
   cnpj: string;
   municipalRegistration: string | null;
+  /** Telefone e e-mail do prestador. Nome e endereço não vão na DPS (E0121/E0128). */
+  prestadorPhone?: string | null;
+  prestadorEmail?: string | null;
   simplesNacional: '1' | '2' | '3' | '4';
   simplesAssessment: '1' | '2' | '3' | null;
   /** pTotTribSN — obrigatório para ME/EPP (3) e optante pendente (4). */
   simplesTaxPercent: string | null;
   specialTaxRegime: '0' | '1' | '2' | '3' | '4' | '5' | '6' | '9';
   issqnTaxation: '1' | '2' | '3' | '4';
-  tomador: { kind: 'cpf' | 'cnpj'; taxId: string; name: string };
+  tomador: NfseTomadorDraft;
   nationalServiceCode: string;
   municipalServiceCode: string | null;
   description: string;
@@ -88,16 +110,61 @@ function rate(value: string) {
   return `${Number(whole)}.${fraction.padEnd(2, '0').slice(0, 2)}`;
 }
 
+function digits(value: string | null | undefined) {
+  return (value ?? '').replace(/\D/g, '');
+}
+
+/** Endereço nacional completo. Parcial vira rejeição E1235. */
+export function nfseAddressXml(address: NfseAddressDraft | null | undefined) {
+  if (!address) return '';
+  const cityCode = digits(address.cityCode);
+  const postalCode = digits(address.postalCode);
+  const street = address.street.trim();
+  const neighborhood = address.neighborhood.trim();
+  const number = (address.number.trim() || 'S/N').slice(0, 60);
+  const complement = address.complement?.trim() || '';
+  if (!/^[0-9]{7}$/.test(cityCode) || !/^[0-9]{8}$/.test(postalCode)) return '';
+  if (!street || !neighborhood) return '';
+  return [
+    '<end>',
+    '<endNac>',
+    `<cMun>${cityCode}</cMun>`,
+    `<CEP>${postalCode}</CEP>`,
+    '</endNac>',
+    `<xLgr>${escapeXml(street.slice(0, 255))}</xLgr>`,
+    `<nro>${escapeXml(number)}</nro>`,
+    complement ? `<xCpl>${escapeXml(complement.slice(0, 156))}</xCpl>` : '',
+    `<xBairro>${escapeXml(neighborhood.slice(0, 60))}</xBairro>`,
+    '</end>',
+  ]
+    .filter(Boolean)
+    .join('');
+}
+
+function phoneXml(value: string | null | undefined) {
+  const phone = digits(value);
+  if (phone.length < 6 || phone.length > 20) return '';
+  return `<fone>${phone}</fone>`;
+}
+
+function emailXml(value: string | null | undefined) {
+  const email = (value ?? '').trim();
+  if (!email || !email.includes('@') || email.length > 80) return '';
+  return `<email>${escapeXml(email)}</email>`;
+}
+
+function imXml(value: string | null | undefined) {
+  const registration = (value ?? '').trim();
+  return registration ? `<IM>${escapeXml(registration.slice(0, 15))}</IM>` : '';
+}
+
 export function buildSignedDps(draft: NfseDpsDraft) {
   const dpsId = nfseDpsId(draft);
   const competence = draft.emittedAt.slice(0, 10);
   const includeRate =
     draft.issRate != null && draft.simplesNacional !== '2' && draft.issqnTaxation === '1';
-  const registration = draft.municipalRegistration?.trim() || '';
   // E0120: IM só quando o município tem complemento no CNC; sem cadastro, omitir.
-  const municipalRegistration = registration
-    ? `<IM>${escapeXml(registration)}</IM>`
-    : '';
+  const municipalRegistration = imXml(draft.municipalRegistration);
   const assessment = draft.simplesAssessment
     ? `<regApTribSN>${draft.simplesAssessment}</regApTribSN>`
     : '';
@@ -111,6 +178,7 @@ export function buildSignedDps(draft: NfseDpsDraft) {
       ? `<totTrib><pTotTribSN>${rate(draft.simplesTaxPercent ?? '0')}</pTotTribSN></totTrib>`
       : '<totTrib><indTotTrib>0</indTotTrib></totTrib>';
   const documentTag = draft.tomador.kind === 'cpf' ? 'CPF' : 'CNPJ';
+  const tomadorAddress = nfseAddressXml(draft.tomador.address);
   const infDps = [
     `<infDPS xmlns="${nfseNs}" Id="${dpsId}">`,
     `<tpAmb>${draft.environment === 'production' ? '1' : '2'}</tpAmb>`,
@@ -124,6 +192,9 @@ export function buildSignedDps(draft: NfseDpsDraft) {
     '<prest>',
     `<CNPJ>${draft.cnpj}</CNPJ>`,
     municipalRegistration,
+    // E0121/E0128: com tpEmit 1 não enviar xNome nem end do prestador.
+    phoneXml(draft.prestadorPhone),
+    emailXml(draft.prestadorEmail),
     '<regTrib>',
     `<opSimpNac>${draft.simplesNacional}</opSimpNac>`,
     assessment,
@@ -132,7 +203,11 @@ export function buildSignedDps(draft: NfseDpsDraft) {
     '</prest>',
     '<toma>',
     `<${documentTag}>${draft.tomador.taxId}</${documentTag}>`,
-    `<xNome>${escapeXml(draft.tomador.name)}</xNome>`,
+    imXml(draft.tomador.municipalRegistration),
+    `<xNome>${escapeXml(draft.tomador.name.slice(0, 150))}</xNome>`,
+    tomadorAddress,
+    phoneXml(draft.tomador.phone),
+    emailXml(draft.tomador.email),
     '</toma>',
     '<serv>',
     '<locPrest>',

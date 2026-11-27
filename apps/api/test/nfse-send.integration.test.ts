@@ -14,7 +14,7 @@ import {
   receivables,
 } from '@erp-360/mod-financial';
 import { nfseDpsCounters, nfseRequests, nfseSettings } from '@erp-360/mod-nfse';
-import { cities, countries, persons, states } from '@erp-360/mod-persons';
+import { cities, countries, personAddresses, persons, states } from '@erp-360/mod-persons';
 import { serviceOrderBillings, serviceOrders } from '@erp-360/mod-service-orders';
 import { eq } from 'drizzle-orm';
 
@@ -51,7 +51,7 @@ describe('envio da NFS-e', { concurrency: false }, () => {
     token = app.jwt.sign({ userId: company.userId, tenantId });
     await db
       .update(persons)
-      .set({ taxId: '52998224725' })
+      .set({ taxId: '52998224725', nfeEmail: 'cliente@teste.local' })
       .where(eq(persons.id, personId));
 
     const mark = randomUUID().replaceAll('-', '').slice(0, 6);
@@ -76,7 +76,28 @@ describe('envio da NFS-e', { concurrency: false }, () => {
     countryId = country.id;
     stateId = state.id;
     cityId = city.id;
-    await db.update(tenants).set({ cityId }).where(eq(tenants.id, tenantId));
+    await db
+      .update(tenants)
+      .set({
+        cityId,
+        email: 'prestador@empresa.local',
+        phone: '1133334444',
+        postalCode: '01001000',
+        street: 'Rua A',
+        number: '100',
+        neighborhood: 'Centro',
+      })
+      .where(eq(tenants.id, tenantId));
+    await db.insert(personAddresses).values({
+      tenantId,
+      personId,
+      type: 'Principal',
+      postalCode: '01001000',
+      street: 'Rua B',
+      number: '200',
+      neighborhood: 'Sé',
+      cityId,
+    });
 
     const [measure] = await db
       .insert(measures)
@@ -251,6 +272,7 @@ describe('envio da NFS-e', { concurrency: false }, () => {
         series: '49001',
         simplesNacional: 'non_optant',
         simplesAssessment: null,
+        simplesTaxPercent: null,
         ibsCbsAssessment: null,
         specialTaxRegime: 'none',
         issqnTaxation: 'taxable',

@@ -4,10 +4,10 @@ import { URL } from 'node:url';
 import { billingDocuments } from '@erp-360/mod-billing';
 import { tenants } from '@erp-360/mod-core';
 import { nfseDpsCounters, nfseRequestLines, nfseRequests, nfseSettings } from '@erp-360/mod-nfse';
-import { cities, persons } from '@erp-360/mod-persons';
+import { cities, personAddresses, personContacts, persons } from '@erp-360/mod-persons';
 import { serviceOrders } from '@erp-360/mod-service-orders';
 import type { NfseEnvironment } from '@erp-360/shared';
-import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 
 import { db } from '../../db/index.ts';
 import { trustedCertificates } from '../certificates/trust.ts';
@@ -15,7 +15,9 @@ import { certificateMaterial } from '../inbound/dfe-sync.ts';
 import { InboundError } from '../inbound/errors.ts';
 import {
   buildSignedDps,
+  type NfseAddressDraft,
   type NfseDpsDraft,
+  nfseAddressXml,
   nfseDpsId,
   nfseEmissionTimestamp,
   nfseSubmissionEndpoint,
@@ -36,6 +38,8 @@ const messages = {
   cnpj: 'O CNPJ da empresa está incompleto.',
   certificateCnpj: 'O certificado A1 não é o CNPJ desta empresa.',
   tomador: 'Informe o CPF ou CNPJ do cliente antes de enviar a NFS-e.',
+  tomadorAddress:
+    'Informe o endereço completo do cliente (CEP, logradouro, número, bairro e município) antes de enviar a NFS-e.',
   foreigner: 'O cliente estrangeiro ainda não entra nesta NFS-e.',
   national: 'Informe o código de tributação nacional do serviço antes de enviar.',
   nationalMixed: 'Os serviços desta nota precisam do mesmo código de tributação nacional.',
@@ -322,6 +326,9 @@ export async function sendServiceOrderNfse(tenantId: string, orderId: string) {
     .select({
       cnpj: tenants.cnpj,
       municipalRegistration: tenants.municipalRegistration,
+      email: tenants.email,
+      phone: tenants.phone,
+      mobilePhone: tenants.mobilePhone,
       cityCode: cities.code,
     })
     .from(tenants)
@@ -332,7 +339,12 @@ export async function sendServiceOrderNfse(tenantId: string, orderId: string) {
   if (!company.cityCode || !/^[0-9]{7}$/.test(company.cityCode)) httpError(messages.city, 400);
 
   const [person] = await db
-    .select({ type: persons.type, name: persons.name, taxId: persons.taxId })
+    .select({
+      type: persons.type,
+      name: persons.name,
+      taxId: persons.taxId,
+      nfeEmail: persons.nfeEmail,
+    })
     .from(persons)
     .where(and(eq(persons.id, order.personId), eq(persons.tenantId, tenantId)))
     .limit(1);
@@ -341,6 +353,62 @@ export async function sendServiceOrderNfse(tenantId: string, orderId: string) {
   const taxId = (person.taxId ?? '').replace(/\D/g, '');
   const tomadorKind = taxId.length === 11 ? 'cpf' : taxId.length === 14 ? 'cnpj' : null;
   if (!tomadorKind) httpError(messages.tomador, 400);
+
+  const addressRows = await db
+    .select({
+      type: personAddresses.type,
+      postalCode: personAddresses.postalCode,
+      street: personAddresses.street,
+      number: personAddresses.number,
+      complement: personAddresses.complement,
+      neighborhood: personAddresses.neighborhood,
+      cityCode: cities.code,
+    })
+    .from(personAddresses)
+    .innerJoin(cities, eq(personAddresses.cityId, cities.id))
+    .where(
+      and(eq(personAddresses.personId, order.personId), eq(personAddresses.tenantId, tenantId)),
+    )
+    .orderBy(asc(personAddresses.type), asc(personAddresses.id));
+  const preferredAddress =
+    addressRows.find((row) => row.type === 'Principal') ??
+    addressRows.find((row) => row.type === 'Faturamento') ??
+    addressRows[0] ??
+    null;
+  const tomadorAddress: NfseAddressDraft | null = preferredAddress
+    ? {
+        cityCode: preferredAddress.cityCode ?? '',
+        postalCode: preferredAddress.postalCode ?? '',
+        street: preferredAddress.street ?? '',
+        number: preferredAddress.number ?? '',
+        complement: preferredAddress.complement,
+        neighborhood: preferredAddress.neighborhood ?? '',
+      }
+    : null;
+  if (!tomadorAddress || !nfseAddressXml(tomadorAddress)) {
+    httpError(messages.tomadorAddress, 400);
+  }
+
+  const [contact] = await db
+    .select({
+      email: personContacts.email,
+      phone: personContacts.phone,
+      mobilePhone: personContacts.mobilePhone,
+      whatsapp: personContacts.whatsapp,
+    })
+    .from(personContacts)
+    .where(
+      and(eq(personContacts.personId, order.personId), eq(personContacts.tenantId, tenantId)),
+    )
+    .orderBy(
+      sql`case when ${personContacts.type} = 'Principal' then 0 else 1 end`,
+      asc(personContacts.id),
+    )
+    .limit(1);
+  const tomadorPhone =
+    contact?.phone || contact?.mobilePhone || contact?.whatsapp || null;
+  const tomadorEmail = person.nfeEmail || contact?.email || null;
+  const prestadorPhone = company.phone || company.mobilePhone || null;
 
   let material: NfseCertificate;
   try {
@@ -417,6 +485,8 @@ export async function sendServiceOrderNfse(tenantId: string, orderId: string) {
     cityCode: company.cityCode,
     cnpj: company.cnpj,
     municipalRegistration: company.municipalRegistration,
+    prestadorPhone,
+    prestadorEmail: company.email,
     simplesNacional: simplesCode[settings.simplesNacional],
     simplesAssessment: settings.simplesAssessment
       ? assessmentCode[settings.simplesAssessment]
@@ -424,7 +494,14 @@ export async function sendServiceOrderNfse(tenantId: string, orderId: string) {
     simplesTaxPercent: settings.simplesTaxPercent,
     specialTaxRegime: regimeCode[settings.specialTaxRegime],
     issqnTaxation: issqnCode[settings.issqnTaxation],
-    tomador: { kind: tomadorKind, taxId, name: person.name.slice(0, 150) },
+    tomador: {
+      kind: tomadorKind,
+      taxId,
+      name: person.name.slice(0, 150),
+      address: tomadorAddress,
+      phone: tomadorPhone,
+      email: tomadorEmail,
+    },
     nationalServiceCode: national,
     municipalServiceCode: municipal,
     description,

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { readDanfse } from '../src/modules/nfse/danfse.ts';
+import { formatServiceLocation, readDanfse } from '../src/modules/nfse/danfse.ts';
 
 const accessKey = '35503082112223330001810000000120261126123456789012';
 
@@ -36,6 +36,7 @@ const sampleXml = `<?xml version="1.0" encoding="UTF-8"?>
           </end>
           <regTrib>
             <opSimpNac>3</opSimpNac>
+            <regApTribSN>1</regApTribSN>
             <regEspTrib>0</regEspTrib>
           </regTrib>
         </prest>
@@ -78,20 +79,33 @@ describe('DANFSe a partir do XML autorizado', () => {
     assert.equal(view.nfseNumber, '1');
     assert.equal(view.dpsNumber, '1');
     assert.equal(view.dpsSeries, '49001');
-    assert.equal(view.competence, '2026-11-26');
+    assert.equal(view.competence, '26/11/2026');
+    assert.equal(view.nfseIssuedAt, '26/11/2026 12:00:00');
+    assert.equal(view.dpsIssuedAt, '26/11/2026 11:58:00');
     assert.equal(view.environment, 'homologation');
     assert.equal(view.issuerCityName, 'São Paulo');
     assert.equal(view.provider.name, 'PRESTADOR LTDA');
-    assert.equal(view.provider.taxId, '11222333000181');
+    assert.equal(view.provider.taxId, '11.222.333/0001-81');
+    assert.equal(view.provider.street, 'Rua A');
+    assert.equal(view.provider.number, '100');
+    assert.equal(view.provider.neighborhood, 'Centro');
+    assert.equal(view.provider.postalCode, '01001-000');
+    assert.equal(view.provider.simplesNacional, 'Optante - MicroEmpresa EPP');
+    assert.equal(view.provider.simplesAssessment, 'Federais e Municipal pelo SN');
     assert.equal(view.taker.name, 'CLIENTE TESTE');
-    assert.equal(view.taker.taxId, '52998224725');
+    assert.equal(view.taker.taxId, '529.982.247-25');
     assert.equal(view.service.nationalCode, '010701');
     assert.equal(view.service.municipalCode, '001');
+    assert.equal(view.service.location, '3550308');
+    assert.equal(formatServiceLocation('Joinville', 'SC'), 'Joinville/SC - BR');
     assert.equal(view.service.description, 'SUPORTE MENSAL');
     assert.equal(view.serviceAmount, '10.00');
     assert.equal(view.netAmount, '10.00');
-    assert.equal(view.issqn.taxation, '1');
+    assert.equal(view.environmentGenerator, 'Sistema Nacional NFS-e');
+    assert.match(view.environmentType, /Produção restrita/);
+    assert.match(view.issqn.taxation, /^1/);
     assert.equal(view.issqn.rate, '2.00');
+    assert.match(view.complementaryInfo, /12\.741/);
     assert.match(view.qrCodeUrl, new RegExp(`chave=${accessKey}$`));
     assert.match(view.qrCodeUrl, /ConsultaPublica/);
   });

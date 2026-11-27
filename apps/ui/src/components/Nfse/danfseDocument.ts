@@ -1,9 +1,9 @@
 import QRCode from 'qrcode';
 
-import type { DanfseView } from '@/services/nfse';
+import type { DanfseParty, DanfseView } from '@/services/nfse';
 import logoUrl from '@/assets/nfse-logo.png';
 
-import template from '../../../../../doc/templates/danfse.html?raw';
+import template from '../../../../../doc/templates/danfse2.html?raw';
 
 function escapeHtml(value: string) {
   return value
@@ -13,14 +13,135 @@ function escapeHtml(value: string) {
     .replaceAll('"', '&quot;');
 }
 
-function partyRows(party: DanfseView['taker']) {
-  return `<div>Nome: ${escapeHtml(party.name)}</div>
-     <div>CPF/CNPJ: ${escapeHtml(party.taxId)}</div>
-     <div>Endereço: ${escapeHtml(party.address)}</div>
-     <div>Município: ${escapeHtml(party.city)}</div>
-     <div>CEP: ${escapeHtml(party.postalCode)}</div>
-     <div>E-mail: ${escapeHtml(party.email)}</div>
-     <div>Telefone: ${escapeHtml(party.phone)}</div>`;
+function display(value: string | null | undefined) {
+  const text = (value ?? '').trim();
+  return text ? escapeHtml(text) : '—';
+}
+
+function cityState(party: DanfseParty) {
+  return [party.city, party.state].filter(Boolean).join(' - ');
+}
+
+function partyRows(party: DanfseParty) {
+  return `<div class="row">
+      <div class="col" style="width: 57%">
+        <div class="label">Nome / Razão social</div>
+        <div class="value">${display(party.name)}</div>
+      </div>
+      <div class="col" style="width: 25%">
+        <div class="label">CPF / CNPJ</div>
+        <div class="value">${display(party.taxId)}</div>
+      </div>
+      <div class="col" style="width: 18%">
+        <div class="label">Inscrição municipal</div>
+        <div class="value">${display(party.municipalRegistration)}</div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col" style="width: 57%">
+        <div class="label">Endereço</div>
+        <div class="value-normal">${display(party.address)}</div>
+      </div>
+      <div class="col" style="width: 25%">
+        <div class="label">Município / UF</div>
+        <div class="value-normal">${display(cityState(party))}</div>
+      </div>
+      <div class="col" style="width: 18%">
+        <div class="label">CEP</div>
+        <div class="value-normal">${display(party.postalCode)}</div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col" style="width: 18%">
+        <div class="label">Telefone</div>
+        <div class="value-normal">${display(party.phone)}</div>
+      </div>
+      <div class="col" style="width: 82%">
+        <div class="label">E-mail</div>
+        <div class="value-normal">${display(party.email)}</div>
+      </div>
+    </div>`;
+}
+
+function issqnRows(view: DanfseView) {
+  if (!view.issqnApplicable) {
+    return '<div style="padding: 4px">TRIBUTAÇÃO MUNICIPAL (ISSQN) — OPERAÇÃO NÃO SUJEITA AO ISSQN</div>';
+  }
+  return `<div class="row">
+      <div class="col" style="width: 15%">
+        <div class="label">Tributação ISSQN</div>
+        <div class="value-normal">${display(view.issqn.taxation)}</div>
+      </div>
+      <div class="col" style="width: 15%">
+        <div class="label">Município incidência</div>
+        <div class="value-normal">${display(view.issqn.cityLabel)}</div>
+      </div>
+      <div class="col" style="width: 15%">
+        <div class="label">Exigibilidade</div>
+        <div class="value-normal">${display(view.issqn.exigibility)}</div>
+      </div>
+      <div class="col" style="width: 15%">
+        <div class="label">Retenção ISSQN</div>
+        <div class="value-normal">${display(view.issqn.retention)}</div>
+      </div>
+      <div class="col" style="width: 15%">
+        <div class="label">Base de cálculo</div>
+        <div class="value-normal">${display(view.issqn.base)}</div>
+      </div>
+      <div class="col" style="width: 10%">
+        <div class="label">Alíquota</div>
+        <div class="value-normal">${display(view.issqn.rate)}</div>
+      </div>
+      <div class="col" style="width: 15%">
+        <div class="label">Valor ISSQN</div>
+        <div class="value-normal">${display(view.issqn.amount)}</div>
+      </div>
+    </div>`;
+}
+
+function federalRows(view: DanfseView) {
+  if (!view.federalPresent) {
+    return '<div style="padding: 4px">—</div>';
+  }
+  return `<div class="row">
+      <div class="col" style="width: 33%">
+        <div class="label">IRRF</div>
+        <div class="value-normal">${display(view.federal.irrf)}</div>
+      </div>
+      <div class="col" style="width: 33%">
+        <div class="label">Contribuição previdenciária retida</div>
+        <div class="value-normal">${display(view.federal.cp)}</div>
+      </div>
+      <div class="col" style="width: 33%">
+        <div class="label">Contribuições sociais retidas</div>
+        <div class="value-normal">${display(view.federal.social)}</div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col" style="width: 33%">
+        <div class="label">PIS</div>
+        <div class="value-normal">${display(view.federal.pis)}</div>
+      </div>
+      <div class="col" style="width: 33%">
+        <div class="label">COFINS</div>
+        <div class="value-normal">${display(view.federal.cofins)}</div>
+      </div>
+      <div class="col" style="width: 33%">
+        <div class="label">Total das retenções federais</div>
+        <div class="value-normal">${display(view.federalRetentionTotal)}</div>
+      </div>
+    </div>`;
+}
+
+function ibsCbsRows(view: DanfseView) {
+  if (!view.ibsCbsPresent) {
+    return '<div style="padding: 4px">—</div>';
+  }
+  const entries = Object.entries(view.ibsCbs);
+  if (entries.length === 0) return '<div style="padding: 4px">—</div>';
+  return `<div style="padding: 4px">${entries
+    .map(([key, value]) => `<div>${escapeHtml(key)}: ${display(value)}</div>`)
+    .join('')}</div>`;
 }
 
 export async function danfseDocument(view: DanfseView): Promise<string> {
@@ -30,7 +151,7 @@ export async function danfseDocument(view: DanfseView): Promise<string> {
     errorCorrectionLevel: 'M',
   });
   const logoImg = `<img src="${logoUrl}" alt="NFS-e" />`;
-  const qrImg = `<img src="${qrDataUrl}" alt="QR Code" width="86" height="86" />`;
+  const qrImg = `<img src="${qrDataUrl}" alt="QR Code" width="74" height="74" />`;
   const homologationBanner =
     view.environment === 'homologation'
       ? '<div class="homolog">NFS-e SEM VALIDADE JURÍDICA</div>'
@@ -45,53 +166,50 @@ export async function danfseDocument(view: DanfseView): Promise<string> {
   const intermediaryBlock = view.intermediaryPresent
     ? partyRows(view.intermediary)
     : 'INTERMEDIÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e';
-  const issqnBlock = view.issqnApplicable
-    ? `<div>Tipo: ${escapeHtml(view.issqn.taxation)}</div>
-       <div>Alíquota: ${escapeHtml(view.issqn.rate)}</div>
-       <div>Retenção: ${escapeHtml(view.issqn.retention)}</div>`
-    : 'TRIBUTAÇÃO MUNICIPAL (ISSQN) - OPERAÇÃO NÃO SUJEITA AO ISSQN';
 
   const values: Record<string, string> = {
     logo: logoImg,
     qrImage: qrImg,
     homologationBanner,
     accessKey: escapeHtml(view.accessKey),
-    nfseNumber: escapeHtml(view.nfseNumber),
-    competence: escapeHtml(view.competence),
-    nfseIssuedAt: escapeHtml(view.nfseIssuedAt),
-    dpsNumber: escapeHtml(view.dpsNumber),
-    dpsSeries: escapeHtml(view.dpsSeries),
-    dpsIssuedAt: escapeHtml(view.dpsIssuedAt),
-    situation: escapeHtml(view.situation),
-    purpose: escapeHtml(view.purpose),
-    providerName: escapeHtml(view.provider.name),
-    providerTaxId: escapeHtml(view.provider.taxId),
-    providerAddress: escapeHtml(view.provider.address),
-    serviceNationalCode: escapeHtml(view.service.nationalCode),
-    serviceMunicipalCode: escapeHtml(view.service.municipalCode),
-    serviceDescription: escapeHtml(view.service.description),
-    serviceAmount: escapeHtml(view.serviceAmount),
-    discountAmount: escapeHtml(view.discountAmount),
-    federalRetentionTotal: escapeHtml(view.federalRetentionTotal),
-    ibsCbsTotal: escapeHtml(view.ibsCbsTotal),
-    netAmount: escapeHtml(view.netAmount),
+    nfseNumber: display(view.nfseNumber),
+    competence: display(view.competence),
+    nfseIssuedAt: display(view.nfseIssuedAt),
+    dpsNumber: display(view.dpsNumber),
+    dpsSeries: display(view.dpsSeries),
+    dpsIssuedAt: display(view.dpsIssuedAt),
+    situation: display(view.situation),
+    purpose: display(view.purpose),
+    issuerCityName: display(view.issuerCityName),
+    environmentGenerator: display(view.environmentGenerator || 'Sistema Nacional NFS-e'),
+    environmentType: display(view.environmentType || view.environmentLabel),
+    providerName: display(view.provider.name),
+    providerTaxId: display(view.provider.taxId),
+    providerMunicipalRegistration: display(view.provider.municipalRegistration),
+    providerAddressLine: display(view.provider.address),
+    providerCityState: display(cityState(view.provider)),
+    providerPostalCode: display(view.provider.postalCode),
+    providerPhone: display(view.provider.phone),
+    providerEmail: display(view.provider.email),
+    providerSimplesNacional: display(view.provider.simplesNacional),
+    providerSimplesAssessment: display(view.provider.simplesAssessment),
+    serviceNationalCode: display(view.service.nationalCode),
+    serviceMunicipalCode: display(view.service.municipalCode),
+    serviceNbsCode: display(view.service.nbsCode),
+    serviceLocation: display(view.service.location),
+    serviceDescription: escapeHtml(view.service.description) || '—',
+    serviceAmount: display(view.serviceAmount),
+    discountAmount: display(view.discountAmount),
+    federalRetentionTotal: display(view.federalRetentionTotal),
+    ibsCbsTotal: display(view.ibsCbsTotal),
+    netAmount: display(view.netAmount),
     complementaryInfo: escapeHtml(view.complementaryInfo) || '—',
-    federalBlock: view.federalPresent
-      ? `<div>IRRF: ${escapeHtml(view.federal.irrf)}</div>
-         <div>CP: ${escapeHtml(view.federal.cp)}</div>
-         <div>Sociais: ${escapeHtml(view.federal.social)}</div>`
-      : '—',
-    ibsCbsBlock: view.ibsCbsPresent
-      ? Object.entries(view.ibsCbs)
-          .map(([key, value]) => `<div>${escapeHtml(key)}: ${escapeHtml(value)}</div>`)
-          .join('')
-      : '—',
+    federalBlock: federalRows(view),
+    ibsCbsBlock: ibsCbsRows(view),
     takerBlock,
     recipientBlock,
     intermediaryBlock,
-    issqnBlock,
-    issuerCityName: escapeHtml(view.issuerCityName),
-    environmentLabel: escapeHtml(view.environmentLabel),
+    issqnBlock: issqnRows(view),
   };
 
   return Object.entries(values).reduce(

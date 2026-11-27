@@ -50,9 +50,15 @@ export type DanfseParty = {
   email: string;
   phone: string;
   address: string;
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
   city: string;
   state: string;
   postalCode: string;
+  simplesNacional: string;
+  simplesAssessment: string;
 };
 
 export type DanfseIssqn = {
@@ -65,6 +71,7 @@ export type DanfseIssqn = {
   processNumber: string;
   base: string;
   amount: string;
+  exigibility: string;
 };
 
 export type DanfseView = {
@@ -79,6 +86,8 @@ export type DanfseView = {
   purpose: string;
   issuerCityName: string;
   environment: 'homologation' | 'production';
+  environmentGenerator: string;
+  environmentType: string;
   environmentLabel: string;
   provider: DanfseParty;
   taker: DanfseParty;
@@ -89,7 +98,9 @@ export type DanfseView = {
   service: {
     nationalCode: string;
     municipalCode: string;
+    nbsCode: string;
     description: string;
+    location: string;
   };
   issqn: DanfseIssqn;
   issqnApplicable: boolean;
@@ -97,6 +108,8 @@ export type DanfseView = {
     irrf: string;
     cp: string;
     social: string;
+    pis: string;
+    cofins: string;
   };
   federalPresent: boolean;
   ibsCbsPresent: boolean;
